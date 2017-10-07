@@ -1,3 +1,5 @@
+services:
+- dockers
 before_install:
 - go get github.com/golang/lint/golint
 - go get github.com/fzipp/gocyclo
@@ -12,6 +14,7 @@ script:
 - goimports -l -e .
 - go test -v ./...
 - go build -v
+- ./docker-upload.sh
 deploy:
   provider: releases
   api_key:
