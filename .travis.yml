@@ -14,7 +14,7 @@ script:
 - goimports -l -e .
 - go test -v ./...
 - go build -v
-- ./docker-create-upload.sh
+- ./.docker-create-upload.sh
 deploy:
   provider: releases
   api_key:
