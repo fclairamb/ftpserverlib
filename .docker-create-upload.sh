@@ -2,7 +2,7 @@
 
 docker login -u="${DOCKER_USERNAME}" -p="${DOCKER_PASSWORD}"
 
-set -x
+echo "Docker repo: ${DOCKER_REPO}:${TRAVIS_COMMIT::7}"
 
 DOCKER_NAME=${DOCKER_REPO}:${TRAVIS_COMMIT::7}
 
