@@ -2,9 +2,9 @@
 
 docker login -u="${DOCKER_USERNAME}" -p="${DOCKER_PASSWORD}"
 
-echo "Docker repo: ${DOCKER_REPO}:${TRAVIS_COMMIT::7}"
+echo "Docker repo: ${DOCKER_REPO}:${TRAVIS_COMMIT}"
 
-DOCKER_NAME=${DOCKER_REPO}:${TRAVIS_COMMIT::7}
+DOCKER_NAME=${DOCKER_REPO}:${TRAVIS_COMMIT}
 
 docker build -t ${DOCKER_NAME} .
 
