@@ -23,3 +23,8 @@ deploy:
   skip_cleanup: true
   on:
     tags: true
+env:
+  global:
+    - DOCKER_REPO=ftpserver/ftpsserver
+    - DOCKER_USERNAME=ftpserver
+    - secure: "PEf2IMYf4B+q9Sycv7JAboZS6J2U+Kqg3aIS5rQWU03cl/v61gSIc45BEXkteNJDN255W5BCh8lXP120FXRafP2eOXmStPHj6VkGZZmnih5GKWAfddkxCPgxV/y6aI1vtpiRbeuhocad5Tq7S+Sbs5gs+zBM8E57oZeFygZBcS6lAYkGpOA86KRowvfxinNJsmF0RvB1uASmqTkvZ7YM+w7vwox6tS4+fpHVgn5vyuBZtWOxdcgEJehBzvnzCr1lc43YkAgtA9pse6A/tlMVj96xm3mhu2r48dwVG17bry9Kp5oiCQzMk48rn/VVAJQoqbTMd4ijyLvwuT2nZqayuHavswbLGV4CjEOqxe/JDhb0feXkGEEqZcc1yJYAqJRY/l1NqghAUoLluVxPvQRJewzEmCDwDzViDhl7lJUuCYFgEo9fcM0kHTDXDgMehfN+LpkSHOdAq+RpOeeyJxWGw8VGg/G18syQ5Bv/JIJfOVhxJ9yPZEm6j+XCFKukLqo+lYuJ7XvLDcFmpcQrbsxkKB7fbj56dchSlB0qi9l1AUG9DG2l86phXLQBz1WMGEL2JR74sys/S+FA1vyyPQEHTFf4MbbApe/WiqzdrhHdtkMRNBJgCRlfxrj/5W9qQzv0R5zx0u3LBdfyBeR009Gl+TYnahRdx1aXMxcbeBaY5zY=" # DOCKER_PASSWORD
