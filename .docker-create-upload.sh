@@ -1,5 +1,8 @@
 #!/bin/sh -e
 
+file ftpserver
+ls -lh ftpserver
+
 docker login -u="${DOCKER_USERNAME}" -p="${DOCKER_PASSWORD}"
 
 echo "Docker repo: ${DOCKER_REPO}:${TRAVIS_COMMIT}"
