@@ -1,5 +1,6 @@
 #!/bin/sh -e
 
+uname -a
 file ftpserver
 ls -lh ftpserver
 
@@ -26,3 +27,5 @@ fi
 docker tag ${DOCKER_NAME} ${DOCKER_REPO}:${DOCKER_TAG}
 
 docker push ${DOCKER_REPO}
+
+docker run -ti ${DOCKER_NAME}
