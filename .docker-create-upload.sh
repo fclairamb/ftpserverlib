@@ -1,5 +1,6 @@
 #!/bin/sh -e
 
+CGO_ENABLED=0 go build -a -installsuffix cgo
 uname -a
 file ftpserver
 ls -lh ftpserver
