@@ -7,10 +7,8 @@ if [ "$version" != "go1.9" ]; then
     exit 0
 fi
 
-GOOS=linux CGO_ENABLED=0 go build -a -installsuffix cgo
-#uname -a
-#file ftpserver
-#ls -lh ftpserver
+GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -a -installsuffix cgo
+# GOOS=linux GOARCH=arm CGO_ENABLED=0 go build -a -installsuffix cgo
 
 docker login -u="${DOCKER_USERNAME}" -p="${DOCKER_PASSWORD}"
 
