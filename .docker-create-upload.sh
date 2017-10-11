@@ -36,4 +36,4 @@ docker tag ${DOCKER_NAME} ${DOCKER_REPO}:${DOCKER_TAG}
 
 docker push ${DOCKER_REPO}
 
-docker run -ti ${DOCKER_NAME}
+#docker run -ti ${DOCKER_NAME}
