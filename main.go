@@ -27,11 +27,16 @@ func main() {
 	driver, err := sample.NewSampleDriver()
 
 	confFile := flag.String("conf", "", "Configuration file")
+	dataDir := flag.String("data", "", "Data directory")
 
 	flag.Parse()
 
 	if *confFile != "" {
 		driver.SettingsFile = *confFile
+	}
+
+	if *dataDir != "" {
+		driver.BaseDir = *dataDir
 	}
 
 	level.Info(logger).Log("msg", "Sample server")

@@ -22,7 +22,7 @@ import (
 type MainDriver struct {
 	Logger       log.Logger  // Logger (probably shared with other components)
 	SettingsFile string      // Settings file
-	baseDir      string      // Base directory from which to serve file
+	BaseDir      string      // Base directory from which to serve file
 	tlsConfig    *tls.Config // TLS config (if applies)
 }
 
@@ -30,7 +30,7 @@ type MainDriver struct {
 func (driver *MainDriver) WelcomeUser(cc server.ClientContext) (string, error) {
 	cc.SetDebug(true)
 	// This will remain the official name for now
-	return fmt.Sprintf("Welcome on ftpserver, you're on dir %s", driver.baseDir), nil
+	return fmt.Sprintf("Welcome on ftpserver, you're on dir %s", driver.BaseDir), nil
 }
 
 // AuthUser authenticates the user and selects an handling driver
@@ -66,13 +66,13 @@ func (driver *MainDriver) ChangeDirectory(cc server.ClientContext, directory str
 	} else if directory == "/virtual" {
 		return nil
 	}
-	_, err := os.Stat(driver.baseDir + directory)
+	_, err := os.Stat(driver.BaseDir + directory)
 	return err
 }
 
 // MakeDirectory creates a directory
 func (driver *MainDriver) MakeDirectory(cc server.ClientContext, directory string) error {
-	return os.Mkdir(driver.baseDir+directory, 0777)
+	return os.Mkdir(driver.BaseDir+directory, 0777)
 }
 
 // ListFiles lists the files of a directory
@@ -95,7 +95,7 @@ func (driver *MainDriver) ListFiles(cc server.ClientContext) ([]os.FileInfo, err
 		return files, nil
 	}
 
-	path := driver.baseDir + cc.Path()
+	path := driver.BaseDir + cc.Path()
 
 	files, err := ioutil.ReadDir(path)
 
@@ -120,10 +120,10 @@ func (driver *MainDriver) UserLeft(cc server.ClientContext) {
 func (driver *MainDriver) OpenFile(cc server.ClientContext, path string, flag int) (server.FileStream, error) {
 
 	if path == "/virtual/localpath.txt" {
-		return &virtualFile{content: []byte(driver.baseDir)}, nil
+		return &virtualFile{content: []byte(driver.BaseDir)}, nil
 	}
 
-	path = driver.baseDir + path
+	path = driver.BaseDir + path
 
 	// If we are writing and we are not in append mode, we should remove the file
 	if (flag & os.O_WRONLY) != 0 {
@@ -138,7 +138,7 @@ func (driver *MainDriver) OpenFile(cc server.ClientContext, path string, flag in
 
 // GetFileInfo gets some info around a file or a directory
 func (driver *MainDriver) GetFileInfo(cc server.ClientContext, path string) (os.FileInfo, error) {
-	path = driver.baseDir + path
+	path = driver.BaseDir + path
 
 	return os.Stat(path)
 }
@@ -150,22 +150,22 @@ func (driver *MainDriver) CanAllocate(cc server.ClientContext, size int) (bool, 
 
 // ChmodFile changes the attributes of the file
 func (driver *MainDriver) ChmodFile(cc server.ClientContext, path string, mode os.FileMode) error {
-	path = driver.baseDir + path
+	path = driver.BaseDir + path
 
 	return os.Chmod(path, mode)
 }
 
 // DeleteFile deletes a file or a directory
 func (driver *MainDriver) DeleteFile(cc server.ClientContext, path string) error {
-	path = driver.baseDir + path
+	path = driver.BaseDir + path
 
 	return os.Remove(path)
 }
 
 // RenameFile renames a file or a directory
 func (driver *MainDriver) RenameFile(cc server.ClientContext, from, to string) error {
-	from = driver.baseDir + from
-	to = driver.baseDir + to
+	from = driver.BaseDir + from
+	to = driver.BaseDir + to
 
 	return os.Rename(from, to)
 }
@@ -211,9 +211,12 @@ func NewSampleDriver() (*MainDriver, error) {
 	driver := &MainDriver{
 		Logger:       log.NewNopLogger(),
 		SettingsFile: "sample/conf/settings.toml",
-		baseDir:      dir,
+		BaseDir:      dir,
 	}
-	os.MkdirAll(driver.baseDir, 0777)
+
+	// This is also a good time to create our dir
+	os.MkdirAll(driver.BaseDir, 0777)
+
 	return driver, nil
 }
 
