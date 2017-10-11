@@ -1,9 +1,16 @@
 #!/bin/sh -e
 
+version=$(go version|grep -Eo go[0-9\.]+)
+
+if [ "$version" != "go1.9" ]; then
+    echo "Container are only generated for version 1.9 and you have ${version}."
+    exit 0
+fi
+
 CGO_ENABLED=0 go build -a -installsuffix cgo
-uname -a
-file ftpserver
-ls -lh ftpserver
+#uname -a
+#file ftpserver
+#ls -lh ftpserver
 
 docker login -u="${DOCKER_USERNAME}" -p="${DOCKER_PASSWORD}"
 
