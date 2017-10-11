@@ -26,9 +26,13 @@ func main() {
 
 	driver, err := sample.NewSampleDriver()
 
-	flag.StringVar(&driver.SettingsFile, "conf", "/etc/ftpserver.conf", "Configuration file")
+	confFile := flag.String("conf", "", "Configuration file")
 
 	flag.Parse()
+
+	if *confFile != "" {
+		driver.SettingsFile = *confFile
+	}
 
 	level.Info(logger).Log("msg", "Sample server")
 
