@@ -7,7 +7,7 @@ if [ "$version" != "go1.9" ]; then
     exit 0
 fi
 
-CGO_ENABLED=0 go build -a -installsuffix cgo
+GOOS=linux CGO_ENABLED=0 go build -a -installsuffix cgo
 #uname -a
 #file ftpserver
 #ls -lh ftpserver

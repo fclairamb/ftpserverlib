@@ -18,17 +18,20 @@ var (
 )
 
 func main() {
-	flag.Parse()
-
 	logger := log.With(
 		log.NewLogfmtLogger(log.NewSyncWriter(os.Stdout)),
 		"ts", log.DefaultTimestampUTC,
 		"caller", log.DefaultCaller,
 	)
 
+	driver, err := sample.NewSampleDriver()
+
+	flag.StringVar(&driver.SettingsFile, "conf", "/etc/ftpserver.conf", "Configuration file")
+
+	flag.Parse()
+
 	level.Info(logger).Log("msg", "Sample server")
 
-	driver, err := sample.NewSampleDriver()
 	if err != nil {
 		level.Error(logger).Log("msg", "Could not load the driver", "err", err)
 		return

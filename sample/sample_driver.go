@@ -20,9 +20,10 @@ import (
 
 // MainDriver defines a very basic serverftp driver
 type MainDriver struct {
-	Logger    log.Logger
-	baseDir   string
-	tlsConfig *tls.Config
+	Logger       log.Logger  // Logger (probably shared with other components)
+	SettingsFile string      // Settings file
+	baseDir      string      // Base directory from which to serve file
+	tlsConfig    *tls.Config // TLS config (if applies)
 }
 
 // WelcomeUser is called to send the very first welcome message
@@ -171,7 +172,7 @@ func (driver *MainDriver) RenameFile(cc server.ClientContext, from, to string) e
 
 // GetSettings returns some general settings around the server setup
 func (driver *MainDriver) GetSettings() *server.Settings {
-	f, err := os.Open("sample/conf/settings.toml")
+	f, err := os.Open(driver.SettingsFile)
 	if err != nil {
 		panic(err)
 	}
@@ -208,8 +209,9 @@ func NewSampleDriver() (*MainDriver, error) {
 	}
 
 	driver := &MainDriver{
-		baseDir: dir,
-		Logger:  log.NewNopLogger(),
+		Logger:       log.NewNopLogger(),
+		SettingsFile: "sample/conf/settings.toml",
+		baseDir:      dir,
 	}
 	os.MkdirAll(driver.baseDir, 0777)
 	return driver, nil
