@@ -33,12 +33,16 @@ fi
 docker tag ${DOCKER_NAME} ${DOCKER_REPO}:${DOCKER_TAG}
 
 # Let's check that the container is actually fully usable
-docker run -d -p 2121-2200:2121-2200 ${DOCKER_NAME}
+docker rm -f ftpserver
+docker run -d -p 2121-2200:2121-2200 --name=ftpserver ${DOCKER_NAME}
 
 # We wait for the server to reply
-for i in $(seq 1 10)
+for i in $(seq 1 30)
 do
-  echo "QUIT" | nc -w 1 localhost 2121 && break
+  out=$(echo "QUIT" | nc localhost 2121 -w 1)
+  if [[ "${out}" == *"220 "* ]]; then
+    break
+  fi
   sleep 1
 done
 
