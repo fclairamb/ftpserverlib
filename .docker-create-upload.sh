@@ -47,7 +47,7 @@ do
 done
 
 # Checking that by default the localpath is the "/data" directory
-path=$(curl ftp://test:test@localhost:2121/virtual/localpath.txt)
+path=$(curl -s ftp://test:test@localhost:2121/virtual/localpath.txt)
 if [ "${path}" != "/data" ]; then
     echo "The path is wrong: ${path}"
     exit 1
