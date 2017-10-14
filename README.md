@@ -41,11 +41,7 @@ container (less than 15MB image, based on alpine):
 mkdir data
 
 # Starting the sample FTP server
-docker run \
-  -d                         # Daemon mode
-  -p 2121-2200:2121-2200 \   # Listening on 2121 + other ports for transfer
-  -v $(pwd)/data:/data \     # Saving files in the local data dir
-  ftpserver/ftpserver
+docker run -d -p 2121-2200:2121-2200 -v $(pwd)/data:/data fclairamb/ftpserver:travis-171
 
 # Connecting to it and uploading a file
 ftp ftp://test:test@localhost:2121
