@@ -1,4 +1,4 @@
-#!/bin/sh -e
+#!/bin/sh -ex
 
 version=$(go version|grep -Eo go[0-9\.]+)
 
