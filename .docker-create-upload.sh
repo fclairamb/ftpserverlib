@@ -33,7 +33,7 @@ fi
 docker tag ${DOCKER_NAME} ${DOCKER_REPO}:${DOCKER_TAG}
 
 # Let's check that the container is actually fully usable
-docker rm -f ftpserver ||:
+docker rm -f ftpserver 2>/dev/null ||:
 docker run -d -p 2121-2200:2121-2200 --name=ftpserver ${DOCKER_NAME}
 
 # We wait for the server to reply
