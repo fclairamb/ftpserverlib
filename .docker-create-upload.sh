@@ -3,7 +3,7 @@
 version=$(go version|grep -Eo go[0-9\.]+)
 
 if [ "$version" != "go1.9" ]; then
-    echo "Container are only generated for version 1.9 and you have ${version}."
+    echo "Docker images are only generated for Go 1.9 and you have ${version}."
     exit 0
 fi
 
@@ -32,6 +32,34 @@ fi
 
 docker tag ${DOCKER_NAME} ${DOCKER_REPO}:${DOCKER_TAG}
 
-docker push ${DOCKER_REPO}
+# Let's check that the container is actually fully usable
+docker run -d -p 2121-2200:2121-2200 ${DOCKER_NAME}
 
-#docker run -ti ${DOCKER_NAME}
+# We wait for the server to reply
+for i in $(seq 1 10)
+do
+  echo "QUIT" | nc -w 1 localhost 2121 && break
+  sleep 1
+done
+
+# Checking that by default the localpath is the "/data" directory
+path=$(curl ftp://test:test@localhost:2121/virtual/localpath.txt)
+if [ "${path}" != "/data" ]; then
+    echo "The path is wrong: ${path}"
+    exit 1
+fi
+
+# Checking that upload/download is working fine
+chk_before=$(shasum ftpserver| cut -d " " -f 1)
+curl -s -T ftpserver ftp://test:test@localhost:2121/upload
+curl -s -o ftpserver_downloaded ftp://test:test@localhost:2121/upload
+chk_after=$(shasum ftpserver_downloaded| cut -d " " -f 1)
+if [ "${chk_before}" != "${chk_after}" ]; then
+    echo "Checksum mismatch"
+    exit 1
+fi
+
+# Check the file listing is working fine
+curl ftp://test:test@localhost:2121/
+
+docker push ${DOCKER_REPO}
