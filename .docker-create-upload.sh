@@ -64,6 +64,6 @@ if [ "${chk_before}" != "${chk_after}" ]; then
 fi
 
 # Check the file listing is working fine
-curl ftp://test:test@localhost:2121/
+curl -s ftp://test:test@localhost:2121/
 
 docker push ${DOCKER_REPO}
