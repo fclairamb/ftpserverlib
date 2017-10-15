@@ -20,8 +20,8 @@ docker build -t ${DOCKER_NAME} .
 
 docker tag ${DOCKER_NAME} ${DOCKER_REPO}:travis-${TRAVIS_BUILD_NUMBER}
 
-if [ "${TRAVIS_TAG}" = "" ]; then
-    if [ "${TRAVIS_BRANCH}" = "master" ]; then
+if [[ "${TRAVIS_TAG}" = "" ]]; then
+    if [[ "${TRAVIS_BRANCH}" = "master" ]]; then
         DOCKER_TAG=latest
     else
         DOCKER_TAG=${TRAVIS_BRANCH}
@@ -32,12 +32,14 @@ fi
 
 docker tag ${DOCKER_NAME} ${DOCKER_REPO}:${DOCKER_TAG}
 
+# If you execute locally:
+# docker rm -f ftpserver 2>/dev/null ||:
+
 # Let's check that the container is actually fully usable
-docker rm -f ftpserver 2>/dev/null ||:
 docker run -d -p 2121-2200:2121-2200 --name=ftpserver ${DOCKER_NAME}
 
-# We wait for the server to reply
-for i in $(seq 1 30)
+# We wait for the server to be ready
+for (( i=0; i < 30; i++))
 do
   out=$(echo "QUIT" | nc localhost 2121 -w 1)
   if [[ "${out}" == *"220 "* ]]; then
