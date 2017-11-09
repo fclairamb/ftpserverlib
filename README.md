@@ -113,7 +113,7 @@ type ClientContext interface {
 	Debug() bool
 
 	// SetID changes current connection external identifier
-    	SetID(id interface{})
+  SetID(id interface{})
 
 	// Returns external client's ID
 	ID() interface{}
