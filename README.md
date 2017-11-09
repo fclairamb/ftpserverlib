@@ -111,6 +111,15 @@ type ClientContext interface {
 
 	// Debug returns the current debugging status of this connection commands
 	Debug() bool
+
+    // SetID changes current connection external identifier
+    SetID(id interface{})
+
+    // Returns external client's ID
+    ID() interface{}
+
+    // Client's address
+    RemoteAddr() net.Addr
 }
 
 // FileStream is a read or write closeable stream

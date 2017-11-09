@@ -14,7 +14,8 @@ import (
 )
 
 type clientHandler struct {
-	id          uint32               // ID of the client
+	id          uint32               // Internal ID of the client
+	extID       interface{}          // External ID of the client
 	daddy       *FtpServer           // Server on which the connection was accepted
 	driver      ClientHandlingDriver // Client handling driver
 	conn        net.Conn             // TCP connection
@@ -76,9 +77,14 @@ func (c *clientHandler) SetDebug(debug bool) {
 	c.debug = debug
 }
 
-// ID provides the client's ID
-func (c *clientHandler) ID() uint32 {
-	return c.id
+// SetID changes current connection external identifier
+func (c *clientHandler) SetID(id interface{}) {
+	c.extID = id
+}
+
+// ID provides the external client's ID
+func (c *clientHandler) ID() interface{} {
+	return c.extID
 }
 
 // RemoteAddr returns the remote network address.
