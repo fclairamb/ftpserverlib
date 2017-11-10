@@ -213,3 +213,8 @@ func (server *FtpServer) clientDeparture(c *clientHandler) {
 	nb := int(atomic.AddInt32(&server.clientsNb, -1))
 	level.Info(c.logger).Log(logKeyMsg, "FTP Client disconnected", logKeyAction, "ftp.disconnected", "clientIp", c.conn.RemoteAddr(), "total", nb)
 }
+
+// ActiveSessions returns amount of current active sessions on server
+func (server *FtpServer) ActiveSessions() int {
+	return int(atomic.LoadInt32(&server.clientsNb))
+}
