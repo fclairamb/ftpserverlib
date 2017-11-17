@@ -194,7 +194,9 @@ func (server *FtpServer) receiveConnection(conn net.Conn) error {
 	c := server.newClientHandler(conn, id)
 	go c.HandleCommands()
 
+	c.connMu.RLock()
 	level.Info(c.logger).Log(logKeyMsg, "FTP Client connected", logKeyAction, "ftp.connected", "clientIp", c.conn.RemoteAddr(), "total", nb)
+	c.connMu.RUnlock()
 
 	return nil
 }
@@ -211,5 +213,7 @@ func (server *FtpServer) clientArrival(c *clientHandler) error {
 // clientDeparture
 func (server *FtpServer) clientDeparture(c *clientHandler) {
 	nb := int(atomic.AddInt32(&server.clientsNb, -1))
+	c.connMu.RLock()
 	level.Info(c.logger).Log(logKeyMsg, "FTP Client disconnected", logKeyAction, "ftp.disconnected", "clientIp", c.conn.RemoteAddr(), "total", nb)
+	c.connMu.RUnlock()
 }
