@@ -11,9 +11,11 @@ import (
 func (c *clientHandler) handleAUTH() {
 	if tlsConfig, err := c.daddy.driver.GetTLSConfig(); err == nil {
 		c.writeMessage(234, "AUTH command ok. Expecting TLS Negotiation.")
+		c.connMu.Lock()
 		c.conn = tls.Server(c.conn, tlsConfig)
 		c.reader = bufio.NewReader(c.conn)
 		c.writer = bufio.NewWriter(c.conn)
+		c.connMu.Unlock()
 	} else {
 		c.writeMessage(550, fmt.Sprintf("Cannot get a TLS config: %v", err))
 	}
@@ -58,12 +60,14 @@ func (c *clientHandler) handleSTATServer() {
 	c.writeLine("213- FTP server status:")
 	duration := time.Now().UTC().Sub(c.connectedAt)
 	duration -= duration % time.Second
+	c.connMu.RLock()
 	c.writeLine(fmt.Sprintf(
 		"Connected to %s from %s for %s",
 		c.daddy.settings.ListenAddr,
 		c.conn.RemoteAddr(),
 		duration,
 	))
+	c.connMu.RUnlock()
 	if c.user != "" {
 		c.writeLine(fmt.Sprintf("Logged in as %s", c.user))
 	} else {

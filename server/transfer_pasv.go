@@ -86,7 +86,10 @@ func (c *clientHandler) handlePASV() {
 
 		// If we don't have an IP address, we can take the one that was used for the current connection
 		if ip == "" {
+			c.connMu.RLock()
 			ip = strings.Split(c.conn.LocalAddr().String(), ":")[0]
+			c.connMu.RUnlock()
+			
 		}
 
 		quads := strings.Split(ip, ".")
