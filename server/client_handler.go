@@ -18,7 +18,7 @@ type clientHandler struct {
 	id          uint32               // ID of the client
 	daddy       *FtpServer           // Server on which the connection was accepted
 	driver      ClientHandlingDriver // Client handling driver
-	connMu sync.RWMutex
+	connMu      sync.RWMutex         // mutex for TCP connection
 	conn        net.Conn             // TCP connection
 	writer      *bufio.Writer        // Writer on the TCP connection
 	reader      *bufio.Reader        // Reader on the TCP connection
