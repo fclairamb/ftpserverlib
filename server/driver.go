@@ -26,6 +26,9 @@ type MainDriver interface {
 	// GetTLSConfig returns a TLS Certificate to use
 	// The certificate could frequently change if we use something like "let's encrypt"
 	GetTLSConfig() (*tls.Config, error)
+
+	// ActiveSessions returns amount of current active sessions on server
+	ActiveSessions() int
 }
 
 // ClientHandlingDriver handles the file system access logic

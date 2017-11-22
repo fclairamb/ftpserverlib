@@ -197,3 +197,8 @@ func (server *FtpServer) clientArrival(conn net.Conn) error {
 func (server *FtpServer) clientDeparture(c *clientHandler) {
 	level.Info(c.logger).Log(logKeyMsg, "FTP Client disconnected", logKeyAction, "ftp.disconnected", "clientIp", c.conn.RemoteAddr())
 }
+
+// ActiveSessions returns amount of current active sessions on server
+func (server *FtpServer) ActiveSessions() int {
+	return int(atomic.LoadInt32(&server.clientsNb))
+}
