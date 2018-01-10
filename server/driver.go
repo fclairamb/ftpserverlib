@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"crypto/tls"
 	"io"
 	"net"
@@ -71,6 +72,12 @@ type ClientContext interface {
 
 	// Client's ID on the server
 	ID() uint32
+
+	// Context returns currently embed context. Always non-nil
+	Context() context.Context
+
+	// SetContext set up current context to passed one. Passed ctx should be non-nil
+	SetContext(ctx context.Context)
 
 	// Client's address
 	RemoteAddr() net.Addr

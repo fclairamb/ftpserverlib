@@ -9,6 +9,8 @@ import (
 	"strings"
 	"time"
 
+	"context"
+
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 )
@@ -31,6 +33,7 @@ type clientHandler struct {
 	transfer    transferHandler      // Transfer connection (only passive is implemented at this stage)
 	transferTLS bool                 // Use TLS for transfer connection
 	logger      log.Logger           // Client handler logging
+	ctx         context.Context      // Client context
 }
 
 // newClientHandler initializes a client handler when someone connects
@@ -79,6 +82,22 @@ func (c *clientHandler) SetDebug(debug bool) {
 // ID provides the client's ID
 func (c *clientHandler) ID() uint32 {
 	return c.id
+}
+
+// Context returns currently embed context. Always non-nil
+func (c *clientHandler) Context() context.Context {
+	if c.ctx != nil {
+		return c.ctx
+	}
+	return context.Background()
+}
+
+// SetContext set up current context to passed one. Passed ctx should be non-nil
+func (c *clientHandler) SetContext(ctx context.Context) {
+	if ctx == nil {
+		panic("nil context passed")
+	}
+	c.ctx = ctx
 }
 
 // RemoteAddr returns the remote network address.
