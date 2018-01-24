@@ -1,8 +1,8 @@
 services:
 - dockers
 before_install:
-- go get github.com/golang/lint/golint
-- go get github.com/fzipp/gocyclo
+- go get -u gopkg.in/alecthomas/gometalinter.v2
+- gometalinter.v2 --install
 - go get golang.org/x/tools/cmd/goimports
 language: go
 go:
@@ -10,7 +10,7 @@ go:
 - 1.9.x
 script:
 - ./.check-fmt.sh
-- gocyclo -over 15 .
+- gometalinter.v2 ./...
 - goimports -l -e .
 - go test -race -v ./...
 - go build -v

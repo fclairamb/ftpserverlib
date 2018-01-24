@@ -7,18 +7,18 @@ import (
 	"io"
 	"net"
 	"strings"
+	"sync"
 	"time"
 
-	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
+	"github.com/sirupsen/logrus"
 )
 
 type clientHandler struct {
 	id          uint32               // ID of the client
+	transferTLS bool                 // Use TLS for transfer connection
 	daddy       *FtpServer           // Server on which the connection was accepted
 	driver      ClientHandlingDriver // Client handling driver
 	conn        net.Conn             // TCP connection
-	writer      *bufio.Writer        // Writer on the TCP connection
 	reader      *bufio.Reader        // Reader on the TCP connection
 	user        string               // Authenticated user
 	path        string               // Current path
@@ -27,33 +27,29 @@ type clientHandler struct {
 	connectedAt time.Time            // Date of connection
 	ctxRnfr     string               // Rename from
 	ctxRest     int64                // Restart point
-	debug       bool                 // Show debugging info on the server side
 	transfer    transferHandler      // Transfer connection (only passive is implemented at this stage)
-	transferTLS bool                 // Use TLS for transfer connection
-	logger      log.Logger           // Client handler logging
+	logger      *logrus.Entry        // Client handler logging
+	mtx         sync.Mutex
+	done        chan struct{}
 }
 
 // newClientHandler initializes a client handler when someone connects
-func (server *FtpServer) newClientHandler(connection net.Conn, id uint32) *clientHandler {
-
-	p := &clientHandler{
+func (server *FtpServer) newClientHandler(conn net.Conn, id uint32, log *logrus.Entry) *clientHandler {
+	ch := &clientHandler{
 		daddy:       server,
-		conn:        connection,
+		conn:        conn,
 		id:          id,
-		writer:      bufio.NewWriter(connection),
-		reader:      bufio.NewReader(connection),
+		reader:      bufio.NewReader(conn),
 		connectedAt: time.Now().UTC(),
 		path:        "/",
-		logger:      log.With(server.Logger, "clientId", id),
+		logger:      log.WithFields(logrus.Fields{"clientId": id, "clientIp": conn.RemoteAddr()}),
+		done:        make(chan struct{}),
 	}
 
-	// Just respecting the existing logic here, this could be probably be dropped at some point
+	ch.logger.WithField(logKeyAction, "ftp.connected").Info("FTP Client connected")
+	go ch.handleCommands()
 
-	return p
-}
-
-func (c *clientHandler) disconnect() {
-	c.conn.Close()
+	return ch
 }
 
 // Path provides the current working directory of the client
@@ -68,12 +64,16 @@ func (c *clientHandler) SetPath(path string) {
 
 // Debug defines if we will list all interaction
 func (c *clientHandler) Debug() bool {
-	return c.debug
+	return c.logger.Logger.Level == logrus.DebugLevel
 }
 
 // SetDebug changes the debug flag
 func (c *clientHandler) SetDebug(debug bool) {
-	c.debug = debug
+	if debug {
+		c.logger.Logger.SetLevel(logrus.DebugLevel)
+	} else {
+		c.logger.Logger.SetLevel(logrus.InfoLevel)
+	}
 }
 
 // ID provides the client's ID
@@ -91,138 +91,202 @@ func (c *clientHandler) LocalAddr() net.Addr {
 	return c.conn.LocalAddr()
 }
 
-func (c *clientHandler) end() {
-	c.daddy.driver.UserLeft(c)
-	c.daddy.clientDeparture(c)
-	if c.transfer != nil {
-		c.transfer.Close()
+// Close closes all open connections for the client.
+func (c *clientHandler) Close() {
+	c.mtx.Lock()
+	defer c.mtx.Unlock()
+
+	select {
+	case <-c.done:
+		// Already closed
+		return
+	default:
+	}
+
+	c.logger.WithField(logKeyAction, "ftp.disconnected").Info("FTP Client disconnected")
+	if err := c.conn.Close(); err != nil {
+		c.logger.WithField(logKeyAction, "ftp.close_error").Error("Network close error ", err)
+	}
+
+	c.transferCloseLocked()
+	close(c.done)
+}
+
+func (c *clientHandler) isDone() bool {
+	c.mtx.Lock()
+	defer c.mtx.Unlock()
+
+	select {
+	case <-c.done:
+		return true
+	default:
+		return false
 	}
 }
 
-// HandleCommands reads the stream of commands
-func (c *clientHandler) HandleCommands() {
-	defer c.end()
+// end cleans up the client resources and then notifies the server.
+func (c *clientHandler) end() {
+	c.Close()
+	c.daddy.driver.UserLeft(c)
+	c.daddy.clientDeparture(c)
+}
 
-	if msg, err := c.daddy.driver.WelcomeUser(c); err == nil {
-		c.writeMessage(220, msg)
-	} else {
-		c.writeMessage(500, msg)
+func (c *clientHandler) sendWelcome() error {
+	msg, err := c.daddy.driver.WelcomeUser(c)
+	if err != nil {
+		if err2 := c.writeMessage(500, err.Error()); err2 != nil {
+			c.logger.Error(err2)
+		}
+		return err
+	}
+
+	return c.writeMessage(220, msg)
+}
+
+// handleCommands reads the stream of commands
+func (c *clientHandler) handleCommands() {
+	defer c.end()
+	if err := c.sendWelcome(); err != nil {
+		c.logger.Error(err)
 		return
 	}
 
-	for {
-		if c.reader == nil {
-			if c.debug {
-				level.Debug(c.logger).Log(logKeyMsg, "Clean disconnect", logKeyAction, "ftp.disconnect", "clean", true)
-			}
-			return
-		}
-
-		// florent(2018-01-14): #58: IDLE timeout: Preparing the deadline before we read
+	for !c.daddy.Stopped() && !c.isDone() {
 		if c.daddy.settings.IdleTimeout > 0 {
-			c.conn.SetDeadline(time.Now().Add(time.Duration(time.Second.Nanoseconds() * int64(c.daddy.settings.IdleTimeout))))
+			c.setDeadline(time.Now().Add(time.Duration(c.daddy.settings.IdleTimeout) * time.Second))
 		}
 
 		line, err := c.reader.ReadString('\n')
-
-		if err != nil {
-			// florent(2018-01-14): #58: IDLE timeout: Adding some code to deal with the deadline
-			switch err := err.(type) {
-			case net.Error:
-				if err.Timeout() {
-					// We have to extend the deadline now
-					c.conn.SetDeadline(time.Now().Add(time.Minute))
-					level.Info(c.logger).Log(logKeyMsg, "IDLE timeout", logKeyAction, "ftp.idle_timeout", "err", err)
-					c.writeMessage(421, fmt.Sprintf("command timeout (%d seconds): closing control connection", c.daddy.settings.IdleTimeout))
-					if err := c.writer.Flush(); err != nil {
-						level.Error(c.logger).Log(logKeyMsg, "Network flush error", logKeyAction, "ftp.flush_error", "err", err)
-					}
-					if err := c.conn.Close(); err != nil {
-						level.Error(c.logger).Log(logKeyMsg, "Network close error", logKeyAction, "ftp.close_error", "err", err)
-					}
-					break
-				}
-				level.Error(c.logger).Log(logKeyMsg, "Network error", logKeyAction, "ftp.net_error", "err", err)
-			default:
-				if err == io.EOF {
-					if c.debug {
-						level.Debug(c.logger).Log(logKeyMsg, "TCP disconnect", logKeyAction, "ftp.disconnect", "clean", false)
-					}
-				} else {
-					level.Error(c.logger).Log(logKeyMsg, "Read error", logKeyAction, "ftp.read_error", "err", err)
-				}
-			}
+		if c.daddy.Stopped() || c.isDone() {
 			return
 		}
 
-		if c.debug {
-			level.Debug(c.logger).Log(logKeyMsg, "FTP RECV", logKeyAction, "ftp.cmd_recv", "line", line)
+		if err != nil {
+			c.handleReadError(err)
+			return
 		}
 
-		c.handleCommand(line)
+		line = strings.TrimRight(line, "\r\n")
+		c.logger.WithFields(logrus.Fields{logKeyAction: "ftp.cmd_recv", "line": line}).Debug("FTP RECV")
+		if err := c.handleCommand(line); err != nil {
+			c.logger.WithField(logKeyAction, "ftp.handle_cmd").Errorf("Command %q failed (%v)", line, err)
+			return
+		}
+	}
+}
+
+func (c *clientHandler) setDeadline(deadline time.Time) {
+	if err := c.conn.SetDeadline(deadline); err != nil {
+		c.logger.WithField(logKeyAction, "ftp.set_deadline").Error(err)
+	}
+}
+
+func (c *clientHandler) handleReadError(err error) {
+	switch err := err.(type) {
+	case net.Error:
+		if err.Timeout() {
+			// We have to extend the deadline now
+			c.setDeadline(time.Now().Add(time.Minute))
+			l := c.logger.WithField(logKeyAction, "ftp.idle_timeout")
+			l.Error("IDLE timeout ", err)
+			if err := c.writeMessage(421, fmt.Sprintf("command timeout (%d seconds): closing control connection", c.daddy.settings.IdleTimeout)); err != nil {
+				l.Error("Write failure: ", err)
+			}
+			return
+		}
+		c.logger.WithField(logKeyAction, "ftp.net_error").Error("Network error ", err)
+	default:
+		if err == io.EOF {
+			c.logger.WithField(logKeyAction, "ftp.disconnect").Error("TCP disconnect ", err)
+		} else {
+			c.logger.WithField(logKeyAction, "ftp.read_error").Error("Read error ", err)
+		}
 	}
 }
 
 // handleCommand takes care of executing the received line
-func (c *clientHandler) handleCommand(line string) {
+func (c *clientHandler) handleCommand(line string) (err error) {
 	command, param := parseLine(line)
 	c.command = strings.ToUpper(command)
 	c.param = param
 
 	cmdDesc := commandsMap[c.command]
 	if cmdDesc == nil {
-		c.writeMessage(500, "Unknown command")
-		return
+		return c.writeMessage(500, "Unknown command")
 	}
 
 	if c.driver == nil && !cmdDesc.Open {
-		c.writeMessage(530, "Please login with USER and PASS")
-		return
+		return c.writeMessage(530, "Please login with USER and PASS")
 	}
 
 	// Let's prepare to recover in case there's a command error
 	defer func() {
 		if r := recover(); r != nil {
-			c.writeMessage(500, fmt.Sprintf("Internal error: %s", r))
+			err = c.writeMessage(500, fmt.Sprintf("Internal error: %s", r))
 		}
 	}()
-	cmdDesc.Fn(c)
+
+	return cmdDesc.Fn(c)
 }
 
-func (c *clientHandler) writeLine(line string) {
-	if c.debug {
-		level.Debug(c.logger).Log(logKeyMsg, "FTP SEND", logKeyAction, "ftp.cmd_send", "line", line)
-	}
-	c.writer.Write([]byte(line))
-	c.writer.Write([]byte("\r\n"))
-	c.writer.Flush()
+func (c *clientHandler) writeLine(line string) error {
+	c.logger.WithFields(logrus.Fields{logKeyAction: "ftp.cmd_send", "line": line}).Debug("FTP SEND")
+	_, err := c.conn.Write([]byte(line + "\r\n"))
+
+	return err
 }
 
-func (c *clientHandler) writeMessage(code int, message string) {
-	c.writeLine(fmt.Sprintf("%d %s", code, message))
+func (c *clientHandler) writeMessage(code int, message string) error {
+	return c.writeLine(fmt.Sprintf("%d %s", code, message))
+}
+
+func (c *clientHandler) setTransfer(transfer transferHandler) {
+	c.mtx.Lock()
+	defer c.mtx.Unlock()
+
+	c.transfer = transfer
 }
 
 func (c *clientHandler) TransferOpen() (net.Conn, error) {
+	c.mtx.Lock()
+	defer c.mtx.Unlock()
+
 	if c.transfer == nil {
-		c.writeMessage(550, "No passive connection declared")
+		if err := c.writeMessage(550, "No passive connection declared"); err != nil {
+			return nil, err
+		}
 		return nil, errors.New("no passive connection declared")
 	}
-	c.writeMessage(150, "Using transfer connection")
+
+	if err := c.writeMessage(150, "Using transfer connection"); err != nil {
+		return nil, err
+	}
 	conn, err := c.transfer.Open()
-	if err == nil && c.debug {
-		level.Debug(c.logger).Log(logKeyMsg, "FTP Transfer connection opened", logKeyAction, "ftp.transfer_open", "remoteAddr", conn.RemoteAddr().String(), "localAddr", conn.LocalAddr().String())
+	if err == nil {
+		c.logger.WithFields(logrus.Fields{logKeyAction: "ftp.transfer_open", "remoteAddr": conn.RemoteAddr(), "localAddr": conn.LocalAddr()}).Debug("FTP Transfer connection opened")
 	}
 	return conn, err
 }
 
 func (c *clientHandler) TransferClose() {
+	c.mtx.Lock()
+	defer c.mtx.Unlock()
+
+	c.transferCloseLocked()
+}
+
+func (c *clientHandler) transferCloseLocked() {
 	if c.transfer != nil {
-		c.writeMessage(226, "Closing transfer connection")
-		c.transfer.Close()
-		c.transfer = nil
-		if c.debug {
-			level.Debug(c.logger).Log(logKeyMsg, "FTP Transfer connection closed", logKeyAction, "ftp.transfer_close")
+		l := c.logger.WithField(logKeyAction, "ftp.transfer_close")
+		if err := c.writeMessage(226, "Closing transfer connection"); err != nil {
+			l.Error("Write failed: ", err)
 		}
+
+		if err := c.transfer.Close(); err != nil {
+			l.Error("Close failed: ", err)
+		}
+		l.Debug("FTP Transfer connection closed")
+		c.transfer = nil
 	}
 }
 

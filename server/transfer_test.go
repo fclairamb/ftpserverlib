@@ -1,4 +1,4 @@
-package tests
+package server
 
 import (
 	"crypto/sha256"
@@ -10,7 +10,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/fclairamb/ftpserver/server"
 	"github.com/secsy/goftp"
 )
 
@@ -98,14 +97,14 @@ func ftpDelete(t *testing.T, ftp *goftp.Client, filename string) {
 
 // TestTransfer validates the upload of file in both active and passive mode
 func TestTransfer(t *testing.T) {
-	s := NewTestServerWithDriver(&ServerDriver{Debug: true, Settings: &server.Settings{NonStandardActiveDataPort: true}})
+	s := NewTestServerWithDriver(&ServerDriver{Debug: true, Settings: &Settings{NonStandardActiveDataPort: true}})
 	defer s.Stop()
 
 	testTransferOnConnection(t, s, false)
 	testTransferOnConnection(t, s, true)
 }
 
-func testTransferOnConnection(t *testing.T, server *server.FtpServer, active bool) {
+func testTransferOnConnection(t *testing.T, server *FtpServer, active bool) {
 	conf := goftp.Config{
 		User:            "test",
 		Password:        "test",

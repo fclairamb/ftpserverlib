@@ -1,16 +1,15 @@
-package tests
+package server
 
 import (
 	"strings"
 	"testing"
 
-	"github.com/fclairamb/ftpserver/server"
 	"gopkg.in/dutchcoders/goftp.v1"
 )
 
 // TestDirAccess relies on LIST of files listing
 func TestDirListing(t *testing.T) {
-	s := NewTestServerWithDriver(&ServerDriver{Debug: true, Settings: &server.Settings{DisableMLSD: true}})
+	s := NewTestServerWithDriver(&ServerDriver{Debug: true, Settings: &Settings{DisableMLSD: true}})
 	defer s.Stop()
 
 	var connErr error
@@ -103,11 +102,8 @@ func TestDirListingWithSpace(t *testing.T) {
 	s := NewTestServer(true)
 	defer s.Stop()
 
-	var connErr error
-	var ftp *goftp.FTP
-	const debug = true
-
-	if ftp, connErr = goftp.Connect(s.Addr()); connErr != nil {
+	ftp, connErr := goftp.Connect(s.Addr())
+	if connErr != nil {
 		t.Fatal("Couldn't connect", connErr)
 	}
 	defer ftp.Quit()
@@ -120,27 +116,25 @@ func TestDirListingWithSpace(t *testing.T) {
 		t.Fatal("Couldn't create dir:", err)
 	}
 
-	if lines, err := ftp.List("/"); err != nil {
+	lines, err := ftp.List("/")
+	if err != nil {
 		t.Fatal("Couldn't list files:", err)
-	} else {
-		found := false
-		for _, line := range lines {
-			line = line[0 : len(line)-2]
-			if len(line) < 47 {
-				break
-			}
-			spl := strings.SplitN(line, "; ", 2)
-			fileName := spl[1]
-			if debug {
-				t.Logf("Line: %s", line)
-			}
-			if fileName == " with spaces " {
-				found = true
-			}
+	}
+
+	found := false
+	for _, line := range lines {
+		line = line[0 : len(line)-2]
+		if len(line) < 47 {
+			break
 		}
-		if !found {
-			t.Fatal("Couldn't find the dir")
+		if strings.SplitN(line, "; ", 2)[1] == " with spaces " {
+			found = true
+			break
 		}
+	}
+
+	if !found {
+		t.Fatal("Couldn't find the dir")
 	}
 
 	if err := ftp.Cwd("/ with spaces "); err != nil {
