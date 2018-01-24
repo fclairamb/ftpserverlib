@@ -1,11 +1,9 @@
-package tests
+package server
 
 import (
 	"testing"
-
 	"time"
 
-	"github.com/fclairamb/ftpserver/server"
 	"github.com/secsy/goftp"
 )
 
@@ -46,7 +44,7 @@ func TestSiteCommand(t *testing.T) {
 
 // florent(2018-01-14): #58: IDLE timeout: Testing timeout
 func TestIdleTimeout(t *testing.T) {
-	s := NewTestServerWithDriver(&ServerDriver{Debug: true, Settings: &server.Settings{IdleTimeout: 2}})
+	s := NewTestServerWithDriver(&ServerDriver{Debug: true, Settings: &Settings{IdleTimeout: 2}})
 	defer s.Stop()
 
 	conf := goftp.Config{

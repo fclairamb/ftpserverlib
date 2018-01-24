@@ -7,8 +7,6 @@ import (
 	"net"
 	"strings"
 	"time"
-
-	"github.com/go-kit/kit/log/level"
 )
 
 // Active/Passive transfer connection handler
@@ -28,45 +26,47 @@ type passiveTransferHandler struct {
 	connection  net.Conn         // TCP Connection established
 }
 
-func (c *clientHandler) handlePASV() {
-	addr, _ := net.ResolveTCPAddr("tcp", ":0")
-	var tcpListener *net.TCPListener
-	var err error
-
+func (c *clientHandler) pasvListener() (*net.TCPListener, error) {
 	portRange := c.daddy.settings.DataPortRange
-
 	if portRange != nil {
 		for start := portRange.Start; start < portRange.End; start++ {
 			port := portRange.Start + rand.Intn(portRange.End-portRange.Start)
-			laddr, err := net.ResolveTCPAddr("tcp", "0.0.0.0:"+fmt.Sprintf("%d", port))
+			laddr, err := net.ResolveTCPAddr("tcp", fmt.Sprintf("0.0.0.0:%v", port))
 			if err != nil {
 				continue
 			}
 
-			tcpListener, err = net.ListenTCP("tcp", laddr)
-			if err == nil {
-				break
+			if l, err := net.ListenTCP("tcp", laddr); err == nil {
+				return l, nil
 			}
 		}
-
-	} else {
-		tcpListener, err = net.ListenTCP("tcp", addr)
+		return nil, fmt.Errorf("no port found")
 	}
 
+	addr, err := net.ResolveTCPAddr("tcp", ":0")
 	if err != nil {
-		level.Error(c.logger).Log(logKeyMsg, "Could not listen", "err", err)
-		return
+		return nil, err
+	}
+	return net.ListenTCP("tcp", addr)
+}
+
+func (c *clientHandler) handlePASV() (err error) {
+	tcpListener, err := c.pasvListener()
+	if err != nil {
+		// Just log so the client can continue
+		c.logger.Error("Could not listen ", err)
+		return nil
 	}
 
 	// The listener will either be plain TCP or TLS
 	var listener net.Listener
 	if c.transferTLS {
-		if tlsConfig, err := c.daddy.driver.GetTLSConfig(); err == nil {
-			listener = tls.NewListener(tcpListener, tlsConfig)
-		} else {
-			c.writeMessage(550, fmt.Sprintf("Cannot get a TLS config: %v", err))
-			return
+		tlsConfig, err2 := c.daddy.driver.GetTLSConfig()
+		if err2 != nil {
+			return c.writeMessage(550, fmt.Sprintf("Cannot get a TLS config: %v", err2))
 		}
+
+		listener = tls.NewListener(tcpListener, tlsConfig)
 	} else {
 		listener = tcpListener
 	}
@@ -77,7 +77,7 @@ func (c *clientHandler) handlePASV() {
 		Port:        tcpListener.Addr().(*net.TCPAddr).Port,
 	}
 
-	// We should rewrite this part
+	// TODO(fclairamb): Rewrite this part
 	if c.command == "PASV" {
 		p1 := p.Port / 256
 		p2 := p.Port - (p1 * 256)
@@ -88,13 +88,12 @@ func (c *clientHandler) handlePASV() {
 		if ip == "" {
 			// Defer to the user provided resolver.
 			if c.daddy.settings.PublicIPResolver != nil {
-				var err error
 				ip, err = c.daddy.settings.PublicIPResolver(c)
 				if err != nil {
 					// Not sure if there is better desired behavior than this.
 					// If we can't resolve the public ip to return to the client, is there any actual
 					// fallback that is better than erroring.
-					panic(err)
+					return err
 				}
 			} else {
 				ip = strings.Split(c.conn.LocalAddr().String(), ":")[0]
@@ -102,20 +101,23 @@ func (c *clientHandler) handlePASV() {
 		}
 
 		quads := strings.Split(ip, ".")
-		c.writeMessage(227, fmt.Sprintf("Entering Passive Mode (%s,%s,%s,%s,%d,%d)", quads[0], quads[1], quads[2], quads[3], p1, p2))
+		err = c.writeMessage(227, fmt.Sprintf("Entering Passive Mode (%s,%s,%s,%s,%d,%d)", quads[0], quads[1], quads[2], quads[3], p1, p2))
 	} else {
-		c.writeMessage(229, fmt.Sprintf("Entering Extended Passive Mode (|||%d|)", p.Port))
+		err = c.writeMessage(229, fmt.Sprintf("Entering Extended Passive Mode (|||%d|)", p.Port))
 	}
 
-	c.transfer = p
+	c.setTransfer(p)
+
+	return err
 }
 
 func (p *passiveTransferHandler) ConnectionWait(wait time.Duration) (net.Conn, error) {
 	if p.connection == nil {
-		p.tcpListener.SetDeadline(time.Now().Add(wait))
+		if err := p.tcpListener.SetDeadline(time.Now().Add(wait)); err != nil {
+			return nil, err
+		}
 		var err error
 		p.connection, err = p.listener.Accept()
-
 		if err != nil {
 			return nil, err
 		}
@@ -130,11 +132,15 @@ func (p *passiveTransferHandler) Open() (net.Conn, error) {
 
 // Closing only the client connection is not supported at that time
 func (p *passiveTransferHandler) Close() error {
+	var err, err2 error
 	if p.tcpListener != nil {
-		p.tcpListener.Close()
+		err = p.tcpListener.Close()
 	}
 	if p.connection != nil {
-		p.connection.Close()
+		err = p.connection.Close()
 	}
-	return nil
+	if err != nil {
+		return err
+	}
+	return err2
 }
