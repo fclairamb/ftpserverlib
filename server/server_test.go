@@ -1,9 +1,10 @@
 package server
 
-import "testing"
+import (
+	"testing"
+)
 
 func TestPortCommandFormatOK(t *testing.T) {
-
 	net, err := parseRemoteAddr("127,0,0,1,239,163")
 	if err != nil {
 		t.Fatal("Problem parsing", err)

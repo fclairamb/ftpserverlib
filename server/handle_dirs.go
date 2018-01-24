@@ -32,81 +32,84 @@ func (c *clientHandler) absPath(p string) string {
 	return p2
 }
 
-func (c *clientHandler) handleCWD() {
+func (c *clientHandler) handleCWD() error {
 	if c.param == ".." {
-		c.handleCDUP()
-		return
+		return c.handleCDUP()
 	}
 
 	p := c.absPath(c.param)
-
-	if err := c.driver.ChangeDirectory(c, p); err == nil {
-		c.SetPath(p)
-		c.writeMessage(250, fmt.Sprintf("CD worked on %s", p))
-	} else {
-		c.writeMessage(550, fmt.Sprintf("CD issue: %v", err))
+	if err := c.driver.ChangeDirectory(c, p); err != nil {
+		return c.writeMessage(StatusActionNotTaken, fmt.Sprintf("CD issue: %v", err))
 	}
+	c.SetPath(p)
+	return c.writeMessage(StatusFileOK, fmt.Sprintf("CD worked on %s", p))
 }
 
-func (c *clientHandler) handleMKD() {
+func (c *clientHandler) handleMKD() error {
 	p := c.absPath(c.param)
-	if err := c.driver.MakeDirectory(c, p); err == nil {
-		c.writeMessage(257, fmt.Sprintf("Created dir %s", p))
-	} else {
-		c.writeMessage(550, fmt.Sprintf("Could not create %s : %v", p, err))
+	if err := c.driver.MakeDirectory(c, p); err != nil {
+		return c.writeMessage(StatusActionNotTaken, fmt.Sprintf("Could not create %s : %v", p, err))
 	}
+
+	return c.writeMessage(StatusPathCreated, fmt.Sprintf("Created dir %s", p))
 }
 
-func (c *clientHandler) handleRMD() {
+func (c *clientHandler) handleRMD() error {
 	p := c.absPath(c.param)
-	if err := c.driver.DeleteFile(c, p); err == nil {
-		c.writeMessage(250, fmt.Sprintf("Deleted dir %s", p))
-	} else {
-		c.writeMessage(550, fmt.Sprintf("Could not delete dir %s: %v", p, err))
+	if err := c.driver.DeleteFile(c, p); err != nil {
+		return c.writeMessage(StatusActionNotTaken, fmt.Sprintf("Could not delete dir %s: %v", p, err))
 	}
+
+	return c.writeMessage(StatusFileOK, fmt.Sprintf("Deleted dir %s", p))
 }
 
-func (c *clientHandler) handleCDUP() {
+func (c *clientHandler) handleCDUP() error {
 	parent, _ := path.Split(c.Path())
 	if parent != "/" && strings.HasSuffix(parent, "/") {
 		parent = parent[0 : len(parent)-1]
 	}
-	if err := c.driver.ChangeDirectory(c, parent); err == nil {
-		c.SetPath(parent)
-		c.writeMessage(250, fmt.Sprintf("CDUP worked on %s", parent))
-	} else {
-		c.writeMessage(550, fmt.Sprintf("CDUP issue: %v", err))
+	if err := c.driver.ChangeDirectory(c, parent); err != nil {
+		return c.writeMessage(StatusActionNotTaken, fmt.Sprintf("CDUP issue: %v", err))
 	}
+	c.SetPath(parent)
+	return c.writeMessage(StatusOK, fmt.Sprintf("CDUP worked on %s", parent))
 }
 
-func (c *clientHandler) handlePWD() {
-	c.writeMessage(257, "\""+c.Path()+"\" is the current directory")
+func (c *clientHandler) handlePWD() error {
+	return c.writeMessage(StatusPathCreated, fmt.Sprintf("%q is the current directory", c.Path()))
 }
 
-func (c *clientHandler) handleLIST() {
-	if files, err := c.driver.ListFiles(c); err == nil {
-		if tr, err := c.TransferOpen(); err == nil {
-			defer c.TransferClose()
-			c.dirTransferLIST(tr, files)
-		}
-	} else {
-		c.writeMessage(500, fmt.Sprintf("Could not list: %v", err))
+func (c *clientHandler) handleLIST() error {
+	files, err := c.driver.ListFiles(c)
+	if err != nil {
+		return c.writeMessage(StatusActionNotTaken, fmt.Sprintf("Could not list: %v", err))
 	}
+
+	tr, err2 := c.TransferOpen()
+	if err2 != nil {
+		return err2
+	}
+	defer c.TransferClose()
+
+	return c.dirTransferLIST(tr, files)
 }
 
-func (c *clientHandler) handleMLSD() {
-	if c.daddy.settings.DisableMLSD {
-		c.writeMessage(500, "MLSD has been disabled")
-		return
+func (c *clientHandler) handleMLSD() error {
+	if c.server.settings.DisableMLSD {
+		return c.writeMessage(StatusCommandNotImplemented, "MLSD has been disabled")
 	}
-	if files, err := c.driver.ListFiles(c); err == nil {
-		if tr, err := c.TransferOpen(); err == nil {
-			defer c.TransferClose()
-			c.dirTransferMLSD(tr, files)
-		}
-	} else {
-		c.writeMessage(500, fmt.Sprintf("Could not list: %v", err))
+	files, err := c.driver.ListFiles(c)
+	if err != nil {
+		return c.writeMessage(StatusActionNotTaken, fmt.Sprintf("Could not list: %v", err))
 	}
+
+	tr, err2 := c.TransferOpen()
+	if err2 != nil {
+		return err2
+	}
+	defer c.TransferClose()
+
+	return c.dirTransferMLSD(tr, files)
 }
 
 const (
@@ -117,11 +120,9 @@ const (
 )
 
 func (c *clientHandler) fileStat(file os.FileInfo) string {
-
 	modTime := file.ModTime()
 
 	var dateFormat string
-
 	if c.connectedAt.Sub(modTime) > dateFormatStatOldSwitch {
 		dateFormat = dateFormatStatYear
 	} else {
@@ -139,27 +140,32 @@ func (c *clientHandler) fileStat(file os.FileInfo) string {
 
 func (c *clientHandler) dirTransferLIST(w io.Writer, files []os.FileInfo) error {
 	for _, file := range files {
-		fmt.Fprintf(w, "%s\r\n", c.fileStat(file))
+		if _, err := fmt.Fprintf(w, "%s\r\n", c.fileStat(file)); err != nil {
+			return err
+		}
 	}
-	fmt.Fprint(w, "\r\n")
-	return nil
+	_, err := fmt.Fprint(w, "\r\n")
+	return err
 }
 
 func (c *clientHandler) dirTransferMLSD(w io.Writer, files []os.FileInfo) error {
 	for _, file := range files {
-		c.writeMLSxOutput(w, file)
+		if err := c.writeMLSxOutput(w, file); err != nil {
+			return err
+		}
 	}
-	fmt.Fprint(w, "\r\n")
-	return nil
+	_, err := fmt.Fprint(w, "\r\n")
+	return err
 }
-func (c *clientHandler) writeMLSxOutput(w io.Writer, file os.FileInfo) {
+
+func (c *clientHandler) writeMLSxOutput(w io.Writer, file os.FileInfo) error {
 	var listType string
 	if file.IsDir() {
 		listType = "dir"
 	} else {
 		listType = "file"
 	}
-	fmt.Fprintf(
+	_, err := fmt.Fprintf(
 		w,
 		"Type=%s;Size=%d;Modify=%s; %s\r\n",
 		listType,
@@ -167,4 +173,6 @@ func (c *clientHandler) writeMLSxOutput(w io.Writer, file os.FileInfo) {
 		file.ModTime().Format(dateFormatMLSD),
 		file.Name(),
 	)
+
+	return err
 }

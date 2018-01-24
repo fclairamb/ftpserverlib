@@ -8,17 +8,15 @@ import (
 	"strings"
 )
 
-func (c *clientHandler) handlePORT() {
+func (c *clientHandler) handlePORT() error {
 	raddr, err := parseRemoteAddr(c.param)
-
 	if err != nil {
-		c.writeMessage(500, fmt.Sprintf("Problem parsing PORT: %v", err))
-		return
+		return c.writeMessage(StatusSyntaxErrorParameters, fmt.Sprintf("Problem parsing PORT: %v", err))
 	}
 
-	c.writeMessage(200, "PORT command successful")
+	c.setTransfer(&activeTransferHandler{raddr: raddr, nonStandardPort: c.server.settings.NonStandardActiveDataPort})
 
-	c.transfer = &activeTransferHandler{raddr: raddr, nonStandardPort: c.daddy.settings.NonStandardActiveDataPort}
+	return c.writeMessage(StatusOK, "PORT command successful")
 }
 
 // Active connection
@@ -29,18 +27,16 @@ type activeTransferHandler struct {
 }
 
 func (a *activeTransferHandler) Open() (net.Conn, error) {
-	var laddr *net.TCPAddr
-	if a.nonStandardPort {
-		laddr = nil
-	} else {
-		laddr, _ = net.ResolveTCPAddr("tcp", ":20")
+	d := &net.Dialer{Timeout: dialTimeout, KeepAlive: keepAlive}
+	if !a.nonStandardPort {
+		laddr, err := net.ResolveTCPAddr("tcp", ":20")
+		if err != nil {
+			return nil, fmt.Errorf("failed to resolve local address: %v", err)
+		}
+		d.LocalAddr = laddr
 	}
-	// TODO(mgenov): support dialing with timeout
-	// Issues:
-	//	https://github.com/golang/go/issues/3097
-	// 	https://github.com/golang/go/issues/4842
-	conn, err := net.DialTCP("tcp", laddr, a.raddr)
 
+	conn, err := d.Dial("tcp", a.raddr.String())
 	if err != nil {
 		return nil, fmt.Errorf("could not establish active connection due: %v", err)
 	}

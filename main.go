@@ -10,8 +10,8 @@ import (
 
 	"github.com/fclairamb/ftpserver/sample"
 	"github.com/fclairamb/ftpserver/server"
-	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
+
+	"github.com/sirupsen/logrus"
 )
 
 var (
@@ -29,13 +29,6 @@ func main() {
 	flag.BoolVar(&onlyConf, "conf-only", false, "Only create the config")
 	flag.Parse()
 
-	// Setting up the logger
-	logger := log.With(
-		log.NewLogfmtLogger(log.NewSyncWriter(os.Stdout)),
-		"ts", log.DefaultTimestampUTC,
-		"caller", log.DefaultCaller,
-	)
-
 	autoCreate := onlyConf
 
 	// The general idea here is that if you start it without any arg, you're probably doing a local quick&dirty run
@@ -46,54 +39,64 @@ func main() {
 	}
 
 	if autoCreate {
-		if _, err := os.Stat(confFile); err != nil && os.IsNotExist(err) {
-			level.Info(logger).Log("msg", "Not config file, creating one", "action", "conf_file.create", "confFile", confFile)
-
-			if err := ioutil.WriteFile(confFile, confFileContent(), 0644); err != nil {
-				level.Error(logger).Log("msg", "Couldn't create config file", "action", "conf_file.could_not_create", "confFile", confFile)
+		if _, err := os.Stat(confFile); err != nil {
+			if os.IsNotExist(err) {
+				logrus.WithFields(logrus.Fields{"action": "conf_file.create", "confFile": confFile}).Info("No config file, creating one")
+				if err = ioutil.WriteFile(confFile, confFileContent(), 0644); err != nil {
+					logrus.WithFields(logrus.Fields{"action": "conf_file.could_not_create", "confFile": confFile}).Error("Couldn't create config file ", err)
+				}
+			} else {
+				logrus.WithFields(logrus.Fields{"action": "conf_file.stat", "confFile": confFile}).Error("Couldn't stat config file ", err)
 			}
 		}
 	}
 
 	// Loading the driver
 	driver, err := sample.NewSampleDriver(dataDir, confFile)
-
 	if err != nil {
-		level.Error(logger).Log("msg", "Could not load the driver", "err", err)
-		return
+		logrus.Fatalf("Could not load the driver %v", err)
 	}
 
 	// Overriding the driver default silent logger by a sub-logger (component: driver)
-	driver.Logger = log.With(logger, "component", "driver")
+	driver.Entry = logrus.WithField("component", "driver")
 
 	// Instantiating the server by passing our driver implementation
 	ftpServer = server.NewFtpServer(driver)
 
 	// Overriding the server default silent logger by a sub-logger (component: server)
-	ftpServer.Logger = log.With(logger, "component", "server")
-
-	// Preparing the SIGTERM handling
-	go signalHandler()
+	ftpServer.Entry = logrus.WithField("component", "server")
 
 	// Blocking call, behaving similarly to the http.ListenAndServe
 	if onlyConf {
-		level.Error(logger).Log("msg", "Only creating conf")
+		logrus.Info("Only creating conf")
 		return
 	}
 
+	// Preparing the SIGTERM handling
+	done := make(chan struct{})
+	go signalHandler(done)
+
 	if err := ftpServer.ListenAndServe(); err != nil {
-		level.Error(logger).Log("msg", "Problem listening", "err", err)
+		if !ftpServer.Stopped() {
+			logrus.Fatalf("Problem listening %v", err)
+			close(done)
+		}
 	}
 }
 
-func signalHandler() {
-	ch := make(chan os.Signal)
+func signalHandler(done chan struct{}) {
+	ch := make(chan os.Signal, 1)
 	signal.Notify(ch, syscall.SIGTERM)
+	defer signal.Stop(ch)
 	for {
-		switch <-ch {
-		case syscall.SIGTERM:
-			ftpServer.Stop()
-			break
+		select {
+		case sig := <-ch:
+			if sig == syscall.SIGTERM {
+				ftpServer.Stop()
+				return
+			}
+		case <-done:
+			return
 		}
 	}
 }
