@@ -103,7 +103,7 @@ func (c *clientHandler) handlePASV() (err error) {
 		quads := strings.Split(ip, ".")
 		err = c.writeMessage(StatusEnteringPASV, fmt.Sprintf("Entering Passive Mode (%s,%s,%s,%s,%d,%d)", quads[0], quads[1], quads[2], quads[3], p1, p2))
 	} else {
-		err = c.writeMessage(StatusEnteringPASV, fmt.Sprintf("Entering Extended Passive Mode (|||%d|)", p.Port))
+		err = c.writeMessage(StatusEnteringEPSV, fmt.Sprintf("Entering Extended Passive Mode (|||%d|)", p.Port))
 	}
 
 	c.setTransfer(p)
