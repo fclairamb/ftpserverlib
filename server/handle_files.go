@@ -32,6 +32,7 @@ func (c *clientHandler) handleStoreAndAppend(append bool) {
 			c.writeMessage(550, err.Error())
 		}
 	} else {
+		file.Close()
 		c.writeMessage(550, "Could not open transfer: "+err.Error())
 	}
 }
