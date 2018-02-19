@@ -12,6 +12,10 @@ import (
 func (c *clientHandler) absPath(p string) string {
 	p2 := c.Path()
 
+	if p == "." {
+		return p2
+	}
+
 	if strings.HasPrefix(p, "/") {
 		p2 = p
 	} else {
@@ -133,31 +137,34 @@ func (c *clientHandler) fileStat(file os.FileInfo) string {
 	)
 }
 
+// fclairamb (2018-02-13): #64: Removed extra empty line
 func (c *clientHandler) dirTransferLIST(w io.Writer, files []os.FileInfo) error {
 	for _, file := range files {
 		fmt.Fprintf(w, "%s\r\n", c.fileStat(file))
 	}
-	fmt.Fprint(w, "\r\n")
 	return nil
 }
 
+// fclairamb (2018-02-13): #64: Removed extra empty line
 func (c *clientHandler) dirTransferMLSD(w io.Writer, files []os.FileInfo) error {
 	for _, file := range files {
-		var listType string
-		if file.IsDir() {
-			listType = "dir"
-		} else {
-			listType = "file"
-		}
-		fmt.Fprintf(
-			w,
-			"Type=%s;Size=%d;Modify=%s; %s\r\n",
-			listType,
-			file.Size(),
-			file.ModTime().Format(dateFormatMLSD),
-			file.Name(),
-		)
+		c.writeMLSxOutput(w, file)
 	}
-	fmt.Fprint(w, "\r\n")
 	return nil
+}
+func (c *clientHandler) writeMLSxOutput(w io.Writer, file os.FileInfo) {
+	var listType string
+	if file.IsDir() {
+		listType = "dir"
+	} else {
+		listType = "file"
+	}
+	fmt.Fprintf(
+		w,
+		"Type=%s;Size=%d;Modify=%s; %s\r\n",
+		listType,
+		file.Size(),
+		file.ModTime().Format(dateFormatMLSD),
+		file.Name(),
+	)
 }
