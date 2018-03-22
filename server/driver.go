@@ -97,8 +97,14 @@ type PortRange struct {
 // to use in the response to the PASV command, or an error if a public IP cannot be determined.
 type PublicIPResolver func(ClientContext) (string, error)
 
+// Type that takes a net.Listener and returns a net.Listener, potentially wrapping or modifying the behavior of
+// the provided listener.
+// This can be used for things like handling the proxy protocol header on connections.
+type ListenerWrapper func(net.Listener) net.Listener
+
 // Settings defines all the server settings
 type Settings struct {
+	ListenerWrapper           ListenerWrapper
 	Listener                  net.Listener     // Allow providing an already initialized listener. Mutually exclusive with ListenAddr
 	ListenAddr                string           // Listening address
 	PublicHost                string           // Public IP to expose (only an IP address is accepted at this stage)

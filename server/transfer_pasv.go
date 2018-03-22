@@ -71,6 +71,10 @@ func (c *clientHandler) handlePASV() {
 		listener = tcpListener
 	}
 
+	if c.daddy.settings.ListenerWrapper != nil {
+		listener = c.daddy.settings.ListenerWrapper(listener)
+	}
+
 	p := &passiveTransferHandler{
 		tcpListener: tcpListener,
 		listener:    listener,
