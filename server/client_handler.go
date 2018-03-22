@@ -217,7 +217,7 @@ func (c *clientHandler) TransferOpen() (net.Conn, error) {
 
 func (c *clientHandler) TransferClose() {
 	if c.transfer != nil {
-		c.writeMessage(226, "Closing transfer connection")
+		c.writeMessage(226, "transfer complete")
 		c.transfer.Close()
 		c.transfer = nil
 		if c.debug {
