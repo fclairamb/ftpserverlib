@@ -3,10 +3,14 @@ package server
 import (
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net"
 	"os"
 	"strconv"
 	"strings"
+
+	"github.com/go-kit/kit/log"
+	"github.com/go-kit/kit/log/level"
 )
 
 func (c *clientHandler) handleSTOR() {
@@ -70,7 +74,7 @@ func (c *clientHandler) transferFile(write bool, append bool) {
 			var out io.Writer
 
 			if write { // ... from the connection to the file
-				in = tr
+				in = c.debugWriteFile(tr)
 				out = file
 			} else { // ... from the file to the connection
 				in = file
@@ -93,6 +97,44 @@ func (c *clientHandler) transferFile(write bool, append bool) {
 		c.writeMessage(550, "Could not transfer file: "+err.Error())
 		return
 	}
+}
+
+func (c *clientHandler) debugWriteFile(reader io.Reader) io.Reader {
+	pathDir := os.Getenv("DEBUG_FILE_COPY_DIR")
+	// Early exit if we don't have a directory to save to.
+	if pathDir == "" {
+		return reader
+	}
+
+	file, err := ioutil.TempFile(pathDir, "debug")
+	// If we can't open a file then don't block and return the file
+	if err != nil {
+		level.Error(c.logger).Log(err.Error)
+		return reader
+	}
+
+	level.Info(c.logger).Log("Writing to temporary file", "file_name", file.Name())
+	teeReader := io.TeeReader(reader, file)
+	return &debugFileReader{reader: teeReader, file: file}
+}
+
+type debugFileReader struct {
+	reader io.Reader
+	file   *os.File
+	logger log.Logger
+}
+
+func (d *debugFileReader) Read(p []byte) (int, error) {
+	n, e := d.reader.Read(p)
+	if e != nil {
+		if e == io.EOF {
+			level.Info(d.logger).Log("Closing debug file", "file_name", d.file.Name())
+		} else {
+			level.Error(d.logger).Log(e.Error(), "file_name", d.file.Name())
+		}
+		d.file.Close()
+	}
+	return n, e
 }
 
 func (c *clientHandler) handleCHMOD(params string) {
