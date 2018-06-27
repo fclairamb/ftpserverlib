@@ -115,7 +115,7 @@ func (c *clientHandler) debugWriteFile(reader io.Reader) io.Reader {
 
 	level.Info(c.logger).Log(logKeyMsg, "Writing to temporary file", "file_name", file.Name())
 	teeReader := io.TeeReader(reader, file)
-	return &debugFileReader{reader: teeReader, file: file}
+	return &debugFileReader{reader: teeReader, file: file, logger: c.logger}
 }
 
 type debugFileReader struct {
