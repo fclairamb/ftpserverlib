@@ -109,11 +109,11 @@ func (c *clientHandler) debugWriteFile(reader io.Reader) io.Reader {
 	file, err := ioutil.TempFile(pathDir, "debug")
 	// If we can't open a file then don't block and return the file
 	if err != nil {
-		level.Error(c.logger).Log(err.Error)
+		level.Error(c.logger).Log(logKeyMsg, err.Error())
 		return reader
 	}
 
-	level.Info(c.logger).Log("Writing to temporary file", "file_name", file.Name())
+	level.Info(c.logger).Log(logKeyMsg, "Writing to temporary file", "file_name", file.Name())
 	teeReader := io.TeeReader(reader, file)
 	return &debugFileReader{reader: teeReader, file: file}
 }
@@ -128,9 +128,9 @@ func (d *debugFileReader) Read(p []byte) (int, error) {
 	n, e := d.reader.Read(p)
 	if e != nil {
 		if e == io.EOF {
-			level.Info(d.logger).Log("Closing debug file", "file_name", d.file.Name())
+			level.Info(d.logger).Log(logKeyMsg, "Closing debug file", "file_name", d.file.Name())
 		} else {
-			level.Error(d.logger).Log(e.Error(), "file_name", d.file.Name())
+			level.Error(d.logger).Log(logKeyMsg, e.Error(), "file_name", d.file.Name())
 		}
 		d.file.Close()
 	}
