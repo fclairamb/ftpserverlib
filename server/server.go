@@ -5,8 +5,7 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
+	"log"
 )
 
 const (
@@ -124,12 +123,12 @@ func (server *FtpServer) Listen() error {
 		server.listener, err = net.Listen("tcp", server.settings.ListenAddr)
 
 		if err != nil {
-			level.Error(server.Logger).Log(logKeyMsg, "Cannot listen", "err", err)
+			log.Println(logKeyMsg, "Cannot listen", "err", err)
 			return err
 		}
 	}
 
-	level.Info(server.Logger).Log(logKeyMsg, "Listening...", logKeyAction, "ftp.listening", "address", server.listener.Addr())
+	log.Println(logKeyMsg, "Listening...", logKeyAction, "ftp.listening", "address", server.listener.Addr())
 
 	return err
 }
@@ -140,7 +139,7 @@ func (server *FtpServer) Serve() {
 		connection, err := server.listener.Accept()
 		if err != nil {
 			if server.listener != nil {
-				level.Error(server.Logger).Log(logKeyMsg, "Accept error", "err", err)
+				log.Println(logKeyMsg, "Accept error", "err", err)
 			}
 			break
 		}
@@ -155,7 +154,7 @@ func (server *FtpServer) ListenAndServe() error {
 		return err
 	}
 
-	level.Info(server.Logger).Log(logKeyMsg, "Starting...", logKeyAction, "ftp.starting")
+	log.Println(logKeyMsg, "Starting...", logKeyAction, "ftp.starting")
 
 	server.Serve()
 
@@ -166,10 +165,7 @@ func (server *FtpServer) ListenAndServe() error {
 
 // NewFtpServer creates a new FtpServer instance
 func NewFtpServer(driver MainDriver) *FtpServer {
-	return &FtpServer{
-		driver: driver,
-		Logger: log.NewNopLogger(),
-	}
+	return &FtpServer{driver: driver}
 }
 
 // Addr shows the listening address
@@ -195,12 +191,12 @@ func (server *FtpServer) clientArrival(conn net.Conn) error {
 	c := server.newClientHandler(conn, id)
 	go c.HandleCommands()
 
-	level.Info(c.logger).Log(logKeyMsg, "FTP Client connected", logKeyAction, "ftp.connected", "clientIp", conn.RemoteAddr())
+	log.Println(logKeyMsg, "FTP Client connected", logKeyAction, "ftp.connected", "clientIp", conn.RemoteAddr())
 
 	return nil
 }
 
 // clientDeparture
 func (server *FtpServer) clientDeparture(c *clientHandler) {
-	level.Info(c.logger).Log(logKeyMsg, "FTP Client disconnected", logKeyAction, "ftp.disconnected", "clientIp", c.conn.RemoteAddr())
+	log.Println(logKeyMsg, "FTP Client disconnected", logKeyAction, "ftp.disconnected", "clientIp", c.conn.RemoteAddr())
 }

@@ -9,8 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
+	"log"
 )
 
 type clientHandler struct {
@@ -44,7 +43,7 @@ func (server *FtpServer) newClientHandler(connection net.Conn, id uint32) *clien
 		reader:      bufio.NewReader(connection),
 		connectedAt: time.Now().UTC(),
 		path:        "/",
-		logger:      log.With(server.Logger, "clientId", id),
+		logger:      server.Logger, //"clientId", id),
 	}
 
 	// Just respecting the existing logic here, this could be probably be dropped at some point
@@ -113,7 +112,7 @@ func (c *clientHandler) HandleCommands() {
 	for {
 		if c.reader == nil {
 			if c.debug {
-				level.Debug(c.logger).Log(logKeyMsg, "Clean disconnect", logKeyAction, "ftp.disconnect", "clean", true)
+				log.Println(c.id, logKeyMsg, " Clean disconnect ", logKeyAction, " ftp.disconnect ", " clean ", true)
 			}
 			return
 		}
@@ -132,31 +131,31 @@ func (c *clientHandler) HandleCommands() {
 				if err.Timeout() {
 					// We have to extend the deadline now
 					c.conn.SetDeadline(time.Now().Add(time.Minute))
-					level.Info(c.logger).Log(logKeyMsg, "IDLE timeout", logKeyAction, "ftp.idle_timeout", "err", err)
+					log.Println(c.id, "IDLE timeout", "err", err)
 					c.writeMessage(421, fmt.Sprintf("command timeout (%d seconds): closing control connection", c.daddy.settings.IdleTimeout))
 					if err := c.writer.Flush(); err != nil {
-						level.Error(c.logger).Log(logKeyMsg, "Network flush error", logKeyAction, "ftp.flush_error", "err", err)
+						log.Println(c.id, "Network flush error", "err", err)
 					}
 					if err := c.conn.Close(); err != nil {
-						level.Error(c.logger).Log(logKeyMsg, "Network close error", logKeyAction, "ftp.close_error", "err", err)
+						log.Println(c.id, "Network close error", "err", err)
 					}
 					break
 				}
-				level.Error(c.logger).Log(logKeyMsg, "Network error", logKeyAction, "ftp.net_error", "err", err)
+				log.Println(c.id, "Network error", "err", err)
 			default:
 				if err == io.EOF {
 					if c.debug {
-						level.Debug(c.logger).Log(logKeyMsg, "TCP disconnect", logKeyAction, "ftp.disconnect", "clean", false)
+						log.Println(c.id, "TCP disconnect")
 					}
 				} else {
-					level.Error(c.logger).Log(logKeyMsg, "Read error", logKeyAction, "ftp.read_error", "err", err)
+					log.Println(c.id, "Read error", "err", err)
 				}
 			}
 			return
 		}
 
 		if c.debug {
-			level.Debug(c.logger).Log(logKeyMsg, "FTP RECV", logKeyAction, "ftp.cmd_recv", "line", line)
+			log.Println(c.id, "<", strings.TrimRight(line, "\n"))
 		}
 
 		c.handleCommand(line)
@@ -191,7 +190,7 @@ func (c *clientHandler) handleCommand(line string) {
 
 func (c *clientHandler) writeLine(line string) {
 	if c.debug {
-		level.Debug(c.logger).Log(logKeyMsg, "FTP SEND", logKeyAction, "ftp.cmd_send", "line", line)
+		log.Println(c.id, ">", line)
 	}
 	c.writer.Write([]byte(line))
 	c.writer.Write([]byte("\r\n"))
@@ -210,7 +209,7 @@ func (c *clientHandler) TransferOpen() (net.Conn, error) {
 	c.writeMessage(150, "Using transfer connection")
 	conn, err := c.transfer.Open()
 	if err == nil && c.debug {
-		level.Debug(c.logger).Log(logKeyMsg, "FTP Transfer connection opened", logKeyAction, "ftp.transfer_open", "remoteAddr", conn.RemoteAddr().String(), "localAddr", conn.LocalAddr().String())
+		log.Println(c.id, "ftp.transfer_open", "remoteAddr", conn.RemoteAddr().String(), "localAddr", conn.LocalAddr().String())
 	}
 	return conn, err
 }
@@ -220,9 +219,6 @@ func (c *clientHandler) TransferClose() {
 		c.writeMessage(226, "Closing transfer connection")
 		c.transfer.Close()
 		c.transfer = nil
-		if c.debug {
-			level.Debug(c.logger).Log(logKeyMsg, "FTP Transfer connection closed", logKeyAction, "ftp.transfer_close")
-		}
 	}
 }
 
