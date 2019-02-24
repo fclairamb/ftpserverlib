@@ -7,16 +7,16 @@ import (
 )
 
 // The virtual file is an example of how you can implement a purely virtual file
-type virtualFile struct {
+type VirtualFile struct {
 	content    []byte // Content of the file
 	readOffset int    // Reading offset
 }
 
-func (f *virtualFile) Close() error {
+func (f *VirtualFile) Close() error {
 	return nil
 }
 
-func (f *virtualFile) Read(buffer []byte) (int, error) {
+func (f *VirtualFile) Read(buffer []byte) (int, error) {
 	n := copy(buffer, f.content[f.readOffset:])
 	f.readOffset += n
 	if n == 0 {
@@ -26,40 +26,47 @@ func (f *virtualFile) Read(buffer []byte) (int, error) {
 	return n, nil
 }
 
-func (f *virtualFile) Seek(n int64, w int) (int64, error) {
+func (f *VirtualFile) Seek(n int64, w int) (int64, error) {
 	return 0, nil
 }
 
-func (f *virtualFile) Write(buffer []byte) (int, error) {
+func (f *VirtualFile) Write(buffer []byte) (int, error) {
 	return 0, nil
 }
 
-type virtualFileInfo struct {
-	name string
-	size int64
-	mode os.FileMode
+type VirtualFileInfo struct {
+	name    string
+	isDir   bool
+	modTime time.Time
+	size    int64
 }
 
-func (f virtualFileInfo) Name() string {
+func (f *VirtualFileInfo) Name() string {
 	return f.name
 }
 
-func (f virtualFileInfo) Size() int64 {
+func (f *VirtualFileInfo) Size() int64 {
 	return f.size
 }
 
-func (f virtualFileInfo) Mode() os.FileMode {
-	return f.mode
+func (f *VirtualFileInfo) Mode() os.FileMode {
+	if f.isDir {
+		return os.ModeDir | os.ModePerm
+	}
+	return os.ModePerm
 }
 
-func (f virtualFileInfo) IsDir() bool {
-	return f.mode.IsDir()
+func (f *VirtualFileInfo) ModTime() time.Time {
+	if f.modTime.IsZero() {
+		return time.Now().UTC()
+	}
+	return f.modTime
 }
 
-func (f virtualFileInfo) ModTime() time.Time {
-	return time.Now().UTC()
+func (f *VirtualFileInfo) IsDir() bool {
+	return f.isDir
 }
 
-func (f virtualFileInfo) Sys() interface{} {
+func (f *VirtualFileInfo) Sys() interface{} {
 	return nil
 }

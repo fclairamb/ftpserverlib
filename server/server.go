@@ -5,14 +5,7 @@ import (
 	"fmt"
 	"net"
 
-	"log"
-)
-
-const (
-	// logKeyMsg is the human-readable part of the log
-	logKeyMsg = "msg"
-	// logKeyAction is the machine-readable part of the log
-	logKeyAction = "action"
+	"github.com/siddontang/go/log"
 )
 
 // CommandDescription defines which function should be used and if it should be open to anyone or only logged in users
@@ -80,7 +73,7 @@ func init() {
 // FtpServer is where everything is stored
 // We want to keep it as simple as possible
 type FtpServer struct {
-	Logger        log.Logger   // Go-Kit logger
+	Logger        *log.Logger  // Go-Kit logger
 	settings      *Settings    // General settings
 	listener      net.Listener // listener used to receive files
 	clientCounter uint32       // Clients counter
@@ -123,12 +116,12 @@ func (server *FtpServer) Listen() error {
 		server.listener, err = net.Listen("tcp", server.settings.ListenAddr)
 
 		if err != nil {
-			log.Println(logKeyMsg, "Cannot listen", "err", err)
+			server.Logger.Error("Cannot listen ", err)
 			return err
 		}
 	}
 
-	log.Println(logKeyMsg, "Listening...", logKeyAction, "ftp.listening", "address", server.listener.Addr())
+	server.Logger.Info("ftp.listening ", "address ", server.listener.Addr())
 
 	return err
 }
@@ -139,7 +132,7 @@ func (server *FtpServer) Serve() {
 		connection, err := server.listener.Accept()
 		if err != nil {
 			if server.listener != nil {
-				log.Println(logKeyMsg, "Accept error", "err", err)
+				server.Logger.Error("Accept error ", err)
 			}
 			break
 		}
@@ -154,8 +147,6 @@ func (server *FtpServer) ListenAndServe() error {
 		return err
 	}
 
-	log.Println(logKeyMsg, "Starting...", logKeyAction, "ftp.starting")
-
 	server.Serve()
 
 	// Note: At this precise time, the clients are still connected. We are just not accepting clients anymore.
@@ -165,7 +156,14 @@ func (server *FtpServer) ListenAndServe() error {
 
 // NewFtpServer creates a new FtpServer instance
 func NewFtpServer(driver MainDriver) *FtpServer {
-	return &FtpServer{driver: driver}
+	f := &FtpServer{driver: driver}
+	h, err := log.NewRotatingFileHandler("ftpserver.log", 1024*1024*30, 2)
+	if err != nil {
+		fmt.Println(err)
+	}
+	f.Logger = log.NewDefault(h)
+
+	return f
 }
 
 // Addr shows the listening address
@@ -191,12 +189,12 @@ func (server *FtpServer) clientArrival(conn net.Conn) error {
 	c := server.newClientHandler(conn, id)
 	go c.HandleCommands()
 
-	log.Println(logKeyMsg, "FTP Client connected", logKeyAction, "ftp.connected", "clientIp", conn.RemoteAddr())
+	server.Logger.Info("ftp.connected ", "clientIp ", conn.RemoteAddr())
 
 	return nil
 }
 
 // clientDeparture
 func (server *FtpServer) clientDeparture(c *clientHandler) {
-	log.Println(logKeyMsg, "FTP Client disconnected", logKeyAction, "ftp.disconnected", "clientIp", c.conn.RemoteAddr())
+	server.Logger.Info("ftp.disconnected ", "clientIp ", c.conn.RemoteAddr())
 }

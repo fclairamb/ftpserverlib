@@ -10,6 +10,7 @@ import (
 
 	"github.com/r0123r/ftpserver/drivers"
 	"github.com/r0123r/ftpserver/server"
+	slog "github.com/siddontang/go/log"
 )
 
 var (
@@ -44,9 +45,22 @@ func main() {
 
 	// Preparing the SIGTERM handling
 	go signalHandler()
-
+	//	logger := logrus.New()
+	//	logger.Formatter = &logrus.TextFormatter{
+	//		TimestampFormat: "2006-01-02 15:04:05",
+	//	}
+	//	//logger.SetLevel(logrus.DebugLevel)
+	//	log.SetFlags(log.Lshortfile)
+	//	// Use logrus for standard log output
+	//	log.SetOutput(logger.Writer())
+	h, err := slog.NewRotatingFileHandler("ftpserver.log", 1024*1024*30, 2)
+	if err != nil {
+		log.Println(err)
+	}
+	ftpServer.Logger = slog.NewDefault(h)
+	ftpServer.Logger.SetLevel(slog.LevelTrace)
 	if err := ftpServer.ListenAndServe(); err != nil {
-		log.Println("err", "Problem listening", "err", err)
+		log.Println("Problem listening", err)
 	}
 }
 

@@ -1,9 +1,12 @@
 package drivers
 
 import (
+	"fmt"
 	"io/ioutil"
 	"os"
+	"path/filepath"
 
+	"github.com/karrick/godirwalk"
 	"github.com/r0123r/ftpserver/server"
 )
 
@@ -29,20 +32,74 @@ func (driver *ClientDriver) MakeDirectory(cc server.ClientContext, directory str
 	return os.Mkdir(driver.BaseDir+directory, 0777)
 }
 
+func (driver *ClientDriver) AsyncListFiles(cc server.ClientContext, cfiles chan<- os.FileInfo) {
+	defer func() {
+		close(cfiles)
+	}()
+
+	if cc.Path() == "/virtual" {
+		cfiles <- &VirtualFileInfo{
+			name: "localpath.txt",
+			size: 1024,
+		}
+		cfiles <- &VirtualFileInfo{
+			name: "file2.txt",
+			size: 2048,
+		}
+		return
+	} else if cc.Path() == "/debug" {
+		return
+	}
+	// We add a virtual dir
+	if cc.Path() == "/" {
+		cfiles <- &VirtualFileInfo{
+			name:  "virtual",
+			isDir: true,
+			size:  4096,
+		}
+	}
+	path := filepath.Join(driver.BaseDir, cc.Path())
+
+	//files, err := ioutil.ReadDir(path)
+	godirwalk.Walk(path, &godirwalk.Options{
+		FollowSymbolicLinks: true,
+		Callback: func(osPathname string, de *godirwalk.Dirent) error {
+			if de.IsDir() && osPathname == path {
+				return nil
+			}
+			if !de.IsSymlink() {
+				ff, err := os.Stat(osPathname)
+				if err == nil {
+					cfiles <- ff
+				}
+			} else {
+				cfiles <- &VirtualFileInfo{
+					name:  de.Name(),
+					isDir: true,
+				}
+			}
+			return fmt.Errorf("stop")
+		},
+		ErrorCallback: func(osPathname string, err error) godirwalk.ErrorAction {
+			return godirwalk.SkipNode
+		},
+		Unsorted: true, // set true for faster yet non-deterministic enumeration (see godoc)
+	})
+
+}
+
 // ListFiles lists the files of a directory
 func (driver *ClientDriver) ListFiles(cc server.ClientContext) ([]os.FileInfo, error) {
 
 	if cc.Path() == "/virtual" {
 		files := make([]os.FileInfo, 0)
 		files = append(files,
-			virtualFileInfo{
+			&VirtualFileInfo{
 				name: "localpath.txt",
-				mode: os.FileMode(0666),
 				size: 1024,
 			},
-			virtualFileInfo{
+			&VirtualFileInfo{
 				name: "file2.txt",
-				mode: os.FileMode(0666),
 				size: 2048,
 			},
 		)
@@ -57,10 +114,10 @@ func (driver *ClientDriver) ListFiles(cc server.ClientContext) ([]os.FileInfo, e
 
 	// We add a virtual dir
 	if cc.Path() == "/" && err == nil {
-		files = append(files, virtualFileInfo{
-			name: "virtual",
-			mode: os.FileMode(0666) | os.ModeDir,
-			size: 4096,
+		files = append(files, &VirtualFileInfo{
+			name:  "virtual",
+			isDir: true,
+			size:  4096,
 		})
 	}
 
@@ -71,7 +128,7 @@ func (driver *ClientDriver) ListFiles(cc server.ClientContext) ([]os.FileInfo, e
 func (driver *ClientDriver) OpenFile(cc server.ClientContext, path string, flag int) (server.FileStream, error) {
 
 	if path == "/virtual/localpath.txt" {
-		return &virtualFile{content: []byte(driver.BaseDir)}, nil
+		return &VirtualFile{content: []byte(driver.BaseDir)}, nil
 	}
 
 	path = driver.BaseDir + path
@@ -91,9 +148,9 @@ func (driver *ClientDriver) OpenFile(cc server.ClientContext, path string, flag 
 func (driver *ClientDriver) GetFileInfo(cc server.ClientContext, path string) (os.FileInfo, error) {
 	switch path {
 	case "/virtual":
-		return &virtualFileInfo{name: "virtual", size: 4096, mode: os.ModeDir}, nil
+		return &VirtualFileInfo{name: "virtual", size: 4096, isDir: true}, nil
 	case "/debug":
-		return &virtualFileInfo{name: "debug", size: 4096, mode: os.ModeDir}, nil
+		return &VirtualFileInfo{name: "debug", size: 4096, isDir: true}, nil
 	}
 
 	path = driver.BaseDir + path

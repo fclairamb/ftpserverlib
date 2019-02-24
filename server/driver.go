@@ -36,6 +36,7 @@ type ClientHandlingDriver interface {
 	// MakeDirectory creates a directory
 	MakeDirectory(cc ClientContext, directory string) error
 
+	AsyncListFiles(cc ClientContext, cfiles chan<- os.FileInfo)
 	// ListFiles lists the files of a directory
 	ListFiles(cc ClientContext) ([]os.FileInfo, error)
 
@@ -108,4 +109,5 @@ type Settings struct {
 	DisableMLST               bool             // Disable MLST support
 	NonStandardActiveDataPort bool             // Allow to use a non-standard active data port
 	IdleTimeout               int              // Maximum inactivity time before disconnecting (#58)
+	Async                     bool
 }

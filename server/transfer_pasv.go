@@ -7,8 +7,6 @@ import (
 	"net"
 	"strings"
 	"time"
-
-	"log"
 )
 
 // Active/Passive transfer connection handler
@@ -54,7 +52,7 @@ func (c *clientHandler) handlePASV() {
 	}
 
 	if err != nil {
-		log.Println(logKeyMsg, "Could not listen", "err", err)
+		c.logger.Error("Could not listen", err)
 		return
 	}
 

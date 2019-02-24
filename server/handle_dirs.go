@@ -84,11 +84,21 @@ func (c *clientHandler) handlePWD() {
 }
 
 func (c *clientHandler) handleLIST() {
-	if files, err := c.driver.ListFiles(c); err == nil {
-		if tr, err := c.TransferOpen(); err == nil {
-			defer c.TransferClose()
-			c.dirTransferLIST(tr, files)
+	tr, err := c.TransferOpen()
+	if err != nil {
+		c.writeMessage(500, fmt.Sprintf("Could not list: %v", err))
+	}
+	defer c.TransferClose()
+	if c.daddy.settings.Async {
+
+		cfiles := make(chan os.FileInfo, 100)
+		go c.driver.AsyncListFiles(c, cfiles)
+		for ff := range cfiles {
+			fmt.Fprintf(tr, "%s\r\n", c.fileStat(ff))
 		}
+
+	} else if files, err := c.driver.ListFiles(c); err == nil {
+		c.dirTransferLIST(tr, files)
 	} else {
 		c.writeMessage(500, fmt.Sprintf("Could not list: %v", err))
 	}
@@ -99,11 +109,23 @@ func (c *clientHandler) handleMLSD() {
 		c.writeMessage(500, "MLSD has been disabled")
 		return
 	}
-	if files, err := c.driver.ListFiles(c); err == nil {
-		if tr, err := c.TransferOpen(); err == nil {
-			defer c.TransferClose()
-			c.dirTransferMLSD(tr, files)
+
+	tr, err := c.TransferOpen()
+	if err != nil {
+		c.writeMessage(500, fmt.Sprintf("Could not list: %v", err))
+	}
+	defer c.TransferClose()
+
+	if c.daddy.settings.Async {
+
+		cfiles := make(chan os.FileInfo, 100)
+		go c.driver.AsyncListFiles(c, cfiles)
+		for ff := range cfiles {
+			c.writeMLSxOutput(tr, ff)
 		}
+
+	} else if files, err := c.driver.ListFiles(c); err == nil {
+		c.dirTransferMLSD(tr, files)
 	} else {
 		c.writeMessage(500, fmt.Sprintf("Could not list: %v", err))
 	}

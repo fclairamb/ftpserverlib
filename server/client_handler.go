@@ -5,11 +5,12 @@ import (
 	"errors"
 	"fmt"
 	"io"
+
 	"net"
 	"strings"
 	"time"
 
-	"log"
+	"github.com/siddontang/go/log"
 )
 
 type clientHandler struct {
@@ -29,7 +30,7 @@ type clientHandler struct {
 	debug       bool                 // Show debugging info on the server side
 	transfer    transferHandler      // Transfer connection (only passive is implemented at this stage)
 	transferTLS bool                 // Use TLS for transfer connection
-	logger      log.Logger           // Client handler logging
+	logger      *log.Logger          // Client handler logging
 }
 
 // newClientHandler initializes a client handler when someone connects
@@ -111,9 +112,7 @@ func (c *clientHandler) HandleCommands() {
 
 	for {
 		if c.reader == nil {
-			if c.debug {
-				log.Println(c.id, logKeyMsg, " Clean disconnect ", logKeyAction, " ftp.disconnect ", " clean ", true)
-			}
+			c.logger.Debug("ftp.disconnect")
 			return
 		}
 
@@ -131,32 +130,28 @@ func (c *clientHandler) HandleCommands() {
 				if err.Timeout() {
 					// We have to extend the deadline now
 					c.conn.SetDeadline(time.Now().Add(time.Minute))
-					log.Println(c.id, "IDLE timeout", "err", err)
+					c.logger.Warn(c.id, "IDLE timeout", "err", err)
 					c.writeMessage(421, fmt.Sprintf("command timeout (%d seconds): closing control connection", c.daddy.settings.IdleTimeout))
 					if err := c.writer.Flush(); err != nil {
-						log.Println(c.id, "Network flush error", "err", err)
+						c.logger.Error(c.id, "Network flush error", "err", err)
 					}
 					if err := c.conn.Close(); err != nil {
-						log.Println(c.id, "Network close error", "err", err)
+						c.logger.Error(c.id, "Network close error", "err", err)
 					}
 					break
 				}
-				log.Println(c.id, "Network error", "err", err)
+				c.logger.Fatal(c.id, "Network error", "err", err)
 			default:
 				if err == io.EOF {
-					if c.debug {
-						log.Println(c.id, "TCP disconnect")
-					}
+					c.logger.Debug(c.id, "TCP disconnect")
 				} else {
-					log.Println(c.id, "Read error", "err", err)
+					c.logger.Error(c.id, "Read error", "err", err)
 				}
 			}
 			return
 		}
 
-		if c.debug {
-			log.Println(c.id, "<", strings.TrimRight(line, "\n"))
-		}
+		c.logger.Debug(c.id, "<", strings.TrimRight(line, "\n"))
 
 		c.handleCommand(line)
 	}
@@ -189,9 +184,8 @@ func (c *clientHandler) handleCommand(line string) {
 }
 
 func (c *clientHandler) writeLine(line string) {
-	if c.debug {
-		log.Println(c.id, ">", line)
-	}
+	c.logger.Debug(c.id, ">", line)
+
 	c.writer.Write([]byte(line))
 	c.writer.Write([]byte("\r\n"))
 	c.writer.Flush()
@@ -208,8 +202,8 @@ func (c *clientHandler) TransferOpen() (net.Conn, error) {
 	}
 	c.writeMessage(150, "Using transfer connection")
 	conn, err := c.transfer.Open()
-	if err == nil && c.debug {
-		log.Println(c.id, "ftp.transfer_open", "remoteAddr", conn.RemoteAddr().String(), "localAddr", conn.LocalAddr().String())
+	if err == nil {
+		c.logger.Debug(c.id, "ftp.transfer_open ", "remoteAddr ", conn.RemoteAddr().String(), " localAddr ", conn.LocalAddr().String())
 	}
 	return conn, err
 }
