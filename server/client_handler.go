@@ -105,7 +105,7 @@ func (c *clientHandler) Close() {
 
 	c.logger.WithField(logKeyAction, "ftp.disconnected").Info("FTP Client disconnected")
 	if err := c.conn.Close(); err != nil {
-		c.logger.WithField(logKeyAction, "ftp.close_error").Error("Network close error ", err)
+		logError(c.logger.WithField(logKeyAction, "ftp.close_error"), "Network close error ", err)
 	}
 
 	c.transferCloseLocked()
@@ -134,9 +134,7 @@ func (c *clientHandler) end() {
 func (c *clientHandler) sendWelcome() error {
 	msg, err := c.server.driver.WelcomeUser(c)
 	if err != nil {
-		if err2 := c.writeMessage(StatusServiceNotAvailable, err.Error()); err2 != nil {
-			c.logger.Error(err2)
-		}
+		c.writeMessage(StatusServiceNotAvailable, err.Error()) // nolint: errcheck
 		return err
 	}
 
@@ -147,7 +145,7 @@ func (c *clientHandler) sendWelcome() error {
 func (c *clientHandler) handleCommands() {
 	defer c.end()
 	if err := c.sendWelcome(); err != nil {
-		c.logger.Error(err)
+		logError(c.logger.WithField(logKeyAction, "ftp.send_welcome"), "Send welcome error ", err)
 		return
 	}
 
@@ -177,7 +175,7 @@ func (c *clientHandler) handleCommands() {
 
 func (c *clientHandler) setDeadline(deadline time.Time) {
 	if err := c.conn.SetDeadline(deadline); err != nil {
-		c.logger.WithField(logKeyAction, "ftp.set_deadline").Error(err)
+		logError(c.logger.WithField(logKeyAction, "ftp.set_deadline"), "Set deadline error ", err)
 	}
 }
 
@@ -188,19 +186,15 @@ func (c *clientHandler) handleReadError(err error) {
 			// We have to extend the deadline now
 			c.setDeadline(time.Now().Add(time.Minute))
 			l := c.logger.WithField(logKeyAction, "ftp.idle_timeout")
-			l.Error("IDLE timeout ", err)
+			logError(l, "IDLE timeout ", err)
 			if err := c.writeMessage(StatusServiceNotAvailable, fmt.Sprintf("command timeout (%d seconds): closing control connection", c.server.settings.IdleTimeout)); err != nil {
-				l.Error("Write failure: ", err)
+				logError(l, "Write failure: ", err)
 			}
 			return
 		}
-		c.logger.WithField(logKeyAction, "ftp.net_error").Error("Network error ", err)
+		logError(c.logger.WithField(logKeyAction, "ftp.net_error"), "Network error ", err)
 	default:
-		if err == io.EOF {
-			c.logger.WithField(logKeyAction, "ftp.disconnect").Debug("TCP disconnect ", err)
-		} else {
-			c.logger.WithField(logKeyAction, "ftp.read_error").Error("Read error ", err)
-		}
+		logError(c.logger.WithField(logKeyAction, "ftp.read_error"), "Read error ", err)
 	}
 }
 
@@ -280,11 +274,11 @@ func (c *clientHandler) transferCloseLocked() {
 	if c.transfer != nil {
 		l := c.logger.WithField(logKeyAction, "ftp.transfer_close")
 		if err := c.writeMessage(StatusClosingDataConn, "Closing transfer connection"); err != nil {
-			l.Error("Write failed: ", err)
+			logError(l, "Write failed: ", err)
 		}
 
 		if err := c.transfer.Close(); err != nil {
-			l.Error("Close failed: ", err)
+			logError(l, "Close failed: ", err)
 		}
 		l.Debug("FTP Transfer connection closed")
 		c.transfer = nil
@@ -297,4 +291,21 @@ func parseLine(line string) (string, string) {
 		return params[0], ""
 	}
 	return params[0], params[1]
+}
+
+// logError logs an error if err is not an error we would expect for closed connections.
+func logError(l *logrus.Entry, msg string, err error) {
+	if closedConnErr(err) {
+		return
+	}
+	l.Error(msg, err)
+}
+
+// closedConnErr returns true if the error message indicates use of a closed connection.
+func closedConnErr(err error) bool {
+	if err == io.EOF {
+		return true
+	}
+	s := err.Error()
+	return strings.Contains(s, "use of closed network connection") || strings.Contains(s, "connection reset by peer")
 }
