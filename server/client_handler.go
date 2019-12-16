@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"runtime"
 	"strings"
 	"time"
 
@@ -183,6 +184,10 @@ func (c *clientHandler) handleCommand(line string) {
 	// Let's prepare to recover in case there's a command error
 	defer func() {
 		if r := recover(); r != nil {
+			buf := make([]byte, 2048)
+			n := runtime.Stack(buf, false)
+			stackInfo := fmt.Sprintf("%s", buf[:n])
+			level.Error(c.logger).Log("Panic stack", stackInfo)
 			c.writeMessage(StatusSyntaxErrorNotRecognised, fmt.Sprintf("Internal error: %s", r))
 		}
 	}()
