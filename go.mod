@@ -2,8 +2,6 @@ module github.com/fclairamb/ftpserver
 
 require (
 	github.com/go-kit/kit v0.10.0
-	github.com/go-logfmt/logfmt v0.4.0 // indirect
-	github.com/go-stack/stack v1.8.0 // indirect
 	github.com/kylelemons/godebug v1.1.0 // indirect
 	github.com/mattn/go-colorable v0.1.4 // indirect
 	github.com/mattn/go-isatty v0.0.11 // indirect
