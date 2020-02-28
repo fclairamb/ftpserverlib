@@ -5,8 +5,7 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
+	"github.com/fclairamb/ftpserver/server/log"
 )
 
 const (
@@ -18,8 +17,8 @@ const (
 
 // CommandDescription defines which function should be used and if it should be open to anyone or only logged in users
 type CommandDescription struct {
-	Open bool                 // Open to clients without auth
-	Fn   func(*clientHandler) // Function to handle it
+	Open bool                       // Open to clients without auth
+	Fn   func(*clientHandler) error // Function to handle it
 }
 
 // This is shared between FtpServer instances as there's no point in making the FTP commands behave differently
@@ -35,6 +34,7 @@ var commandsMap = map[string]*CommandDescription{
 	"PBSZ": {Fn: (*clientHandler).handlePBSZ, Open: true},
 
 	// Misc
+	"CLNT": {Fn: (*clientHandler).handleCLNT, Open: true},
 	"FEAT": {Fn: (*clientHandler).handleFEAT, Open: true},
 	"SYST": {Fn: (*clientHandler).handleSYST, Open: true},
 	"NOOP": {Fn: (*clientHandler).handleNOOP, Open: true},
@@ -44,6 +44,7 @@ var commandsMap = map[string]*CommandDescription{
 	"SIZE": {Fn: (*clientHandler).handleSIZE},
 	"STAT": {Fn: (*clientHandler).handleSTAT},
 	"MDTM": {Fn: (*clientHandler).handleMDTM},
+	"MFMT": {Fn: (*clientHandler).handleMFMT},
 	"RETR": {Fn: (*clientHandler).handleRETR},
 	"STOR": {Fn: (*clientHandler).handleSTOR},
 	"APPE": {Fn: (*clientHandler).handleAPPE},
@@ -58,7 +59,7 @@ var commandsMap = map[string]*CommandDescription{
 	"CWD":  {Fn: (*clientHandler).handleCWD},
 	"PWD":  {Fn: (*clientHandler).handlePWD},
 	"CDUP": {Fn: (*clientHandler).handleCDUP},
-	"NLST": {Fn: (*clientHandler).handleLIST},
+	"NLST": {Fn: (*clientHandler).handleNLST},
 	"LIST": {Fn: (*clientHandler).handleLIST},
 	"MLSD": {Fn: (*clientHandler).handleMLSD},
 	"MLST": {Fn: (*clientHandler).handleMLST},
@@ -123,24 +124,25 @@ func (server *FtpServer) Listen() error {
 		server.listener, err = net.Listen("tcp", server.settings.ListenAddr)
 
 		if err != nil {
-			level.Error(server.Logger).Log(logKeyMsg, "Cannot listen", "err", err)
+			server.Logger.Error(logKeyMsg, "Cannot listen", "err", err)
 			return err
 		}
 	}
 
-	level.Info(server.Logger).Log(logKeyMsg, "Listening...", logKeyAction, "ftp.listening", "address", server.listener.Addr())
+	server.Logger.Info(logKeyMsg, "Listening...", logKeyAction, "ftp.listening", "address", server.listener.Addr())
 
 	return err
 }
 
-// Serve accepts and process any new client coming
+// Serve accepts and processes any new incoming client
 func (server *FtpServer) Serve() {
 	for {
 		connection, err := server.listener.Accept()
 		if err != nil {
 			if server.listener != nil {
-				level.Error(server.Logger).Log(logKeyMsg, "Accept error", "err", err)
+				server.Logger.Error(logKeyMsg, "Accept error", "err", err)
 			}
+
 			break
 		}
 
@@ -154,11 +156,11 @@ func (server *FtpServer) ListenAndServe() error {
 		return err
 	}
 
-	level.Info(server.Logger).Log(logKeyMsg, "Starting...", logKeyAction, "ftp.starting")
+	server.Logger.Info(logKeyMsg, "Starting...", logKeyAction, "ftp.starting")
 
 	server.Serve()
 
-	// Note: At this precise time, the clients are still connected. We are just not accepting clients anymore.
+	// At this precise time, the clients are still connected. We are just not accepting clients anymore.
 
 	return nil
 }
@@ -167,7 +169,7 @@ func (server *FtpServer) ListenAndServe() error {
 func NewFtpServer(driver MainDriver) *FtpServer {
 	return &FtpServer{
 		driver: driver,
-		Logger: log.NewNopLogger(),
+		Logger: log.NewNopGKLogger(),
 	}
 }
 
@@ -176,30 +178,35 @@ func (server *FtpServer) Addr() string {
 	if server.listener != nil {
 		return server.listener.Addr().String()
 	}
+
 	return ""
 }
 
 // Stop closes the listener
 func (server *FtpServer) Stop() {
 	if server.listener != nil {
-		server.listener.Close()
+		if err := server.listener.Close(); err != nil {
+			server.Logger.Warn(
+				"msg", "Could not close listener",
+				"action", "err.closing_listener",
+				"err", err,
+			)
+		}
 	}
 }
 
 // When a client connects, the server could refuse the connection
-func (server *FtpServer) clientArrival(conn net.Conn) error {
+func (server *FtpServer) clientArrival(conn net.Conn) {
 	server.clientCounter++
 	id := server.clientCounter
 
 	c := server.newClientHandler(conn, id)
 	go c.HandleCommands()
 
-	level.Info(c.logger).Log(logKeyMsg, "FTP Client connected", logKeyAction, "ftp.connected", "clientIp", conn.RemoteAddr())
-
-	return nil
+	c.logger.Info(logKeyMsg, "FTP Client connected", logKeyAction, "ftp.connected", "clientIp", conn.RemoteAddr())
 }
 
 // clientDeparture
 func (server *FtpServer) clientDeparture(c *clientHandler) {
-	level.Info(c.logger).Log(logKeyMsg, "FTP Client disconnected", logKeyAction, "ftp.disconnected", "clientIp", c.conn.RemoteAddr())
+	c.logger.Info(logKeyMsg, "FTP Client disconnected", logKeyAction, "ftp.disconnected", "clientIp", c.conn.RemoteAddr())
 }
