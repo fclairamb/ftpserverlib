@@ -182,3 +182,4 @@ func (p *passiveTransferHandler) Close() error {
 func (p *passiveTransferHandler) Ok() bool {
 	return p.connection.RemoteAddr() != nil
 }
+
