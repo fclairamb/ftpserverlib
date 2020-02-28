@@ -4,6 +4,7 @@ package server
 import (
 	"crypto/tls"
 	"fmt"
+	"io"
 	"math/rand"
 	"net"
 	"strings"
@@ -180,5 +181,24 @@ func (p *passiveTransferHandler) Close() error {
 }
 
 func (p *passiveTransferHandler) Ok() bool {
-	return p.connection.RemoteAddr() != nil
+	switch p.connection.(type) {
+	case *net.TCPConn:
+		return isTcpConnClosed(p.connection.(*net.TCPConn))
+	default:
+		return true
+	}
+}
+
+func isTcpConnClosed(c *net.TCPConn) bool {
+	one := make([]byte, 1)
+	_ = c.SetReadDeadline(time.Time{})
+	_, err := c.Read(one)
+	if err == io.EOF {
+		c = nil
+		return true
+	} else {
+		var zero time.Time
+		_ = c.SetReadDeadline(zero)
+		return false
+	}
 }
