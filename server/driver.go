@@ -1,3 +1,4 @@
+// Package server provides all the tools to build your own FTP server: The core library and the driver.
 package server
 
 import (
@@ -5,6 +6,7 @@ import (
 	"io"
 	"net"
 	"os"
+	"time"
 )
 
 // This file is the driver part of the server. It must be implemented by anyone wanting to use the server.
@@ -37,7 +39,7 @@ type ClientHandlingDriver interface {
 	MakeDirectory(cc ClientContext, directory string) error
 
 	// ListFiles lists the files of a directory
-	ListFiles(cc ClientContext) ([]os.FileInfo, error)
+	ListFiles(cc ClientContext, directory string) ([]os.FileInfo, error)
 
 	// OpenFile opens a file in 3 possible modes: read, write, appending write (use appropriate flags)
 	OpenFile(cc ClientContext, path string, flag int) (FileStream, error)
@@ -47,6 +49,9 @@ type ClientHandlingDriver interface {
 
 	// GetFileInfo gets some info around a file or a directory
 	GetFileInfo(cc ClientContext, path string) (os.FileInfo, error)
+
+	//SetFileMtime changes file mtime
+	SetFileMtime(cc ClientContext, path string, mtime time.Time) error
 
 	// RenameFile renames a file or a directory
 	RenameFile(cc ClientContext, from, to string) error
@@ -98,15 +103,17 @@ type PortRange struct {
 type PublicIPResolver func(ClientContext) (string, error)
 
 // Settings defines all the server settings
+// nolint: maligned
 type Settings struct {
-	Listener                  net.Listener     // Allow providing an already initialized listener. Mutually exclusive with ListenAddr
-	ListenAddr                string           // Listening address
-	PublicHost                string           // Public IP to expose (only an IP address is accepted at this stage)
-	PublicIPResolver          PublicIPResolver // Optional function that can perform a public ip lookup for the given CientContext.
-	DataPortRange             *PortRange       // Port Range for data connections. Random one will be used if not specified
-	DisableMLSD               bool             // Disable MLSD support
-	DisableMLST               bool             // Disable MLST support
-	NonStandardActiveDataPort bool             // Allow to use a non-standard active data port
-	IdleTimeout               int              // Maximum inactivity time before disconnecting (#58)
-	ConnectionTimeout         int              // Maximum time to establish passive or active transfer connections
+	Listener                 net.Listener     // (Optional) To provide an already initialized listener
+	ListenAddr               string           // Listening address
+	PublicHost               string           // Public IP to expose (only an IP address is accepted at this stage)
+	PublicIPResolver         PublicIPResolver // (Optional) To fetch a public IP lookup
+	PassiveTransferPortRange *PortRange       // Port Range for data connections. Random if not specified
+	ActiveTransferPortNon20  bool             // Do not impose the port 20 for active data transfer (#88, RFC 1579)
+	IdleTimeout              int              // Maximum inactivity time before disconnecting (#58)
+	ConnectionTimeout        int              // Maximum time to establish passive or active transfer connections
+	DisableMLSD              bool             // Disable MLSD support
+	DisableMLST              bool             // Disable MLST support
+	DisableMFMT              bool             // Disable MFMT support (modify file mtime)
 }

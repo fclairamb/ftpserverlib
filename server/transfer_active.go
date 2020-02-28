@@ -1,3 +1,4 @@
+// Package server provides all the tools to build your own FTP server: The core library and the driver.
 package server
 
 import (
@@ -9,12 +10,12 @@ import (
 	"time"
 )
 
-func (c *clientHandler) handlePORT() {
+func (c *clientHandler) handlePORT() error {
 	raddr, err := parseRemoteAddr(c.param)
 
 	if err != nil {
 		c.writeMessage(StatusSyntaxErrorNotRecognised, fmt.Sprintf("Problem parsing PORT: %v", err))
-		return
+		return nil
 	}
 
 	c.writeMessage(StatusOK, "PORT command successful")
@@ -23,6 +24,8 @@ func (c *clientHandler) handlePORT() {
 		raddr:    raddr,
 		settings: c.server.settings,
 	}
+
+	return nil
 }
 
 // Active connection
@@ -33,10 +36,10 @@ type activeTransferHandler struct {
 }
 
 func (a *activeTransferHandler) Open() (net.Conn, error) {
-	timeout := time.Duration(int64(time.Second.Nanoseconds()) * int64(a.settings.ConnectionTimeout))
+	timeout := time.Duration(time.Second.Nanoseconds() * int64(a.settings.ConnectionTimeout))
 	dialer := &net.Dialer{Timeout: timeout}
 
-	if !a.settings.NonStandardActiveDataPort {
+	if !a.settings.ActiveTransferPortNon20 {
 		dialer.LocalAddr, _ = net.ResolveTCPAddr("tcp", ":20")
 	}
 	// TODO(mgenov): support dialing with timeout
@@ -60,6 +63,7 @@ func (a *activeTransferHandler) Close() error {
 	if a.conn != nil {
 		return a.conn.Close()
 	}
+
 	return nil
 }
 
@@ -75,16 +79,20 @@ func parseRemoteAddr(param string) (*net.TCPAddr, error) {
 	if len(params) != 6 {
 		return nil, errors.New("bad number of args")
 	}
+
 	ip := strings.Join(params[0:4], ".")
 
 	p1, err := strconv.Atoi(params[4])
 	if err != nil {
 		return nil, err
 	}
+
 	p2, err := strconv.Atoi(params[5])
+
 	if err != nil {
 		return nil, err
 	}
+
 	port := p1<<8 + p2
 
 	return net.ResolveTCPAddr("tcp", fmt.Sprintf("%s:%d", ip, port))
