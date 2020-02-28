@@ -17,6 +17,9 @@ type transferHandler interface {
 	// Get the connection to transfer data on
 	Open() (net.Conn, error)
 
+	// is connection ok?
+	Ok() bool
+
 	// Close the connection (and any associated resource)
 	Close() error
 }
@@ -174,4 +177,8 @@ func (p *passiveTransferHandler) Close() error {
 	}
 
 	return nil
+}
+
+func (p *passiveTransferHandler) Ok() bool {
+	return p.connection.RemoteAddr() != nil
 }

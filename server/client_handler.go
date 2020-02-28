@@ -243,7 +243,7 @@ func (c *clientHandler) writeLine(line string) {
 
 	if err := c.writer.Flush(); err != nil {
 		c.logger.Warn(
-			logKeyMsg, "Couldn't flush line (" + line + ")",
+			logKeyMsg, "Couldn't flush line ("+line+")",
 			logKeyAction, "err.client_flush",
 			"err", err,
 		)
@@ -276,8 +276,10 @@ func (c *clientHandler) TransferOpen() (net.Conn, error) {
 
 func (c *clientHandler) TransferClose() {
 	if c.transfer != nil {
-		c.writeMessage(StatusClosingDataConn, "Closing transfer connection")
-
+		if c.transfer.Ok() {
+			c.writeMessage(StatusClosingDataConn, "Closing transfer connection")
+		}
+		
 		if err := c.transfer.Close(); err != nil {
 			c.logger.Warn(
 				logKeyMsg, "Problem closing tranfer connection",

@@ -58,6 +58,10 @@ func (a *activeTransferHandler) Open() (net.Conn, error) {
 	return a.conn, nil
 }
 
+func (a *activeTransferHandler) Ok() bool {
+	return a.conn.RemoteAddr() != nil
+}
+
 // Close closes only if connection is established
 func (a *activeTransferHandler) Close() error {
 	if a.conn != nil {
