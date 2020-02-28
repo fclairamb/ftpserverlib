@@ -4,7 +4,6 @@ package server
 import (
 	"crypto/tls"
 	"fmt"
-	"io"
 	"math/rand"
 	"net"
 	"strings"
@@ -17,9 +16,6 @@ import (
 type transferHandler interface {
 	// Get the connection to transfer data on
 	Open() (net.Conn, error)
-
-	// is connection ok?
-	Ok() bool
 
 	// Close the connection (and any associated resource)
 	Close() error
@@ -178,27 +174,4 @@ func (p *passiveTransferHandler) Close() error {
 	}
 
 	return nil
-}
-
-func (p *passiveTransferHandler) Ok() bool {
-	switch p.connection.(type) {
-	case *net.TCPConn:
-		return isTcpConnClosed(p.connection.(*net.TCPConn))
-	default:
-		return true
-	}
-}
-
-func isTcpConnClosed(c *net.TCPConn) bool {
-	one := make([]byte, 1)
-	_ = c.SetReadDeadline(time.Time{})
-	_, err := c.Read(one)
-	if err == io.EOF {
-		c = nil
-		return true
-	} else {
-		var zero time.Time
-		_ = c.SetReadDeadline(zero)
-		return false
-	}
 }

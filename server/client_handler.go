@@ -276,10 +276,8 @@ func (c *clientHandler) TransferOpen() (net.Conn, error) {
 
 func (c *clientHandler) TransferClose() {
 	if c.transfer != nil {
-		if c.transfer.Ok() {
-			c.writeMessage(StatusClosingDataConn, "Closing transfer connection")
-		}
-		
+		c.writeMessage(StatusClosingDataConn, "Closing transfer connection")
+
 		if err := c.transfer.Close(); err != nil {
 			c.logger.Warn(
 				logKeyMsg, "Problem closing tranfer connection",
