@@ -1,4 +1,4 @@
-package tests
+package ftpserver
 
 import (
 	"crypto/tls"

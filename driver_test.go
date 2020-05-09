@@ -1,5 +1,5 @@
 // Package tests brings all the logic to test the server without messing up the main code
-package tests
+package ftpserver
 
 import (
 	"crypto/tls"
@@ -10,26 +10,25 @@ import (
 	gklog "github.com/go-kit/kit/log"
 	"github.com/spf13/afero"
 
-	"github.com/fclairamb/ftpserver/server"
-	"github.com/fclairamb/ftpserver/server/log"
+	"github.com/fclairamb/ftpserver/log"
 )
 
 // NewTestServer provides a test server with or without debugging
-func NewTestServer(debug bool) *server.FtpServer {
+func NewTestServer(debug bool) *FtpServer {
 	return NewTestServerWithDriver(&ServerDriver{Debug: debug})
 }
 
 // NewTestServerWithDriver provides a server instantiated with some settings
-func NewTestServerWithDriver(driver *ServerDriver) *server.FtpServer {
+func NewTestServerWithDriver(driver *ServerDriver) *FtpServer {
 	if driver.Settings == nil {
-		driver.Settings = &server.Settings{}
+		driver.Settings = &Settings{}
 	}
 
 	if driver.Settings.ListenAddr == "" {
 		driver.Settings.ListenAddr = "127.0.0.1:0"
 	}
 
-	s := server.NewFtpServer(driver)
+	s := NewFtpServer(driver)
 
 	// If we are in debug mode, we should log things
 	if driver.Debug {
@@ -53,7 +52,7 @@ type ServerDriver struct {
 	Debug bool // To display connection logs information
 	TLS   bool
 
-	Settings     *server.Settings // Settings
+	Settings     *Settings // Settings
 	FileOverride afero.File
 }
 
@@ -76,14 +75,14 @@ func NewClientDriver() *ClientDriver {
 }
 
 // WelcomeUser is the very first message people will see
-func (driver *ServerDriver) WelcomeUser(cc server.ClientContext) (string, error) {
+func (driver *ServerDriver) WelcomeUser(cc ClientContext) (string, error) {
 	cc.SetDebug(driver.Debug)
 	// This will remain the official name for now
 	return "TEST Server", nil
 }
 
 // AuthUser with authenticate users
-func (driver *ServerDriver) AuthUser(cc server.ClientContext, user, pass string) (afero.Fs, error) {
+func (driver *ServerDriver) AuthUser(cc ClientContext, user, pass string) (afero.Fs, error) {
 	if user == "test" && pass == "test" {
 		clientdriver := NewClientDriver()
 
@@ -98,12 +97,12 @@ func (driver *ServerDriver) AuthUser(cc server.ClientContext, user, pass string)
 }
 
 // UserLeft is called when the user disconnects
-func (driver *ServerDriver) UserLeft(cc server.ClientContext) {
+func (driver *ServerDriver) UserLeft(cc ClientContext) {
 
 }
 
 // GetSettings fetches the basic server settings
-func (driver *ServerDriver) GetSettings() (*server.Settings, error) {
+func (driver *ServerDriver) GetSettings() (*Settings, error) {
 	return driver.Settings, nil
 }
 

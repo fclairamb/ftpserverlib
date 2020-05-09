@@ -1,4 +1,4 @@
-package server
+package ftpserver
 
 import "testing"
 

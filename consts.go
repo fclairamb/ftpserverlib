@@ -1,5 +1,5 @@
 // Package server provides all the tools to build your own FTP server: The core library and the driver.
-package server
+package ftpserver
 
 // from @stevenh's PR proposal
 // https://github.com/fclairamb/ftpserver/blob/becc125a0770e3b670c4ced7e7bd12594fb024ff/server/consts.go

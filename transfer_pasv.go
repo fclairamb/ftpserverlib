@@ -1,5 +1,5 @@
 // Package server provides all the tools to build your own FTP server: The core library and the driver.
-package server
+package ftpserver
 
 import (
 	"crypto/tls"
@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/fclairamb/ftpserver/server/log"
+	"github.com/fclairamb/ftpserver/log"
 )
 
 // Active/Passive transfer connection handler

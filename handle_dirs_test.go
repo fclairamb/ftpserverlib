@@ -1,4 +1,4 @@
-package tests
+package ftpserver
 
 import (
 	"runtime"
@@ -6,15 +6,13 @@ import (
 	"testing"
 
 	"gopkg.in/dutchcoders/goftp.v1"
-
-	"github.com/fclairamb/ftpserver/server"
 )
 
 const DirKnown = "known"
 
 // TestDirAccess relies on LIST of files listing
 func TestDirListing(t *testing.T) {
-	s := NewTestServerWithDriver(&ServerDriver{Debug: true, Settings: &server.Settings{DisableMLSD: true}})
+	s := NewTestServerWithDriver(&ServerDriver{Debug: true, Settings: &Settings{DisableMLSD: true}})
 	defer s.Stop()
 
 	var connErr error
@@ -60,7 +58,7 @@ func TestDirListing(t *testing.T) {
 }
 
 func TestDirListingPathArg(t *testing.T) {
-	s := NewTestServerWithDriver(&ServerDriver{Debug: true, Settings: &server.Settings{DisableMLSD: true}})
+	s := NewTestServerWithDriver(&ServerDriver{Debug: true, Settings: &Settings{DisableMLSD: true}})
 	defer s.Stop()
 
 	var connErr error

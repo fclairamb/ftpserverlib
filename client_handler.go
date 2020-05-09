@@ -1,5 +1,5 @@
 // Package server is the core of the library
-package server
+package ftpserver
 
 import (
 	"bufio"
@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/fclairamb/ftpserver/server/log"
+	"github.com/fclairamb/ftpserver/log"
 
 	"github.com/spf13/afero"
 )
