@@ -1,5 +1,4 @@
-// Package log provides a way to use the go-kit/log package without having to deal
-// with their very-opiniated/crazy choice of returning an error all the time: https://github.com/go-kit/kit/issues/164
+// Package log provides a simple interface to handle logging
 package log
 
 // Logger interface

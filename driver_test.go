@@ -1,4 +1,3 @@
-// Package tests brings all the logic to test the server without messing up the main code
 package ftpserver
 
 import (

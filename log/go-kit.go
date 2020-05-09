@@ -1,7 +1,9 @@
+// Package log provides a simple interface to handle logging
 package log
 
 import (
 	"fmt"
+
 	gklog "github.com/go-kit/kit/log"
 	gklevel "github.com/go-kit/kit/log/level"
 )
@@ -14,8 +16,7 @@ func (logger *gKLogger) checkError(err error) {
 
 func (logger *gKLogger) log(gklogger gklog.Logger, event string, keyvals ...interface{}) {
 	newKV := make([]interface{}, len(keyvals)+2)
-	newKV = append(newKV, "event")
-	newKV = append(newKV, event)
+	newKV = append(newKV, "event", event)
 	newKV = append(newKV, keyvals...)
 	logger.checkError(gklogger.Log(newKV))
 }
