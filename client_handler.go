@@ -58,8 +58,7 @@ func (server *FtpServer) newClientHandler(connection net.Conn, id uint32) *clien
 func (c *clientHandler) disconnect() {
 	if err := c.conn.Close(); err != nil {
 		c.logger.Warn(
-			"msg", "Problem disconnecting a client",
-			"action", "ftp.err_disconnecting",
+			"Problem disconnecting a client",
 			"err", err)
 	}
 }
@@ -106,8 +105,7 @@ func (c *clientHandler) end() {
 	if c.transfer != nil {
 		if err := c.transfer.Close(); err != nil {
 			c.logger.Warn(
-				"msg", "Problem closing a transfer",
-				"action", "ftp.err_closing_transfer",
+				"Problem closing a transfer",
 				"err", err,
 			)
 		}

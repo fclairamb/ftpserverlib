@@ -17,5 +17,5 @@ func getLogger() Logger {
 
 func TestLogSimple(t *testing.T) {
 	logger := getLogger()
-	logger.Info("msg", "Hello !")
+	logger.Info("Hello !")
 }

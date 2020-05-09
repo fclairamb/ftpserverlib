@@ -187,8 +187,7 @@ func (server *FtpServer) Stop() {
 	if server.listener != nil {
 		if err := server.listener.Close(); err != nil {
 			server.Logger.Warn(
-				"msg", "Could not close listener",
-				"action", "err.closing_listener",
+				"Could not close listener",
 				"err", err,
 			)
 		}
