@@ -33,8 +33,8 @@ func NewTestServerWithDriver(driver *ServerDriver) *FtpServer {
 	// If we are in debug mode, we should log things
 	if driver.Debug {
 		s.Logger = log.NewGKLogger(gklog.NewLogfmtLogger(gklog.NewSyncWriter(os.Stdout))).With(
-			"ts", log.DefaultTimestampUTC,
-			"caller", log.DefaultCaller,
+			"ts", log.GKDefaultTimestampUTC,
+			"caller", log.GKDefaultCaller,
 		)
 	}
 

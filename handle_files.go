@@ -94,7 +94,7 @@ func (c *clientHandler) transferFile(write bool, append bool) {
 				err = errCopy
 			} else {
 				c.logger.Debug(
-					logKeyMsg, "Stream copy finished",
+					"Stream copy finished",
 					"writtenBytes", written,
 				)
 			}

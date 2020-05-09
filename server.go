@@ -9,10 +9,10 @@ import (
 )
 
 const (
-	// logKeyMsg is the human-readable part of the log
-	logKeyMsg = "msg"
-	// logKeyAction is the machine-readable part of the log
-	logKeyAction = "action"
+// logKeyMsg is the human-readable part of the log
+// logKeyMsg = "msg"
+// logKeyAction is the machine-readable part of the log
+// logKeyAction = "action"
 )
 
 // CommandDescription defines which function should be used and if it should be open to anyone or only logged in users
@@ -124,12 +124,12 @@ func (server *FtpServer) Listen() error {
 		server.listener, err = net.Listen("tcp", server.settings.ListenAddr)
 
 		if err != nil {
-			server.Logger.Error(logKeyMsg, "Cannot listen", "err", err)
+			server.Logger.Error("Cannot listen", "err", err)
 			return err
 		}
 	}
 
-	server.Logger.Info(logKeyMsg, "Listening...", logKeyAction, "ftp.listening", "address", server.listener.Addr())
+	server.Logger.Info("Listening...", "address", server.listener.Addr())
 
 	return err
 }
@@ -140,7 +140,7 @@ func (server *FtpServer) Serve() {
 		connection, err := server.listener.Accept()
 		if err != nil {
 			if server.listener != nil {
-				server.Logger.Error(logKeyMsg, "Accept error", "err", err)
+				server.Logger.Error("Listener accept error", "err", err)
 			}
 
 			break
@@ -156,7 +156,7 @@ func (server *FtpServer) ListenAndServe() error {
 		return err
 	}
 
-	server.Logger.Info(logKeyMsg, "Starting...", logKeyAction, "ftp.starting")
+	server.Logger.Info("Starting...")
 
 	server.Serve()
 
@@ -203,10 +203,10 @@ func (server *FtpServer) clientArrival(conn net.Conn) {
 	c := server.newClientHandler(conn, id)
 	go c.HandleCommands()
 
-	c.logger.Info(logKeyMsg, "FTP Client connected", logKeyAction, "ftp.connected", "clientIp", conn.RemoteAddr())
+	c.logger.Info("Client connected", "clientIp", conn.RemoteAddr())
 }
 
 // clientDeparture
 func (server *FtpServer) clientDeparture(c *clientHandler) {
-	c.logger.Info(logKeyMsg, "FTP Client disconnected", logKeyAction, "ftp.disconnected", "clientIp", c.conn.RemoteAddr())
+	c.logger.Info("Client disconnected", "clientIp", c.conn.RemoteAddr())
 }
