@@ -10,7 +10,7 @@ import (
 	gklog "github.com/go-kit/kit/log"
 	"github.com/spf13/afero"
 
-	"github.com/fclairamb/ftpserver/log"
+	"github.com/fclairamb/ftpserverlib/log"
 )
 
 const (
