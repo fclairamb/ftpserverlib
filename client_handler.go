@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/fclairamb/ftpserver/log"
+	"github.com/fclairamb/ftpserverlib/log"
 )
 
 // nolint: maligned

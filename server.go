@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/fclairamb/ftpserver/log"
+	"github.com/fclairamb/ftpserverlib/log"
 )
 
 const (
