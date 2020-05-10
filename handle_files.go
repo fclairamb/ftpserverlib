@@ -230,7 +230,7 @@ func (c *clientHandler) handleSTATFile() error {
 				return nil
 			}
 
-			if files, errList := directory.Readdir(1000000); errList == nil {
+			if files, errList := directory.Readdir(-1); errList == nil {
 				for _, f := range files {
 					c.writeLine(fmt.Sprintf(" %s", c.fileStat(f)))
 				}

@@ -97,7 +97,7 @@ func (c *clientHandler) LocalAddr() net.Addr {
 }
 
 func (c *clientHandler) end() {
-	c.server.driver.UserLeft(c)
+	c.server.driver.ClientDisconnected(c)
 	c.server.clientDeparture(c)
 
 	if c.transfer != nil {
@@ -114,7 +114,7 @@ func (c *clientHandler) end() {
 func (c *clientHandler) HandleCommands() {
 	defer c.end()
 
-	if msg, err := c.server.driver.WelcomeUser(c); err == nil {
+	if msg, err := c.server.driver.ClientConnected(c); err == nil {
 		c.writeMessage(StatusServiceReady, msg)
 	} else {
 		c.writeMessage(StatusSyntaxErrorNotRecognised, msg)

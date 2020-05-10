@@ -83,7 +83,7 @@ func (c *clientHandler) handleLIST() error {
 		return nil
 	}
 
-	if files, err := directory.Readdir(1000000); err == nil || err == io.EOF {
+	if files, err := directory.Readdir(-1); err == nil || err == io.EOF {
 		if tr, errTr := c.TransferOpen(); errTr == nil {
 			defer c.TransferClose()
 			return c.dirTransferLIST(tr, files)
@@ -102,7 +102,7 @@ func (c *clientHandler) handleNLST() error {
 		return nil
 	}
 
-	if files, err := directory.Readdir(1000000); err == nil || err == io.EOF {
+	if files, err := directory.Readdir(-1); err == nil || err == io.EOF {
 		if tr, errTrOpen := c.TransferOpen(); errTrOpen == nil {
 			defer c.TransferClose()
 			return c.dirTransferNLST(tr, files)
@@ -138,7 +138,14 @@ func (c *clientHandler) handleMLSD() error {
 		return nil
 	}
 
-	if files, err := directory.Readdir(1000000); err == nil || err == io.EOF {
+	// TODO: We have a lot of copy/paste around directory listing, we should refactor this.
+	defer func() {
+		if errClose := directory.Close(); errClose != nil {
+			c.logger.Error("Couldn't close directory", errClose, "directory", directoryPath)
+		}
+	}()
+
+	if files, err := directory.Readdir(-1); err == nil || err == io.EOF {
 		if tr, errTr := c.TransferOpen(); errTr == nil {
 			defer c.TransferClose()
 			return c.dirTransferMLSD(tr, files)
