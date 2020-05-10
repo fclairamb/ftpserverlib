@@ -1,4 +1,4 @@
-module github.com/fclairamb/ftpserver
+module github.com/fclairamb/ftpserverlib
 
 require (
 	github.com/go-kit/kit v0.10.0
@@ -9,4 +9,4 @@ require (
 	gopkg.in/dutchcoders/goftp.v1 v1.0.0-20170301105846-ed59a591ce14
 )
 
-go 1.13
+go 1.14
