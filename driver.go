@@ -1,5 +1,5 @@
-// Package server provides all the tools to build your own FTP server: The core library and the driver.
-package server
+// Package ftpserver provides all the tools to build your own FTP server: The core library and the driver.
+package ftpserver
 
 import (
 	"crypto/tls"
@@ -22,11 +22,30 @@ type MainDriver interface {
 	UserLeft(cc ClientContext)
 
 	// AuthUser authenticates the user and selects an handling driver
-	AuthUser(cc ClientContext, user, pass string) (afero.Fs, error)
+	AuthUser(cc ClientContext, user, pass string) (ClientDriver, error)
 
 	// GetTLSConfig returns a TLS Certificate to use
 	// The certificate could frequently change if we use something like "let's encrypt"
 	GetTLSConfig() (*tls.Config, error)
+}
+
+// ClientDriver is the base FS implementation that allows to manipulate files
+type ClientDriver interface {
+	afero.Fs
+}
+
+// ClientDriverExtensionAllocate is an extension to allow to support the allocation command
+type ClientDriverExtensionAllocate interface {
+
+	// AllocateSpace reserves the space necessary to upload files
+	AllocateSpace(size int) error
+}
+
+// ClientDriverExtensionChown is an extension to allow to support the chown command
+type ClientDriverExtensionChown interface {
+
+	// Chown changes the owner of a file
+	Chown(name string, user string, group string) error
 }
 
 // ClientContext is implemented on the server side to provide some access to few data around the client

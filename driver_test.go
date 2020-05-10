@@ -1,41 +1,46 @@
-// Package tests brings all the logic to test the server without messing up the main code
-package tests
+package ftpserver
 
 import (
 	"crypto/tls"
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"os"
 
 	gklog "github.com/go-kit/kit/log"
 	"github.com/spf13/afero"
 
-	"github.com/fclairamb/ftpserver/server"
-	"github.com/fclairamb/ftpserver/server/log"
+	"github.com/fclairamb/ftpserver/log"
+)
+
+const (
+	authUser  = "test"
+	authPass  = "test"
+	authGroup = "test"
 )
 
 // NewTestServer provides a test server with or without debugging
-func NewTestServer(debug bool) *server.FtpServer {
-	return NewTestServerWithDriver(&ServerDriver{Debug: debug})
+func NewTestServer(debug bool) *FtpServer {
+	return NewTestServerWithDriver(&TestServerDriver{Debug: debug})
 }
 
 // NewTestServerWithDriver provides a server instantiated with some settings
-func NewTestServerWithDriver(driver *ServerDriver) *server.FtpServer {
+func NewTestServerWithDriver(driver *TestServerDriver) *FtpServer {
 	if driver.Settings == nil {
-		driver.Settings = &server.Settings{}
+		driver.Settings = &Settings{}
 	}
 
 	if driver.Settings.ListenAddr == "" {
 		driver.Settings.ListenAddr = "127.0.0.1:0"
 	}
 
-	s := server.NewFtpServer(driver)
+	s := NewFtpServer(driver)
 
 	// If we are in debug mode, we should log things
 	if driver.Debug {
 		s.Logger = log.NewGKLogger(gklog.NewLogfmtLogger(gklog.NewSyncWriter(os.Stdout))).With(
-			"ts", log.DefaultTimestampUTC,
-			"caller", log.DefaultCaller,
+			"ts", log.GKDefaultTimestampUTC,
+			"caller", log.GKDefaultCaller,
 		)
 	}
 
@@ -48,44 +53,46 @@ func NewTestServerWithDriver(driver *ServerDriver) *server.FtpServer {
 	return s
 }
 
-// ServerDriver defines a minimal serverftp server driver
-type ServerDriver struct {
+// TestServerDriver defines a minimal serverftp server driver
+type TestServerDriver struct {
 	Debug bool // To display connection logs information
 	TLS   bool
 
-	Settings     *server.Settings // Settings
+	Settings     *Settings // Settings
 	FileOverride afero.File
 }
 
-// ClientDriver defines a minimal serverftp client driver
-type ClientDriver struct {
+// TestClientDriver defines a minimal serverftp client driver
+type TestClientDriver struct {
 	FileOverride afero.File
+	user         string
 	afero.Fs
 }
 
-// NewClientDriver creates a client driver
-func NewClientDriver() *ClientDriver {
+// NewTestClientDriver creates a client driver
+func NewTestClientDriver() *TestClientDriver {
 	dir, _ := ioutil.TempDir("", "example")
 	if err := os.MkdirAll(dir, 0750); err != nil {
 		panic(err)
 	}
 
-	return &ClientDriver{
+	return &TestClientDriver{
 		Fs: afero.NewBasePathFs(afero.NewOsFs(), dir),
 	}
 }
 
 // WelcomeUser is the very first message people will see
-func (driver *ServerDriver) WelcomeUser(cc server.ClientContext) (string, error) {
+func (driver *TestServerDriver) WelcomeUser(cc ClientContext) (string, error) {
 	cc.SetDebug(driver.Debug)
 	// This will remain the official name for now
 	return "TEST Server", nil
 }
 
 // AuthUser with authenticate users
-func (driver *ServerDriver) AuthUser(cc server.ClientContext, user, pass string) (afero.Fs, error) {
-	if user == "test" && pass == "test" {
-		clientdriver := NewClientDriver()
+func (driver *TestServerDriver) AuthUser(cc ClientContext, user, pass string) (ClientDriver, error) {
+	if user == authUser && pass == authPass {
+		clientdriver := NewTestClientDriver()
+		clientdriver.user = user
 
 		if driver.FileOverride != nil {
 			clientdriver.FileOverride = driver.FileOverride
@@ -98,17 +105,17 @@ func (driver *ServerDriver) AuthUser(cc server.ClientContext, user, pass string)
 }
 
 // UserLeft is called when the user disconnects
-func (driver *ServerDriver) UserLeft(cc server.ClientContext) {
+func (driver *TestServerDriver) UserLeft(cc ClientContext) {
 
 }
 
 // GetSettings fetches the basic server settings
-func (driver *ServerDriver) GetSettings() (*server.Settings, error) {
+func (driver *TestServerDriver) GetSettings() (*Settings, error) {
 	return driver.Settings, nil
 }
 
 // GetTLSConfig fetches the TLS config
-func (driver *ServerDriver) GetTLSConfig() (*tls.Config, error) {
+func (driver *TestServerDriver) GetTLSConfig() (*tls.Config, error) {
 	if driver.TLS {
 		keypair, err := tls.X509KeyPair(localhostCert, localhostKey)
 		if err != nil {
@@ -122,12 +129,32 @@ func (driver *ServerDriver) GetTLSConfig() (*tls.Config, error) {
 }
 
 // OpenFile opens a file in 3 possible modes: read, write, appending write (use appropriate flags)
-func (driver *ClientDriver) OpenFile(path string, flag int, perm os.FileMode) (afero.File, error) {
+func (driver *TestClientDriver) OpenFile(path string, flag int, perm os.FileMode) (afero.File, error) {
 	if driver.FileOverride != nil {
 		return driver.FileOverride, nil
 	}
 
 	return driver.Fs.OpenFile(path, flag, perm)
+}
+
+func (driver *TestClientDriver) AllocateSpace(size int) error {
+	if size < 1*1024*1024 {
+		return nil
+	}
+
+	return errors.New("you're asking too much")
+}
+
+func (driver *TestClientDriver) Chown(name string, user string, group string) error {
+	if user != driver.user {
+		return fmt.Errorf("only accepted chown user: %s", user)
+	}
+
+	if group != "" && group != authGroup {
+		return fmt.Errorf("only accepted chown group: %s", group)
+	}
+
+	return nil
 }
 
 // (copied from net/http/httptest)

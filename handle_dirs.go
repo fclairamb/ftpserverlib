@@ -1,5 +1,5 @@
-// Package server provides all the tools to build your own FTP server: The core library and the driver.
-package server
+// Package ftpserver provides all the tools to build your own FTP server: The core library and the driver.
+package ftpserver
 
 import (
 	"fmt"
@@ -116,7 +116,9 @@ func (c *clientHandler) handleNLST() error {
 
 func (c *clientHandler) dirTransferNLST(w io.Writer, files []os.FileInfo) error {
 	for _, file := range files {
-		fmt.Fprintf(w, "%s\r\n", file.Name())
+		if _, err := fmt.Fprintf(w, "%s\r\n", file.Name()); err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -178,7 +180,9 @@ func (c *clientHandler) fileStat(file os.FileInfo) string {
 // fclairamb (2018-02-13): #64: Removed extra empty line
 func (c *clientHandler) dirTransferLIST(w io.Writer, files []os.FileInfo) error {
 	for _, file := range files {
-		fmt.Fprintf(w, "%s\r\n", c.fileStat(file))
+		if _, err := fmt.Fprintf(w, "%s\r\n", c.fileStat(file)); err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -187,12 +191,14 @@ func (c *clientHandler) dirTransferLIST(w io.Writer, files []os.FileInfo) error 
 // fclairamb (2018-02-13): #64: Removed extra empty line
 func (c *clientHandler) dirTransferMLSD(w io.Writer, files []os.FileInfo) error {
 	for _, file := range files {
-		c.writeMLSxOutput(w, file)
+		if err := c.writeMLSxOutput(w, file); err != nil {
+			return err
+		}
 	}
 
 	return nil
 }
-func (c *clientHandler) writeMLSxOutput(w io.Writer, file os.FileInfo) {
+func (c *clientHandler) writeMLSxOutput(w io.Writer, file os.FileInfo) error {
 	var listType string
 	if file.IsDir() {
 		listType = "dir"
@@ -200,7 +206,7 @@ func (c *clientHandler) writeMLSxOutput(w io.Writer, file os.FileInfo) {
 		listType = "file"
 	}
 
-	fmt.Fprintf(
+	_, err := fmt.Fprintf(
 		w,
 		"Type=%s;Size=%d;Modify=%s; %s\r\n",
 		listType,
@@ -208,6 +214,8 @@ func (c *clientHandler) writeMLSxOutput(w io.Writer, file os.FileInfo) {
 		file.ModTime().Format(dateFormatMLSD),
 		file.Name(),
 	)
+
+	return err
 }
 
 func quoteDoubling(s string) string {

@@ -1,5 +1,5 @@
-// Package server provides all the tools to build your own FTP server: The core library and the driver.
-package server
+// Package ftpserver provides all the tools to build your own FTP server: The core library and the driver.
+package ftpserver
 
 import (
 	"crypto/tls"
@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/fclairamb/ftpserver/server/log"
+	"github.com/fclairamb/ftpserverlib/log"
 )
 
 // Active/Passive transfer connection handler
@@ -68,7 +68,7 @@ func (c *clientHandler) findListenerWithinPortRange(portRange *PortRange) (*net.
 		laddr, errResolve := net.ResolveTCPAddr("tcp", fmt.Sprintf("0.0.0.0:%d", port))
 
 		if errResolve != nil {
-			c.logger.Error(logKeyMsg, "Problem resolving local port", "port", port)
+			c.logger.Error("Problem resolving local port", errResolve, "port", port)
 			return nil, fmt.Errorf("could not resolve port: %d", port)
 		}
 
@@ -79,7 +79,7 @@ func (c *clientHandler) findListenerWithinPortRange(portRange *PortRange) (*net.
 	}
 
 	c.logger.Warn(
-		logKeyMsg, "Could not find any free port",
+		"Could not find any free port",
 		"nbAttempts", nbAttempts,
 		"portRangeStart", portRange.Start,
 		"portRAngeEnd", portRange.End,
@@ -104,7 +104,7 @@ func (c *clientHandler) handlePASV() error {
 	}
 
 	if err != nil {
-		c.logger.Error(logKeyMsg, "Could not listen", "err", err)
+		c.logger.Error("Could not listen for passive connection", err)
 		return nil
 	}
 
@@ -179,8 +179,7 @@ func (p *passiveTransferHandler) Close() error {
 	if p.tcpListener != nil {
 		if err := p.tcpListener.Close(); err != nil {
 			p.logger.Warn(
-				"msg", "Problem closing passive listener",
-				"action", "err.closing_passive_listener",
+				"Problem closing passive listener",
 				"err", err,
 			)
 		}
@@ -189,8 +188,7 @@ func (p *passiveTransferHandler) Close() error {
 	if p.connection != nil {
 		if err := p.connection.Close(); err != nil {
 			p.logger.Warn(
-				"msg", "Problem closing passive connecting",
-				"action", "err.closing_passive_connection",
+				"Problem closing passive connection",
 				"err", err,
 			)
 		}
