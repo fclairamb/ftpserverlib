@@ -15,10 +15,8 @@ func (logger *gKLogger) checkError(err error) {
 }
 
 func (logger *gKLogger) log(gklogger gklog.Logger, event string, keyvals ...interface{}) {
-	newKV := make([]interface{}, len(keyvals)+2)
-	newKV = append(newKV, "event", event)
-	newKV = append(newKV, keyvals...)
-	logger.checkError(gklogger.Log(newKV))
+	keyvals = append(keyvals, "event", event)
+	logger.checkError(gklogger.Log(keyvals...))
 }
 
 // Debug logs key-values at debug level
@@ -37,7 +35,8 @@ func (logger *gKLogger) Warn(event string, keyvals ...interface{}) {
 }
 
 // Error logs key-values at error level
-func (logger *gKLogger) Error(event string, keyvals ...interface{}) {
+func (logger *gKLogger) Error(event string, err error, keyvals ...interface{}) {
+	keyvals = append(keyvals, "err", err)
 	logger.log(gklevel.Error(logger.logger), event, keyvals...)
 }
 

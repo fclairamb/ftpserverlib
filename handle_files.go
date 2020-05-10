@@ -131,6 +131,41 @@ func (c *clientHandler) handleCHMOD(params string) {
 	c.writeMessage(StatusOK, "SITE CHMOD command successful")
 }
 
+// https://www.raidenftpd.com/en/raiden-ftpd-doc/help-sitecmd.html (wildcard isn't supported)
+func (c *clientHandler) handleCHOWN(params string) {
+	// TODO: Implement it
+	spl := strings.SplitN(params, " ", 2)
+
+	if len(spl) < 2 {
+		c.writeMessage(StatusSyntaxErrorParameters, "bad command")
+		return
+	}
+
+	var user, group string
+	{
+		usergroup := strings.Split(spl[0], ":")
+		user = usergroup[0]
+		if len(usergroup) > 1 {
+			group = usergroup[1]
+		} else {
+			group = ""
+		}
+	}
+
+	path := c.absPath(spl[1])
+
+	if chownInt, ok := c.driver.(ClientDriverExtensionChown); !ok {
+		// It's not implemented and that's not OK, it must be explicitely refused
+		c.writeMessage(StatusCommandNotImplemented, "This extension hasn't been implemented !")
+	} else {
+		if err := chownInt.Chown(path, user, group); err != nil {
+			c.writeMessage(StatusActionNotTaken, fmt.Sprintf("Couldn't allocate: %v", err))
+		} else {
+			c.writeMessage(StatusOK, "Done !")
+		}
+	}
+}
+
 func (c *clientHandler) handleDELE() error {
 	path := c.absPath(c.param)
 	if err := c.driver.Remove(path); err == nil {
@@ -232,8 +267,16 @@ func (c *clientHandler) handleMLST() error {
 
 func (c *clientHandler) handleALLO() error {
 	// We should probably add a method in the driver
-	if _, err := strconv.Atoi(c.param); err == nil {
-		c.writeMessage(StatusOK, "Afero doesn't expose this information")
+	if size, err := strconv.Atoi(c.param); err == nil {
+		if alloInt, ok := c.driver.(ClientDriverExtensionAllocate); !ok {
+			c.writeMessage(StatusNotImplemented, "This extension hasn't been implemented !")
+		} else {
+			if errAllocate := alloInt.AllocateSpace(size); errAllocate != nil {
+				c.writeMessage(StatusActionNotTaken, fmt.Sprintf("Couldn't alloInt: %v", errAllocate))
+			} else {
+				c.writeMessage(StatusOK, "Done !")
+			}
+		}
 	} else {
 		c.writeMessage(StatusSyntaxErrorParameters, fmt.Sprintf("Couldn't parse size: %v", err))
 	}

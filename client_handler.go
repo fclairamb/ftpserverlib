@@ -11,15 +11,13 @@ import (
 	"time"
 
 	"github.com/fclairamb/ftpserver/log"
-
-	"github.com/spf13/afero"
 )
 
 // nolint: maligned
 type clientHandler struct {
 	id          uint32          // ID of the client
 	server      *FtpServer      // Server on which the connection was accepted
-	driver      afero.Fs        // Client handling driver
+	driver      ClientDriver    // Client handling driver
 	conn        net.Conn        // TCP connection
 	writer      *bufio.Writer   // Writer on the TCP connection
 	reader      *bufio.Reader   // Reader on the TCP connection
@@ -136,7 +134,7 @@ func (c *clientHandler) HandleCommands() {
 		if c.server.settings.IdleTimeout > 0 {
 			if err := c.conn.SetDeadline(
 				time.Now().Add(time.Duration(time.Second.Nanoseconds() * int64(c.server.settings.IdleTimeout)))); err != nil {
-				c.logger.Error("Network error", "err", err)
+				c.logger.Error("Network error", err)
 			}
 		}
 
@@ -162,7 +160,7 @@ func (c *clientHandler) handleCommandsStreamError(err error) {
 		if err.Timeout() {
 			// We have to extend the deadline now
 			if err := c.conn.SetDeadline(time.Now().Add(time.Minute)); err != nil {
-				c.logger.Error("Could not set read deadline", "err", err)
+				c.logger.Error("Could not set read deadline", err)
 			}
 
 			c.logger.Info("Client IDLE timeout", "err", err)
@@ -171,24 +169,24 @@ func (c *clientHandler) handleCommandsStreamError(err error) {
 				fmt.Sprintf("command timeout (%d seconds): closing control connection", c.server.settings.IdleTimeout))
 
 			if err := c.writer.Flush(); err != nil {
-				c.logger.Error("Flush error", "err", err)
+				c.logger.Error("Flush error", err)
 			}
 
 			if err := c.conn.Close(); err != nil {
-				c.logger.Error("Close error", "err", err)
+				c.logger.Error("Close error", err)
 			}
 
 			break
 		}
 
-		c.logger.Error("Network error", "err", err)
+		c.logger.Error("Network error", err)
 	default:
 		if err == io.EOF {
 			if c.debug {
 				c.logger.Debug("Client disconnected", "clean", false)
 			}
 		} else {
-			c.logger.Error("Read error", "err", err)
+			c.logger.Error("Read error", err)
 		}
 	}
 }
@@ -224,7 +222,7 @@ func (c *clientHandler) handleCommand(line string) {
 
 func (c *clientHandler) writeLine(line string) {
 	if c.debug {
-		c.logger.Debug("Send answer", "line", line)
+		c.logger.Debug("Sending answer", "line", line)
 	}
 
 	if _, err := c.writer.WriteString(fmt.Sprintf("%s\r\n", line)); err != nil {

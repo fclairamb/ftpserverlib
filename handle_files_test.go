@@ -1,6 +1,7 @@
 package ftpserver
 
 import (
+	"github.com/secsy/goftp"
 	"regexp"
 	"testing"
 )
@@ -69,5 +70,87 @@ func TestMLSxEntryValidation(t *testing.T) {
 		if !validMLSxEntryPattern.MatchString(entry) {
 			t.Errorf("Valid MLSD response example did not pass validation: \"%s\"", entry)
 		}
+	}
+}
+
+func TestALLO(t *testing.T) {
+	s := NewTestServer(true)
+	defer s.Stop()
+
+	conf := goftp.Config{
+		User:     "test",
+		Password: "test",
+	}
+
+	var err error
+
+	var c *goftp.Client
+
+	if c, err = goftp.DialConfig(conf, s.Addr()); err != nil {
+		t.Fatal("Couldn't connect", err)
+	}
+
+	defer func() { panicOnError(c.Close()) }()
+
+	var raw goftp.RawConn
+
+	if raw, err = c.OpenRawConn(); err != nil {
+		t.Fatal("Couldn't open raw connection")
+	}
+
+	// Asking for too much (2MB)
+	if rc, _, err := raw.SendCommand("ALLO 2000000"); err != nil || rc != 550 {
+		t.Fatal("Should have been refused", err, rc)
+	}
+
+	// Asking for the right amount of space (500KB)
+	if rc, _, err := raw.SendCommand("ALLO 500000"); err != nil || rc != 200 {
+		t.Fatal("Should have been accepted", err, rc)
+	}
+}
+
+func TestCHOWN(t *testing.T) {
+	s := NewTestServer(true)
+	defer s.Stop()
+
+	conf := goftp.Config{
+		User:     "test",
+		Password: "test",
+	}
+
+	var err error
+
+	var c *goftp.Client
+
+	if c, err = goftp.DialConfig(conf, s.Addr()); err != nil {
+		t.Fatal("Couldn't connect", err)
+	}
+
+	defer func() { panicOnError(c.Close()) }()
+
+	var raw goftp.RawConn
+
+	if raw, err = c.OpenRawConn(); err != nil {
+		t.Fatal("Couldn't open raw connection")
+	}
+
+	// Asking for a user change that isn't authorized
+	if rc, _, err := raw.SendCommand("SITE CHOWN user:group file"); err != nil || rc != 550 {
+		t.Fatal("Should have been refused", err, rc)
+	}
+
+	// Asking for a user change that isn't authorized
+	if rc, _, err := raw.SendCommand("SITE CHOWN user file"); err != nil || rc != 550 {
+		t.Fatal("Should have been refused", err, rc)
+	}
+
+	// Asking for the right chown user
+	if rc, _, err := raw.SendCommand("SITE CHOWN test:test file"); err != nil || rc != 200 {
+		t.Fatal("Should have been accepted", err, rc)
+	}
+
+	// Asking for the right chown user
+	if rc, _, err := raw.SendCommand("SITE CHOWN test file"); err != nil || rc != 200 {
+		t.Fatal("Should have been accepted", err, rc)
 	}
 }

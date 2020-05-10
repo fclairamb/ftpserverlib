@@ -7,6 +7,6 @@ type Logger interface {
 	Debug(event string, keyvals ...interface{})
 	Info(event string, keyvals ...interface{})
 	Warn(event string, keyvals ...interface{})
-	Error(event string, keyvals ...interface{})
+	Error(event string, err error, keyvals ...interface{})
 	With(keyvals ...interface{}) Logger
 }

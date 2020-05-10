@@ -73,7 +73,7 @@ func TestLoginFailure(t *testing.T) {
 }
 
 func TestAuthTLS(t *testing.T) {
-	s := NewTestServerWithDriver(&ServerDriver{
+	s := NewTestServerWithDriver(&TestServerDriver{
 		Debug: true,
 		TLS:   true,
 	})

@@ -12,7 +12,7 @@ const DirKnown = "known"
 
 // TestDirAccess relies on LIST of files listing
 func TestDirListing(t *testing.T) {
-	s := NewTestServerWithDriver(&ServerDriver{Debug: true, Settings: &Settings{DisableMLSD: true}})
+	s := NewTestServerWithDriver(&TestServerDriver{Debug: true, Settings: &Settings{DisableMLSD: true}})
 	defer s.Stop()
 
 	var connErr error
@@ -58,7 +58,7 @@ func TestDirListing(t *testing.T) {
 }
 
 func TestDirListingPathArg(t *testing.T) {
-	s := NewTestServerWithDriver(&ServerDriver{Debug: true, Settings: &Settings{DisableMLSD: true}})
+	s := NewTestServerWithDriver(&TestServerDriver{Debug: true, Settings: &Settings{DisableMLSD: true}})
 	defer s.Stop()
 
 	var connErr error

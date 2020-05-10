@@ -39,6 +39,7 @@ var commandsMap = map[string]*CommandDescription{
 	"SYST": {Fn: (*clientHandler).handleSYST, Open: true},
 	"NOOP": {Fn: (*clientHandler).handleNOOP, Open: true},
 	"OPTS": {Fn: (*clientHandler).handleOPTS, Open: true},
+	"QUIT": {Fn: (*clientHandler).handleQUIT, Open: true},
 
 	// File access
 	"SIZE": {Fn: (*clientHandler).handleSIZE},
@@ -71,7 +72,6 @@ var commandsMap = map[string]*CommandDescription{
 	"PASV": {Fn: (*clientHandler).handlePASV},
 	"EPSV": {Fn: (*clientHandler).handlePASV},
 	"PORT": {Fn: (*clientHandler).handlePORT},
-	"QUIT": {Fn: (*clientHandler).handleQUIT, Open: true},
 }
 
 // FtpServer is where everything is stored
@@ -124,7 +124,7 @@ func (server *FtpServer) Listen() error {
 		server.listener, err = net.Listen("tcp", server.settings.ListenAddr)
 
 		if err != nil {
-			server.Logger.Error("Cannot listen", "err", err)
+			server.Logger.Error("Cannot listen", err)
 			return err
 		}
 	}
@@ -140,7 +140,7 @@ func (server *FtpServer) Serve() {
 		connection, err := server.listener.Accept()
 		if err != nil {
 			if server.listener != nil {
-				server.Logger.Error("Listener accept error", "err", err)
+				server.Logger.Error("Listener accept error", err)
 			}
 
 			break

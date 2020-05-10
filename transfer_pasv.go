@@ -68,7 +68,7 @@ func (c *clientHandler) findListenerWithinPortRange(portRange *PortRange) (*net.
 		laddr, errResolve := net.ResolveTCPAddr("tcp", fmt.Sprintf("0.0.0.0:%d", port))
 
 		if errResolve != nil {
-			c.logger.Error("Problem resolving local port", "port", port)
+			c.logger.Error("Problem resolving local port", errResolve, "port", port)
 			return nil, fmt.Errorf("could not resolve port: %d", port)
 		}
 
@@ -104,7 +104,7 @@ func (c *clientHandler) handlePASV() error {
 	}
 
 	if err != nil {
-		c.logger.Error("Could not listen for passive connection", "err", err)
+		c.logger.Error("Could not listen for passive connection", err)
 		return nil
 	}
 

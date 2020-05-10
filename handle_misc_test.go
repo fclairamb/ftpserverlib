@@ -48,7 +48,7 @@ func TestSiteCommand(t *testing.T) {
 
 // florent(2018-01-14): #58: IDLE timeout: Testing timeout
 func TestIdleTimeout(t *testing.T) {
-	s := NewTestServerWithDriver(&ServerDriver{Debug: true, Settings: &Settings{IdleTimeout: 2}})
+	s := NewTestServerWithDriver(&TestServerDriver{Debug: true, Settings: &Settings{IdleTimeout: 2}})
 	defer s.Stop()
 
 	conf := goftp.Config{

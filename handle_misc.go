@@ -52,8 +52,12 @@ func (c *clientHandler) handleSTAT() error {
 func (c *clientHandler) handleSITE() error {
 	spl := strings.SplitN(c.param, " ", 2)
 	if len(spl) > 1 {
-		if strings.EqualFold(spl[0], "CHMOD") {
+		switch strings.ToUpper(spl[0]) {
+		case "CHMOD":
 			c.handleCHMOD(spl[1])
+			return nil
+		case "CHOWN":
+			c.handleCHOWN(spl[1])
 			return nil
 		}
 	}
