@@ -155,7 +155,7 @@ func (c *clientHandler) handleCHOWN(params string) {
 	path := c.absPath(spl[1])
 
 	if chownInt, ok := c.driver.(ClientDriverExtensionChown); !ok {
-		// It's not implemented and that's not OK, it must be explicitely refused
+		// It's not implemented and that's not OK, it must be explicitly refused
 		c.writeMessage(StatusCommandNotImplemented, "This extension hasn't been implemented !")
 	} else {
 		if err := chownInt.Chown(path, user, group); err != nil {
@@ -257,7 +257,9 @@ func (c *clientHandler) handleMLST() error {
 		m := c.multilineAnswer(StatusFileOK, "File details")
 		defer m()
 
-		c.writeMLSxOutput(c.writer, info)
+		if errWrite := c.writeMLSxOutput(c.writer, info); errWrite != nil {
+			return errWrite
+		}
 	} else {
 		c.writeMessage(StatusActionNotTaken, fmt.Sprintf("Could not list: %v", err))
 	}

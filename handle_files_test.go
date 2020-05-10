@@ -1,9 +1,10 @@
 package ftpserver
 
 import (
-	"github.com/secsy/goftp"
 	"regexp"
 	"testing"
+
+	"github.com/secsy/goftp"
 )
 
 // validMLSxEntryPattern ensures an entry follows RFC3659 (section 7.2)

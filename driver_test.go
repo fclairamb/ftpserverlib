@@ -13,6 +13,12 @@ import (
 	"github.com/fclairamb/ftpserver/log"
 )
 
+const (
+	authUser  = "test"
+	authPass  = "test"
+	authGroup = "test"
+)
+
 // NewTestServer provides a test server with or without debugging
 func NewTestServer(debug bool) *FtpServer {
 	return NewTestServerWithDriver(&TestServerDriver{Debug: debug})
@@ -84,7 +90,7 @@ func (driver *TestServerDriver) WelcomeUser(cc ClientContext) (string, error) {
 
 // AuthUser with authenticate users
 func (driver *TestServerDriver) AuthUser(cc ClientContext, user, pass string) (ClientDriver, error) {
-	if user == "test" && pass == "test" {
+	if user == authUser && pass == authPass {
 		clientdriver := NewTestClientDriver()
 		clientdriver.user = user
 
@@ -134,9 +140,9 @@ func (driver *TestClientDriver) OpenFile(path string, flag int, perm os.FileMode
 func (driver *TestClientDriver) AllocateSpace(size int) error {
 	if size < 1*1024*1024 {
 		return nil
-	} else {
-		return errors.New("you're asking too much")
 	}
+
+	return errors.New("you're asking too much")
 }
 
 func (driver *TestClientDriver) Chown(name string, user string, group string) error {
@@ -144,9 +150,10 @@ func (driver *TestClientDriver) Chown(name string, user string, group string) er
 		return fmt.Errorf("only accepted chown user: %s", user)
 	}
 
-	if group != "" && group != "test" {
+	if group != "" && group != authGroup {
 		return fmt.Errorf("only accepted chown group: %s", group)
 	}
+
 	return nil
 }
 

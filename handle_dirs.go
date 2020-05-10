@@ -214,6 +214,7 @@ func (c *clientHandler) writeMLSxOutput(w io.Writer, file os.FileInfo) error {
 		file.ModTime().Format(dateFormatMLSD),
 		file.Name(),
 	)
+
 	return err
 }
 
