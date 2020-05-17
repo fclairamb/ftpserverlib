@@ -1,11 +1,8 @@
 # Golang FTP Server library
 
-![Build](https://github.com/fclairamb/ftpserver/workflows/Build/badge.svg)
-![Docker Image](https://github.com/fclairamb/ftpserver/workflows/Docker%20Image/badge.svg)
-![Cross Build](https://github.com/fclairamb/ftpserver/workflows/Cross%20Build/badge.svg)
-![Docker test](https://github.com/fclairamb/ftpserver/workflows/Docker%20test/badge.svg)
-[![Go Report Card](https://goreportcard.com/badge/fclairamb/ftpserver)](https://goreportcard.com/report/fclairamb/ftpserver)
-[![GoDoc](https://godoc.org/github.com/fclairamb/ftpserver?status.svg)](https://godoc.org/github.com/fclairamb/ftpserver/server)
+![Build](https://github.com/fclairamb/ftpserverlib/workflows/Build/badge.svg)
+[![Go Report Card](https://goreportcard.com/badge/fclairamb/ftpserverlib)](https://goreportcard.com/report/fclairamb/ftpserverlib)
+[![GoDoc](https://godoc.org/github.com/fclairamb/ftpserverlib?status.svg)](https://godoc.org/github.com/fclairamb/ftpserverlib)
 
 This library allows to easily build a simple and fully-featured FTP server using [afero](https://github.com/spf13/afero) as the backend.
 
