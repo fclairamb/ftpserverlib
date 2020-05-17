@@ -15,11 +15,11 @@ type MainDriver interface {
 	// GetSettings returns some general settings around the server setup
 	GetSettings() (*Settings, error)
 
-	// WelcomeUser is called to send the very first welcome message
-	WelcomeUser(cc ClientContext) (string, error)
+	// ClientConnected is called to send the very first welcome message
+	ClientConnected(cc ClientContext) (string, error)
 
-	// UserLeft is called when the user disconnects, even if he never authenticated
-	UserLeft(cc ClientContext)
+	// ClientDisconnected is called when the user disconnects, even if he never authenticated
+	ClientDisconnected(cc ClientContext)
 
 	// AuthUser authenticates the user and selects an handling driver
 	AuthUser(cc ClientContext, user, pass string) (ClientDriver, error)

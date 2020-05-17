@@ -81,8 +81,8 @@ func NewTestClientDriver() *TestClientDriver {
 	}
 }
 
-// WelcomeUser is the very first message people will see
-func (driver *TestServerDriver) WelcomeUser(cc ClientContext) (string, error) {
+// ClientConnected is the very first message people will see
+func (driver *TestServerDriver) ClientConnected(cc ClientContext) (string, error) {
 	cc.SetDebug(driver.Debug)
 	// This will remain the official name for now
 	return "TEST Server", nil
@@ -104,8 +104,8 @@ func (driver *TestServerDriver) AuthUser(cc ClientContext, user, pass string) (C
 	return nil, errors.New("bad username or password")
 }
 
-// UserLeft is called when the user disconnects
-func (driver *TestServerDriver) UserLeft(cc ClientContext) {
+// ClientDisconnected is called when the user disconnects
+func (driver *TestServerDriver) ClientDisconnected(cc ClientContext) {
 
 }
 
