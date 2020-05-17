@@ -242,6 +242,8 @@ func (c *clientHandler) writeLine(line string) {
 }
 
 func (c *clientHandler) writeMessage(code int, message string) {
+	message = strings.ReplaceAll(message, "\n", "\\n")
+	message = strings.ReplaceAll(message, "\r", "\\r")
 	c.writeLine(fmt.Sprintf("%d %s", code, message))
 }
 

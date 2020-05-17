@@ -325,8 +325,8 @@ func (c *clientHandler) handleMFMT() error {
 	path := c.absPath(params[1])
 
 	if err := c.driver.Chtimes(path, mtime, mtime); err != nil {
-		c.writeMessage(StatusSyntaxErrorParameters, fmt.Sprintf(
-			"Couldn't set mtime %q for %q, err: %v", mtime.Format(time.RFC3339), params[0], err))
+		c.writeMessage(StatusActionNotTaken, fmt.Sprintf(
+			"Couldn't set mtime %q for %q, err: %v", mtime.Format(time.RFC3339), path, err))
 	}
 
 	c.writeMessage(StatusFileStatus, fmt.Sprintf("Modify=%s; %s", params[0], params[1]))
