@@ -4,7 +4,9 @@
 [![Go Report Card](https://goreportcard.com/badge/fclairamb/ftpserverlib)](https://goreportcard.com/report/fclairamb/ftpserverlib)
 [![GoDoc](https://godoc.org/github.com/fclairamb/ftpserverlib?status.svg)](https://godoc.org/github.com/fclairamb/ftpserverlib)
 
-This library allows to easily build a simple and fully-featured FTP server using [afero](https://github.com/spf13/afero) as the backend.
+This library allows to easily build a simple and fully-featured FTP server using [afero](https://github.com/spf13/afero) as the backend filesystem.
+
+If you're interested in a fully featured FTP server, you should use [ftpserver](https://github.com/fclairamb/ftpserver).
 
 ## Current status of the project
 
