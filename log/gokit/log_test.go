@@ -1,17 +1,18 @@
-package log
+package gokit
 
 import (
 	"os"
 	"testing"
 
-	"github.com/go-kit/kit/log"
 	gklog "github.com/go-kit/kit/log"
+
+	"github.com/fclairamb/ftpserverlib/log"
 )
 
-func getLogger() Logger {
+func getLogger() log.Logger {
 	return NewGKLogger(gklog.NewLogfmtLogger(gklog.NewSyncWriter(os.Stdout))).With(
-		"ts", log.DefaultTimestampUTC,
-		"caller", log.DefaultCaller,
+		"ts", gklog.DefaultTimestampUTC,
+		"caller", gklog.DefaultCaller,
 	)
 }
 

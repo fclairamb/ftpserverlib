@@ -3,6 +3,7 @@ package ftpserver
 
 import (
 	"fmt"
+	"io"
 	"net"
 
 	"github.com/fclairamb/ftpserverlib/log"
@@ -118,13 +119,15 @@ func (server *FtpServer) Listen() error {
 		return fmt.Errorf("could not load settings: %v", err)
 	}
 
+	// The driver can provide its own listener implementation
 	if server.settings.Listener != nil {
 		server.listener = server.settings.Listener
 	} else {
+		// Otherwise, it's what we currently use
 		server.listener, err = net.Listen("tcp", server.settings.ListenAddr)
 
 		if err != nil {
-			server.Logger.Error("Cannot listen", err)
+			server.Logger.Error("Cannot listen", "err", err)
 			return err
 		}
 	}
@@ -135,19 +138,23 @@ func (server *FtpServer) Listen() error {
 }
 
 // Serve accepts and processes any new incoming client
-func (server *FtpServer) Serve() {
-	for {
+func (server *FtpServer) Serve() error {
+	for server.listener != nil {
 		connection, err := server.listener.Accept()
-		if err != nil {
-			if server.listener != nil {
-				server.Logger.Error("Listener accept error", err)
-			}
 
-			break
+		if server.listener == nil {
+			return io.EOF
+		}
+
+		if err != nil {
+			server.Logger.Error("Listener accept error", "err", err)
+			return err
 		}
 
 		server.clientArrival(connection)
 	}
+
+	return io.EOF
 }
 
 // ListenAndServe simply chains the Listen and Serve method calls
@@ -158,18 +165,14 @@ func (server *FtpServer) ListenAndServe() error {
 
 	server.Logger.Info("Starting...")
 
-	server.Serve()
-
-	// At this precise time, the clients are still connected. We are just not accepting clients anymore.
-
-	return nil
+	return server.Serve()
 }
 
 // NewFtpServer creates a new FtpServer instance
 func NewFtpServer(driver MainDriver) *FtpServer {
 	return &FtpServer{
 		driver: driver,
-		Logger: log.NewNopGKLogger(),
+		Logger: log.Nothing(),
 	}
 }
 
@@ -184,13 +187,19 @@ func (server *FtpServer) Addr() string {
 
 // Stop closes the listener
 func (server *FtpServer) Stop() {
-	if server.listener != nil {
-		if err := server.listener.Close(); err != nil {
-			server.Logger.Warn(
-				"Could not close listener",
-				"err", err,
-			)
-		}
+	currentListener := server.listener
+
+	if currentListener == nil {
+		return
+	}
+
+	server.listener = nil
+
+	if err := currentListener.Close(); err != nil {
+		server.Logger.Warn(
+			"Could not close listener",
+			"err", err,
+		)
 	}
 }
 

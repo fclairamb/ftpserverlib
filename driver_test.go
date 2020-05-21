@@ -4,13 +4,14 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"os"
 
 	gklog "github.com/go-kit/kit/log"
 	"github.com/spf13/afero"
 
-	"github.com/fclairamb/ftpserverlib/log"
+	"github.com/fclairamb/ftpserverlib/log/gokit"
 )
 
 const (
@@ -38,9 +39,9 @@ func NewTestServerWithDriver(driver *TestServerDriver) *FtpServer {
 
 	// If we are in debug mode, we should log things
 	if driver.Debug {
-		s.Logger = log.NewGKLogger(gklog.NewLogfmtLogger(gklog.NewSyncWriter(os.Stdout))).With(
-			"ts", log.GKDefaultTimestampUTC,
-			"caller", log.GKDefaultCaller,
+		s.Logger = gokit.NewGKLogger(gklog.NewLogfmtLogger(gklog.NewSyncWriter(os.Stdout))).With(
+			"ts", gokit.GKDefaultTimestampUTC,
+			"caller", gokit.GKDefaultCaller,
 		)
 	}
 
@@ -48,7 +49,11 @@ func NewTestServerWithDriver(driver *TestServerDriver) *FtpServer {
 		return nil
 	}
 
-	go s.Serve()
+	go func() {
+		if err := s.Serve(); err != nil && err != io.EOF {
+			s.Logger.Error("problem serving", "err", err)
+		}
+	}()
 
 	return s
 }

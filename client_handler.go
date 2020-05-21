@@ -48,8 +48,6 @@ func (server *FtpServer) newClientHandler(connection net.Conn, id uint32) *clien
 		logger:      server.Logger.With("clientId", id),
 	}
 
-	// Just respecting the existing logic here, this could be probably be dropped at some point
-
 	return p
 }
 
@@ -57,7 +55,8 @@ func (c *clientHandler) disconnect() {
 	if err := c.conn.Close(); err != nil {
 		c.logger.Warn(
 			"Problem disconnecting a client",
-			"err", err)
+			"err", err,
+		)
 	}
 }
 
@@ -134,7 +133,7 @@ func (c *clientHandler) HandleCommands() {
 		if c.server.settings.IdleTimeout > 0 {
 			if err := c.conn.SetDeadline(
 				time.Now().Add(time.Duration(time.Second.Nanoseconds() * int64(c.server.settings.IdleTimeout)))); err != nil {
-				c.logger.Error("Network error", err)
+				c.logger.Error("Network error", "err", err)
 			}
 		}
 
@@ -160,7 +159,7 @@ func (c *clientHandler) handleCommandsStreamError(err error) {
 		if err.Timeout() {
 			// We have to extend the deadline now
 			if err := c.conn.SetDeadline(time.Now().Add(time.Minute)); err != nil {
-				c.logger.Error("Could not set read deadline", err)
+				c.logger.Error("Could not set read deadline", "err", err)
 			}
 
 			c.logger.Info("Client IDLE timeout", "err", err)
@@ -169,24 +168,24 @@ func (c *clientHandler) handleCommandsStreamError(err error) {
 				fmt.Sprintf("command timeout (%d seconds): closing control connection", c.server.settings.IdleTimeout))
 
 			if err := c.writer.Flush(); err != nil {
-				c.logger.Error("Flush error", err)
+				c.logger.Error("Flush error", "err", err)
 			}
 
 			if err := c.conn.Close(); err != nil {
-				c.logger.Error("Close error", err)
+				c.logger.Error("Close error", "err", err)
 			}
 
 			break
 		}
 
-		c.logger.Error("Network error", err)
+		c.logger.Error("Network error", "err", err)
 	default:
 		if err == io.EOF {
 			if c.debug {
 				c.logger.Debug("Client disconnected", "clean", false)
 			}
 		} else {
-			c.logger.Error("Read error", err)
+			c.logger.Error("Read error", "err", err)
 		}
 	}
 }
@@ -212,6 +211,12 @@ func (c *clientHandler) handleCommand(line string) {
 	defer func() {
 		if r := recover(); r != nil {
 			c.writeMessage(StatusSyntaxErrorNotRecognised, fmt.Sprintf("Unhandled internal error: %s", r))
+			c.logger.Warn(
+				"Internal command handling error",
+				"err", r,
+				"command", c.command,
+				"param", c.param,
+			)
 		}
 	}()
 
@@ -294,7 +299,8 @@ func parseLine(line string) (string, string) {
 	return params[0], params[1]
 }
 
-// For future use
+// nolint: unparam
+// ... because we are actually using the returned function, just directly in the defer call
 func (c *clientHandler) multilineAnswer(code int, message string) func() {
 	c.writeLine(fmt.Sprintf("%d-%s", code, message))
 
