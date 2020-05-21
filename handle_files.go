@@ -219,7 +219,7 @@ func (c *clientHandler) handleSTATFile() error {
 	path := c.absPath(c.param)
 
 	if info, err := c.driver.Stat(path); err == nil {
-		defer c.multilineAnswer(StatusSystemStatus, "System status")
+		defer c.multilineAnswer(StatusSystemStatus, "System status")()
 
 		// c.writeLine(fmt.Sprintf("%d-Status follows:", StatusSystemStatus))
 		if info.IsDir() {
@@ -254,7 +254,7 @@ func (c *clientHandler) handleMLST() error {
 	path := c.absPath(c.param)
 
 	if info, err := c.driver.Stat(path); err == nil {
-		defer c.multilineAnswer(StatusFileOK, "File details")
+		defer c.multilineAnswer(StatusFileOK, "File details")()
 
 		if errWrite := c.writeMLSxOutput(c.writer, info); errWrite != nil {
 			return errWrite

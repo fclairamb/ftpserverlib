@@ -299,8 +299,6 @@ func parseLine(line string) (string, string) {
 	return params[0], params[1]
 }
 
-// nolint: unparam
-// ... because we are actually using the returned function, just directly in the defer call
 func (c *clientHandler) multilineAnswer(code int, message string) func() {
 	c.writeLine(fmt.Sprintf("%d-%s", code, message))
 

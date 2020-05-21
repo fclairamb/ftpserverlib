@@ -2,18 +2,15 @@
 package ftpserver
 
 import (
+	"errors"
 	"fmt"
-	"io"
 	"net"
 
 	"github.com/fclairamb/ftpserverlib/log"
 )
 
-const (
-// logKeyMsg is the human-readable part of the log
-// logKeyMsg = "msg"
-// logKeyAction is the machine-readable part of the log
-// logKeyAction = "action"
+var (
+	ErrNotListening = errors.New("we aren't listening")
 )
 
 // CommandDescription defines which function should be used and if it should be open to anyone or only logged in users
@@ -139,22 +136,23 @@ func (server *FtpServer) Listen() error {
 
 // Serve accepts and processes any new incoming client
 func (server *FtpServer) Serve() error {
-	for server.listener != nil {
+	for {
 		connection, err := server.listener.Accept()
 
-		if server.listener == nil {
-			return io.EOF
-		}
-
 		if err != nil {
+			if errOp, ok := err.(*net.OpError); ok {
+				// This means we just closed the connetion and it's OK
+				if errOp.Err.Error() == "use of closed network connection" {
+					server.listener = nil
+					return nil
+				}
+			}
 			server.Logger.Error("Listener accept error", "err", err)
 			return err
 		}
 
 		server.clientArrival(connection)
 	}
-
-	return io.EOF
 }
 
 // ListenAndServe simply chains the Listen and Serve method calls
@@ -186,21 +184,19 @@ func (server *FtpServer) Addr() string {
 }
 
 // Stop closes the listener
-func (server *FtpServer) Stop() {
-	currentListener := server.listener
-
-	if currentListener == nil {
-		return
+func (server *FtpServer) Stop() error {
+	if server.listener == nil {
+		return ErrNotListening
 	}
 
-	server.listener = nil
-
-	if err := currentListener.Close(); err != nil {
+	err := server.listener.Close()
+	if err != nil {
 		server.Logger.Warn(
 			"Could not close listener",
 			"err", err,
 		)
 	}
+	return err
 }
 
 // When a client connects, the server could refuse the connection
