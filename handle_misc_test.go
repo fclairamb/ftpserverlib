@@ -11,7 +11,7 @@ import (
 
 func TestSiteCommand(t *testing.T) {
 	s := NewTestServer(true)
-	defer s.Stop()
+	defer mustStopServer(s)
 
 	conf := goftp.Config{
 		User:     "test",
@@ -49,7 +49,7 @@ func TestSiteCommand(t *testing.T) {
 // florent(2018-01-14): #58: IDLE timeout: Testing timeout
 func TestIdleTimeout(t *testing.T) {
 	s := NewTestServerWithDriver(&TestServerDriver{Debug: true, Settings: &Settings{IdleTimeout: 2}})
-	defer s.Stop()
+	defer mustStopServer(s)
 
 	conf := goftp.Config{
 		User:     "test",
@@ -87,7 +87,7 @@ func TestIdleTimeout(t *testing.T) {
 
 func TestStat(t *testing.T) {
 	s := NewTestServer(true)
-	defer s.Stop()
+	defer mustStopServer(s)
 
 	conf := goftp.Config{
 		User:     "test",
@@ -125,7 +125,7 @@ func TestStat(t *testing.T) {
 
 func TestCLNT(t *testing.T) {
 	s := NewTestServer(true)
-	defer s.Stop()
+	defer mustStopServer(s)
 
 	conf := goftp.Config{
 		User:     "test",

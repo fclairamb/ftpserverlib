@@ -141,7 +141,7 @@ func (c *clientHandler) handleMLSD() error {
 	// TODO: We have a lot of copy/paste around directory listing, we should refactor this.
 	defer func() {
 		if errClose := directory.Close(); errClose != nil {
-			c.logger.Error("Couldn't close directory", errClose, "directory", directoryPath)
+			c.logger.Error("Couldn't close directory", "err", errClose, "directory", directoryPath)
 		}
 	}()
 

@@ -22,7 +22,7 @@ func reportError(err error) {
 
 func TestLoginSuccess(t *testing.T) {
 	s := NewTestServer(true)
-	defer s.Stop()
+	defer mustStopServer(s)
 
 	var err error
 
@@ -55,7 +55,7 @@ func TestLoginSuccess(t *testing.T) {
 
 func TestLoginFailure(t *testing.T) {
 	s := NewTestServer(true)
-	defer s.Stop()
+	defer mustStopServer(s)
 
 	var err error
 
@@ -77,7 +77,7 @@ func TestAuthTLS(t *testing.T) {
 		Debug: true,
 		TLS:   true,
 	})
-	defer s.Stop()
+	defer mustStopServer(s)
 
 	ftp, err := goftp.Connect(s.Addr())
 	if err != nil {

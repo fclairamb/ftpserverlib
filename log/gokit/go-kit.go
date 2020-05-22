@@ -1,11 +1,13 @@
-// Package log provides a simple interface to handle logging
-package log
+// Package gokit provides go-kit Logger implementation
+package gokit
 
 import (
 	"fmt"
 
 	gklog "github.com/go-kit/kit/log"
 	gklevel "github.com/go-kit/kit/log/level"
+
+	"github.com/fclairamb/ftpserverlib/log"
 )
 
 func (logger *gKLogger) checkError(err error) {
@@ -35,26 +37,20 @@ func (logger *gKLogger) Warn(event string, keyvals ...interface{}) {
 }
 
 // Error logs key-values at error level
-func (logger *gKLogger) Error(event string, err error, keyvals ...interface{}) {
-	keyvals = append(keyvals, "err", err)
+func (logger *gKLogger) Error(event string, keyvals ...interface{}) {
 	logger.log(gklevel.Error(logger.logger), event, keyvals...)
 }
 
 // With adds key-values
-func (logger *gKLogger) With(keyvals ...interface{}) Logger {
+func (logger *gKLogger) With(keyvals ...interface{}) log.Logger {
 	return NewGKLogger(gklog.With(logger.logger, keyvals...))
 }
 
 // NewGKLogger creates a logger based on go-kit logs
-func NewGKLogger(logger gklog.Logger) Logger {
+func NewGKLogger(logger gklog.Logger) log.Logger {
 	return &gKLogger{
 		logger: logger,
 	}
-}
-
-// NewNopGKLogger instantiates go-kit logger
-func NewNopGKLogger() Logger {
-	return NewGKLogger(gklog.NewNopLogger())
 }
 
 type gKLogger struct {

@@ -2,17 +2,16 @@
 package ftpserver
 
 import (
+	"errors"
 	"fmt"
 	"net"
 
 	"github.com/fclairamb/ftpserverlib/log"
 )
 
-const (
-// logKeyMsg is the human-readable part of the log
-// logKeyMsg = "msg"
-// logKeyAction is the machine-readable part of the log
-// logKeyAction = "action"
+var (
+	// ErrNotListening is returned when we are performing an action that is only valid while listening
+	ErrNotListening = errors.New("we aren't listening")
 )
 
 // CommandDescription defines which function should be used and if it should be open to anyone or only logged in users
@@ -118,13 +117,15 @@ func (server *FtpServer) Listen() error {
 		return fmt.Errorf("could not load settings: %v", err)
 	}
 
+	// The driver can provide its own listener implementation
 	if server.settings.Listener != nil {
 		server.listener = server.settings.Listener
 	} else {
+		// Otherwise, it's what we currently use
 		server.listener, err = net.Listen("tcp", server.settings.ListenAddr)
 
 		if err != nil {
-			server.Logger.Error("Cannot listen", err)
+			server.Logger.Error("Cannot listen", "err", err)
 			return err
 		}
 	}
@@ -135,15 +136,22 @@ func (server *FtpServer) Listen() error {
 }
 
 // Serve accepts and processes any new incoming client
-func (server *FtpServer) Serve() {
+func (server *FtpServer) Serve() error {
 	for {
 		connection, err := server.listener.Accept()
+
 		if err != nil {
-			if server.listener != nil {
-				server.Logger.Error("Listener accept error", err)
+			if errOp, ok := err.(*net.OpError); ok {
+				// This means we just closed the connection and it's OK
+				if errOp.Err.Error() == "use of closed network connection" {
+					server.listener = nil
+					return nil
+				}
 			}
 
-			break
+			server.Logger.Error("Listener accept error", "err", err)
+
+			return err
 		}
 
 		server.clientArrival(connection)
@@ -158,18 +166,14 @@ func (server *FtpServer) ListenAndServe() error {
 
 	server.Logger.Info("Starting...")
 
-	server.Serve()
-
-	// At this precise time, the clients are still connected. We are just not accepting clients anymore.
-
-	return nil
+	return server.Serve()
 }
 
 // NewFtpServer creates a new FtpServer instance
 func NewFtpServer(driver MainDriver) *FtpServer {
 	return &FtpServer{
 		driver: driver,
-		Logger: log.NewNopGKLogger(),
+		Logger: log.Nothing(),
 	}
 }
 
@@ -183,15 +187,20 @@ func (server *FtpServer) Addr() string {
 }
 
 // Stop closes the listener
-func (server *FtpServer) Stop() {
-	if server.listener != nil {
-		if err := server.listener.Close(); err != nil {
-			server.Logger.Warn(
-				"Could not close listener",
-				"err", err,
-			)
-		}
+func (server *FtpServer) Stop() error {
+	if server.listener == nil {
+		return ErrNotListening
 	}
+
+	err := server.listener.Close()
+	if err != nil {
+		server.Logger.Warn(
+			"Could not close listener",
+			"err", err,
+		)
+	}
+
+	return err
 }
 
 // When a client connects, the server could refuse the connection

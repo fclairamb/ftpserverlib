@@ -86,7 +86,7 @@ type Settings struct {
 	ListenAddr               string           // Listening address
 	PublicHost               string           // Public IP to expose (only an IP address is accepted at this stage)
 	PublicIPResolver         PublicIPResolver // (Optional) To fetch a public IP lookup
-	PassiveTransferPortRange *PortRange       // Port Range for data connections. Random if not specified
+	PassiveTransferPortRange *PortRange       // (Optional) Port Range for data connections. Random if not specified
 	ActiveTransferPortNon20  bool             // Do not impose the port 20 for active data transfer (#88, RFC 1579)
 	IdleTimeout              int              // Maximum inactivity time before disconnecting (#58)
 	ConnectionTimeout        int              // Maximum time to establish passive or active transfer connections

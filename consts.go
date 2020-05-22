@@ -2,7 +2,7 @@
 package ftpserver
 
 // from @stevenh's PR proposal
-// https://github.com/fclairamb/ftpserver/blob/becc125a0770e3b670c4ced7e7bd12594fb024ff/server/consts.go
+// https://github.com/fclairamb/ftpserverlib/blob/becc125a0770e3b670c4ced7e7bd12594fb024ff/server/consts.go
 
 // Status codes as documented by:
 // https://tools.ietf.org/html/rfc959

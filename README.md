@@ -17,13 +17,13 @@ If you're interested in a fully featured FTP server, you should use [ftpserver](
  * File and directory deletion and renaming
  * TLS support (AUTH + PROT)
  * File download/upload resume support (REST)
- * Complete driver for all the above features
  * Passive socket connections (EPSV and PASV commands)
  * Active socket connections (PORT command)
  * Small memory footprint
- * Only relies on the standard library except for:
-   * [go-kit log](https://github.com/go-kit/kit/tree/master/log) for logging
+ * Clean code: No sync, no sleep, no panic
+ * Uses only the standard library except for:
    * [afero](https://github.com/spf13/afero) for generic file systems handling
+   * [go-kit log](https://github.com/go-kit/kit/tree/master/log) (optional) for logging
  * Supported extensions:
    * [AUTH](https://tools.ietf.org/html/rfc2228#page-6) - Control session protection
    * [AUTH TLS](https://tools.ietf.org/html/rfc4217#section-4.1) - TLS session
