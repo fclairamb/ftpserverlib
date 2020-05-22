@@ -86,6 +86,13 @@ func NewTestClientDriver() *TestClientDriver {
 	}
 }
 
+func mustStopServer(server *FtpServer) {
+	err := server.Stop()
+	if err != nil {
+		panic(err)
+	}
+}
+
 // ClientConnected is the very first message people will see
 func (driver *TestServerDriver) ClientConnected(cc ClientContext) (string, error) {
 	cc.SetDebug(driver.Debug)

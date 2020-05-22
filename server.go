@@ -10,6 +10,7 @@ import (
 )
 
 var (
+	// ErrNotListening is returned when we are performing an action that is only valid while listening
 	ErrNotListening = errors.New("we aren't listening")
 )
 
@@ -141,13 +142,15 @@ func (server *FtpServer) Serve() error {
 
 		if err != nil {
 			if errOp, ok := err.(*net.OpError); ok {
-				// This means we just closed the connetion and it's OK
+				// This means we just closed the connection and it's OK
 				if errOp.Err.Error() == "use of closed network connection" {
 					server.listener = nil
 					return nil
 				}
 			}
+
 			server.Logger.Error("Listener accept error", "err", err)
+
 			return err
 		}
 
@@ -196,6 +199,7 @@ func (server *FtpServer) Stop() error {
 			"err", err,
 		)
 	}
+
 	return err
 }
 

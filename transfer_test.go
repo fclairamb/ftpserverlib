@@ -106,7 +106,7 @@ func ftpDelete(t *testing.T, ftp *goftp.Client, filename string) {
 // TestTransfer validates the upload of file in both active and passive mode
 func TestTransfer(t *testing.T) {
 	s := NewTestServerWithDriver(&TestServerDriver{Debug: true, Settings: &Settings{ActiveTransferPortNon20: true}})
-	defer s.Stop()
+	defer mustStopServer(s)
 
 	testTransferOnConnection(t, s, false)
 	testTransferOnConnection(t, s, true)
@@ -150,7 +150,7 @@ func testTransferOnConnection(t *testing.T, server *FtpServer, active bool) {
 // TestFailedTransfer validates the handling of failed transfer caused by file access issues
 func TestFailedTransfer(t *testing.T) {
 	s := NewTestServer(true)
-	defer s.Stop()
+	defer mustStopServer(s)
 
 	conf := goftp.Config{
 		User:     "test",
@@ -185,7 +185,7 @@ func TestFailedFileClose(t *testing.T) {
 	}
 
 	s := NewTestServerWithDriver(driver)
-	defer s.Stop()
+	defer mustStopServer(s)
 
 	conf := goftp.Config{
 		User:     "test",
