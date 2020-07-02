@@ -8,6 +8,8 @@ import (
 	"path"
 	"strings"
 	"time"
+
+	"github.com/spf13/afero"
 )
 
 func (c *clientHandler) absPath(p string) string {
@@ -21,9 +23,10 @@ func (c *clientHandler) absPath(p string) string {
 func (c *clientHandler) handleCWD() error {
 	p := c.absPath(c.param)
 
-	if _, err := c.driver.Open(p); err == nil {
+	if f, err := c.driver.Open(p); err == nil {
 		c.SetPath(p)
 		c.writeMessage(StatusFileOK, fmt.Sprintf("CD worked on %s", p))
+		c.closeDirectory(p, f)
 	} else {
 		c.writeMessage(StatusActionNotTaken, fmt.Sprintf("CD issue: %v", err))
 	}
@@ -77,11 +80,15 @@ func (c *clientHandler) handlePWD() error {
 }
 
 func (c *clientHandler) handleLIST() error {
-	directory, errOpenFile := c.driver.Open(c.absPath(c.param))
+	directoryPath := c.absPath(c.param)
+	directory, errOpenFile := c.driver.Open(directoryPath)
+
 	if errOpenFile != nil {
 		c.writeMessage(500, fmt.Sprintf("Could not list: %v", errOpenFile))
 		return nil
 	}
+
+	defer c.closeDirectory(directoryPath, directory)
 
 	if files, err := directory.Readdir(-1); err == nil || err == io.EOF {
 		if tr, errTr := c.TransferOpen(); errTr == nil {
@@ -96,11 +103,15 @@ func (c *clientHandler) handleLIST() error {
 }
 
 func (c *clientHandler) handleNLST() error {
-	directory, errOpenFile := c.driver.Open(c.absPath(c.param))
+	directoryPath := c.absPath(c.param)
+	directory, errOpenFile := c.driver.Open(directoryPath)
+
 	if errOpenFile != nil {
 		c.writeMessage(500, fmt.Sprintf("Could not list: %v", errOpenFile))
 		return nil
 	}
+
+	defer c.closeDirectory(directoryPath, directory)
 
 	if files, err := directory.Readdir(-1); err == nil || err == io.EOF {
 		if tr, errTrOpen := c.TransferOpen(); errTrOpen == nil {
@@ -138,12 +149,7 @@ func (c *clientHandler) handleMLSD() error {
 		return nil
 	}
 
-	// TODO: We have a lot of copy/paste around directory listing, we should refactor this.
-	defer func() {
-		if errClose := directory.Close(); errClose != nil {
-			c.logger.Error("Couldn't close directory", "err", errClose, "directory", directoryPath)
-		}
-	}()
+	defer c.closeDirectory(directoryPath, directory)
 
 	if files, err := directory.Readdir(-1); err == nil || err == io.EOF {
 		if tr, errTr := c.TransferOpen(); errTr == nil {
@@ -223,6 +229,12 @@ func (c *clientHandler) writeMLSxOutput(w io.Writer, file os.FileInfo) error {
 	)
 
 	return err
+}
+
+func (c *clientHandler) closeDirectory(directoryPath string, directory afero.File) {
+	if errClose := directory.Close(); errClose != nil {
+		c.logger.Error("Couldn't close directory", "err", errClose, "directory", directoryPath)
+	}
 }
 
 func quoteDoubling(s string) string {
