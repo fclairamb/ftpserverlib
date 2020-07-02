@@ -23,10 +23,9 @@ func (c *clientHandler) absPath(p string) string {
 func (c *clientHandler) handleCWD() error {
 	p := c.absPath(c.param)
 
-	if f, err := c.driver.Open(p); err == nil {
+	if _, err := c.driver.Stat(p); err == nil {
 		c.SetPath(p)
 		c.writeMessage(StatusFileOK, fmt.Sprintf("CD worked on %s", p))
-		c.closeDirectory(p, f)
 	} else {
 		c.writeMessage(StatusActionNotTaken, fmt.Sprintf("CD issue: %v", err))
 	}
