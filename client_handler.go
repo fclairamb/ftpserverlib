@@ -95,6 +95,11 @@ func (c *clientHandler) LocalAddr() net.Addr {
 	return c.conn.LocalAddr()
 }
 
+// GetClientVersion returns the identified client, can be empty.
+func (c *clientHandler) GetClientVersion() string {
+	return c.clnt
+}
+
 func (c *clientHandler) end() {
 	c.server.driver.ClientDisconnected(c)
 	c.server.clientDeparture(c)
