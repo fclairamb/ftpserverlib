@@ -258,8 +258,17 @@ func (c *clientHandler) TransferOpen() (net.Conn, error) {
 		return nil, errors.New("no passive connection declared")
 	}
 
-	c.writeMessage(StatusFileStatusOK, "Using transfer connection")
 	conn, err := c.transfer.Open()
+	if err != nil {
+		c.logger.Warn(
+			"Unable to open transfer",
+			"error", err)
+		c.writeMessage(StatusCannotOpenDataConnection, fmt.Sprintf("Unable to open transfer: %v", err))
+
+		return conn, err
+	}
+
+	c.writeMessage(StatusFileStatusOK, "Using transfer connection")
 
 	if err == nil && c.debug {
 		c.logger.Debug(

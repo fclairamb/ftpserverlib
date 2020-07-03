@@ -38,8 +38,9 @@ const (
 
 	// 400 Series - The command was not accepted and the requested action did not take place,
 	// but the error condition is temporary and the action may be requested again.
-	StatusServiceNotAvailable = 421 // RFC 959, 4.2.1
-	StatusFileActionNotTaken  = 450 // RFC 959, 4.2.1
+	StatusServiceNotAvailable      = 421 // RFC 959, 4.2.1
+	StatusCannotOpenDataConnection = 425 // RFC 959, 4.2.1
+	StatusFileActionNotTaken       = 450 // RFC 959, 4.2.1
 
 	// 500 Series - Syntax error, command unrecognized and the requested action did not take
 	// place. This may include errors such as command line too long.
