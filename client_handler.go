@@ -3,7 +3,6 @@ package ftpserver
 
 import (
 	"bufio"
-	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -12,6 +11,14 @@ import (
 
 	"github.com/fclairamb/ftpserverlib/log"
 )
+
+type openTransferError struct {
+	err string
+}
+
+func (e *openTransferError) Error() string {
+	return fmt.Sprintf("Unable to open transfer: %s", e.err)
+}
 
 // nolint: maligned
 type clientHandler struct {
@@ -254,8 +261,10 @@ func (c *clientHandler) writeMessage(code int, message string) {
 
 func (c *clientHandler) TransferOpen() (net.Conn, error) {
 	if c.transfer == nil {
-		c.writeMessage(StatusActionNotTaken, "No passive connection declared")
-		return nil, errors.New("no passive connection declared")
+		err := &openTransferError{err: "No passive connection declared"}
+		c.writeMessage(StatusActionNotTaken, err.Error())
+
+		return nil, err
 	}
 
 	conn, err := c.transfer.Open()
@@ -263,7 +272,9 @@ func (c *clientHandler) TransferOpen() (net.Conn, error) {
 		c.logger.Warn(
 			"Unable to open transfer",
 			"error", err)
-		c.writeMessage(StatusCannotOpenDataConnection, fmt.Sprintf("Unable to open transfer: %v", err))
+
+		err = &openTransferError{err: err.Error()}
+		c.writeMessage(StatusCannotOpenDataConnection, err.Error())
 
 		return conn, err
 	}
