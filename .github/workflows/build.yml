@@ -15,7 +15,7 @@ jobs:
 
     strategy:
       matrix:
-        go: [ 1.14, 1.13, 1.12 ]
+        go: [ 1.14, 1.13 ]
         include:
           - go: 1.14
             lint: true
