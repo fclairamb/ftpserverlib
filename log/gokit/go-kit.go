@@ -3,6 +3,7 @@ package gokit
 
 import (
 	"fmt"
+	"os"
 
 	gklog "github.com/go-kit/kit/log"
 	gklevel "github.com/go-kit/kit/log/level"
@@ -51,6 +52,11 @@ func NewGKLogger(logger gklog.Logger) log.Logger {
 	return &gKLogger{
 		logger: logger,
 	}
+}
+
+// NewGKLoggerStdout creates a logger based on go-kit logs but with some default parameters
+func NewGKLoggerStdout() log.Logger {
+	return NewGKLogger(gklog.NewLogfmtLogger(gklog.NewSyncWriter(os.Stdout)))
 }
 
 type gKLogger struct {
