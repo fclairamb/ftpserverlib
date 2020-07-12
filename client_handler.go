@@ -3,7 +3,6 @@ package ftpserver
 
 import (
 	"bufio"
-	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -12,6 +11,14 @@ import (
 
 	"github.com/fclairamb/ftpserverlib/log"
 )
+
+type openTransferError struct {
+	err string
+}
+
+func (e *openTransferError) Error() string {
+	return fmt.Sprintf("Unable to open transfer: %s", e.err)
+}
 
 // nolint: maligned
 type clientHandler struct {
@@ -258,20 +265,31 @@ func (c *clientHandler) writeMessage(code int, message string) {
 }
 
 // ErrNoPassiveConnectionDeclared is defined when a transfer is openeed without any passive connection declared
-var ErrNoPassiveConnectionDeclared = errors.New("no passive connection declared")
+// var ErrNoPassiveConnectionDeclared = errors.New("no passive connection declared")
 
 func (c *clientHandler) TransferOpen() (net.Conn, error) {
 	if c.transfer == nil {
-		err := ErrNoPassiveConnectionDeclared
+		err := &openTransferError{err: "No passive connection declared"}
 		c.writeMessage(StatusActionNotTaken, err.Error())
 
 		return nil, err
 	}
 
-	c.writeMessage(StatusFileStatusOK, "Using transfer connection")
 	conn, err := c.transfer.Open()
+	if err != nil {
+		c.logger.Warn(
+			"Unable to open transfer",
+			"error", err)
 
-	if err == nil && c.debug {
+		err = &openTransferError{err: err.Error()}
+		c.writeMessage(StatusCannotOpenDataConnection, err.Error())
+
+		return conn, err
+	}
+
+	c.writeMessage(StatusFileStatusOK, "Using transfer connection")
+
+	if c.debug {
 		c.logger.Debug(
 			"Transfer connection opened",
 			"remoteAddr", conn.RemoteAddr().String(),

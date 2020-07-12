@@ -32,7 +32,6 @@ func (c *clientHandler) handleRETR() error {
 // To make sure we don't miss any step, we execute everything in order
 func (c *clientHandler) transferFile(write bool, append bool) {
 	var file afero.File
-
 	var err error
 
 	path := c.absPath(c.param)
@@ -77,9 +76,7 @@ func (c *clientHandler) transferFile(write bool, append bool) {
 			defer c.TransferClose()
 
 			// Copy the data
-
 			var in io.Reader
-
 			var out io.Writer
 
 			if write { // ... from the connection to the file
@@ -107,8 +104,11 @@ func (c *clientHandler) transferFile(write bool, append bool) {
 	}
 
 	if err != nil {
-		c.writeMessage(StatusActionNotTaken, "Could not transfer file: "+err.Error())
-		return
+		// if the transfer could not be open we already sent an error
+		if _, isOpenTransferErr := err.(*openTransferError); !isOpenTransferErr {
+			c.writeMessage(StatusActionNotTaken, "Could not transfer file: "+err.Error())
+			return
+		}
 	}
 }
 
