@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -49,7 +50,7 @@ func (a *activeTransferHandler) Open() (net.Conn, error) {
 	conn, err := dialer.Dial("tcp", a.raddr.String())
 
 	if err != nil {
-		return nil, fmt.Errorf("could not establish active connection due: %v", err)
+		return nil, fmt.Errorf("could not establish active connection: %w", err)
 	}
 
 	// keep connection as it will be closed by Close()
@@ -67,6 +68,11 @@ func (a *activeTransferHandler) Close() error {
 	return nil
 }
 
+var remoteAddrRegex = regexp.MustCompile(`^([0-9]{1,3},){5}[0-9]{1,3}$`)
+
+// ErrRemoteAddrFormat is returned when the remote address has a bad format
+var ErrRemoteAddrFormat = errors.New("remote address has a bad format")
+
 // parseRemoteAddr parses remote address of the client from param. This address
 // is used for establishing a connection with the client.
 //
@@ -74,11 +80,11 @@ func (a *activeTransferHandler) Close() error {
 // Host: 192.168.150.80
 // Port: (14 * 256) + 148
 func parseRemoteAddr(param string) (*net.TCPAddr, error) {
-	//TODO(mgenov): ensure that format of the params is valid
-	params := strings.Split(param, ",")
-	if len(params) != 6 {
-		return nil, errors.New("bad number of args")
+	if !remoteAddrRegex.Match([]byte(param)) {
+		return nil, fmt.Errorf("could not parse %s: %w", param, ErrRemoteAddrFormat)
 	}
+
+	params := strings.Split(param, ",")
 
 	ip := strings.Join(params[0:4], ".")
 
