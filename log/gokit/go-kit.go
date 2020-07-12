@@ -54,7 +54,7 @@ func NewGKLogger(logger gklog.Logger) log.Logger {
 	}
 }
 
-// NewGKLogger creates a logger based on go-kit logs but with some default parameters
+// NewGKLoggerStdout creates a logger based on go-kit logs but with some default parameters
 func NewGKLoggerStdout() log.Logger {
 	return NewGKLogger(gklog.NewLogfmtLogger(gklog.NewSyncWriter(os.Stdout)))
 }
