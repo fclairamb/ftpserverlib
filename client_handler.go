@@ -265,7 +265,7 @@ func (c *clientHandler) writeMessage(code int, message string) {
 }
 
 // ErrNoPassiveConnectionDeclared is defined when a transfer is openeed without any passive connection declared
-var ErrNoPassiveConnectionDeclared = errors.New("no passive connection declared")
+// var ErrNoPassiveConnectionDeclared = errors.New("no passive connection declared")
 
 func (c *clientHandler) TransferOpen() (net.Conn, error) {
 	if c.transfer == nil {
@@ -289,7 +289,7 @@ func (c *clientHandler) TransferOpen() (net.Conn, error) {
 
 	c.writeMessage(StatusFileStatusOK, "Using transfer connection")
 
-	if err == nil && c.debug {
+	if c.debug {
 		c.logger.Debug(
 			"Transfer connection opened",
 			"remoteAddr", conn.RemoteAddr().String(),
