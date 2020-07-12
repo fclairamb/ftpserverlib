@@ -1,7 +1,6 @@
 package ftpserver
 
 import (
-	"fmt"
 	"sync"
 	"testing"
 
@@ -29,7 +28,7 @@ func TestConcurrency(t *testing.T) {
 			defer func() { panicOnError(ftp.Close()) }()
 
 			if err = ftp.Login("test", "test"); err != nil {
-				panic(fmt.Errorf("failed to login: %s", err))
+				panic(err)
 			}
 
 			waitGroup.Done()

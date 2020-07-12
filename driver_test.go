@@ -3,7 +3,6 @@ package ftpserver
 import (
 	"crypto/tls"
 	"errors"
-	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
@@ -100,8 +99,10 @@ func (driver *TestServerDriver) ClientConnected(cc ClientContext) (string, error
 	return "TEST Server", nil
 }
 
+var errBadUserNameOrPassword = errors.New("bad username or password")
+
 // AuthUser with authenticate users
-func (driver *TestServerDriver) AuthUser(cc ClientContext, user, pass string) (ClientDriver, error) {
+func (driver *TestServerDriver) AuthUser(_ ClientContext, user, pass string) (ClientDriver, error) {
 	if user == authUser && pass == authPass {
 		clientdriver := NewTestClientDriver()
 		clientdriver.user = user
@@ -113,11 +114,11 @@ func (driver *TestServerDriver) AuthUser(cc ClientContext, user, pass string) (C
 		return clientdriver, nil
 	}
 
-	return nil, errors.New("bad username or password")
+	return nil, errBadUserNameOrPassword
 }
 
 // ClientDisconnected is called when the user disconnects
-func (driver *TestServerDriver) ClientDisconnected(cc ClientContext) {
+func (driver *TestServerDriver) ClientDisconnected(_ ClientContext) {
 
 }
 
@@ -149,21 +150,26 @@ func (driver *TestClientDriver) OpenFile(path string, flag int, perm os.FileMode
 	return driver.Fs.OpenFile(path, flag, perm)
 }
 
+var errTooMuchSpaceRequested = errors.New("you're requesting too much space")
+
 func (driver *TestClientDriver) AllocateSpace(size int) error {
 	if size < 1*1024*1024 {
 		return nil
 	}
 
-	return errors.New("you're asking too much")
+	return errTooMuchSpaceRequested
 }
 
-func (driver *TestClientDriver) Chown(name string, user string, group string) error {
+var errInvalidChownUser = errors.New("invalid chown group")
+var errInvalidChownGroup = errors.New("invalid chown group")
+
+func (driver *TestClientDriver) Chown(_ string, user string, group string) error {
 	if user != driver.user {
-		return fmt.Errorf("only accepted chown user: %s", user)
+		return errInvalidChownUser
 	}
 
 	if group != "" && group != authGroup {
-		return fmt.Errorf("only accepted chown group: %s", group)
+		return errInvalidChownGroup
 	}
 
 	return nil
