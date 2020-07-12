@@ -67,6 +67,9 @@ type ClientContext interface {
 
 	// Servers's address
 	LocalAddr() net.Addr
+
+	// Client's version can be empty
+	GetClientVersion() string
 }
 
 // PortRange is a range of ports
