@@ -102,6 +102,11 @@ func (c *clientHandler) LocalAddr() net.Addr {
 	return c.conn.LocalAddr()
 }
 
+// GetClientVersion returns the identified client, can be empty.
+func (c *clientHandler) GetClientVersion() string {
+	return c.clnt
+}
+
 func (c *clientHandler) end() {
 	c.server.driver.ClientDisconnected(c)
 	c.server.clientDeparture(c)
@@ -258,6 +263,9 @@ func (c *clientHandler) writeMessage(code int, message string) {
 	message = strings.ReplaceAll(message, "\r", "\\r")
 	c.writeLine(fmt.Sprintf("%d %s", code, message))
 }
+
+// ErrNoPassiveConnectionDeclared is defined when a transfer is openeed without any passive connection declared
+var ErrNoPassiveConnectionDeclared = errors.New("no passive connection declared")
 
 func (c *clientHandler) TransferOpen() (net.Conn, error) {
 	if c.transfer == nil {

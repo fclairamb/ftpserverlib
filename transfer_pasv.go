@@ -3,6 +3,7 @@ package ftpserver
 
 import (
 	"crypto/tls"
+	"errors"
 	"fmt"
 	"math/rand"
 	"net"
@@ -43,7 +44,7 @@ func (c *clientHandler) getCurrentIP() ([]string, error) {
 			ip, err = c.server.settings.PublicIPResolver(c)
 
 			if err != nil {
-				return nil, fmt.Errorf("couldn't fetch public IP: %v", err)
+				return nil, fmt.Errorf("couldn't fetch public IP: %w", err)
 			}
 		} else {
 			ip = strings.Split(c.conn.LocalAddr().String(), ":")[0]
@@ -52,6 +53,9 @@ func (c *clientHandler) getCurrentIP() ([]string, error) {
 
 	return strings.Split(ip, "."), nil
 }
+
+// ErrNoAvailableListeningPort is returned when no port could be found to accept incoming connection
+var ErrNoAvailableListeningPort = errors.New("could not find any port to listen to")
 
 func (c *clientHandler) findListenerWithinPortRange(portRange *PortRange) (*net.TCPListener, error) {
 	nbAttempts := portRange.End - portRange.Start
@@ -69,7 +73,7 @@ func (c *clientHandler) findListenerWithinPortRange(portRange *PortRange) (*net.
 
 		if errResolve != nil {
 			c.logger.Error("Problem resolving local port", "err", errResolve, "port", port)
-			return nil, fmt.Errorf("could not resolve port: %d", port)
+			return nil, fmt.Errorf("could not resolve port %d: %w", port, errResolve)
 		}
 
 		tcpListener, errListen := net.ListenTCP("tcp", laddr)
@@ -85,7 +89,7 @@ func (c *clientHandler) findListenerWithinPortRange(portRange *PortRange) (*net.
 		"portRAngeEnd", portRange.End,
 	)
 
-	return nil, fmt.Errorf("could not find any port to listen to")
+	return nil, ErrNoAvailableListeningPort
 }
 
 func (c *clientHandler) handlePASV() error {
@@ -156,7 +160,7 @@ func (p *passiveTransferHandler) ConnectionWait(wait time.Duration) (net.Conn, e
 	if p.connection == nil {
 		var err error
 		if err = p.tcpListener.SetDeadline(time.Now().Add(wait)); err != nil {
-			return nil, fmt.Errorf("failed to set deadline: %v", err)
+			return nil, fmt.Errorf("failed to set deadline: %w", err)
 		}
 
 		p.connection, err = p.listener.Accept()
