@@ -9,8 +9,6 @@ import (
 	"strconv"
 	"strings"
 	"time"
-
-	"github.com/spf13/afero"
 )
 
 func (c *clientHandler) handleSTOR() error {
@@ -31,7 +29,7 @@ func (c *clientHandler) handleRETR() error {
 // File transfer, read or write, seek or not, is basically the same.
 // To make sure we don't miss any step, we execute everything in order
 func (c *clientHandler) transferFile(write bool, append bool) {
-	var file afero.File
+	var file FileTransfer
 	var err error
 
 	path := c.absPath(c.param)
@@ -50,9 +48,14 @@ func (c *clientHandler) transferFile(write bool, append bool) {
 		} else {
 			fileFlag = os.O_RDONLY
 		}
+		if fileTransfer, ok := c.driver.(ClientDriverExtentionFileTransfer); ok {
+			file, err = fileTransfer.GetHandle(path, fileFlag)
+		} else {
+			file, err = c.driver.OpenFile(path, fileFlag, filePerm)
+		}
 
 		// If this fail, can stop right here
-		if file, err = c.driver.OpenFile(path, fileFlag, filePerm); err != nil {
+		if err != nil {
 			c.writeMessage(550, "Could not access file: "+err.Error())
 			return
 		}
@@ -63,39 +66,13 @@ func (c *clientHandler) transferFile(write bool, append bool) {
 		if _, errSeek := file.Seek(c.ctxRest, 0); errSeek != nil {
 			err = errSeek
 		}
-
 		// Whatever happens we should reset the seek position
 		c.ctxRest = 0
 	}
 
 	// Start the transfer
 	if err == nil {
-		var tr net.Conn
-
-		if tr, err = c.TransferOpen(); err == nil {
-			defer c.TransferClose()
-
-			// Copy the data
-			var in io.Reader
-			var out io.Writer
-
-			if write { // ... from the connection to the file
-				in = tr
-				out = file
-			} else { // ... from the file to the connection
-				in = file
-				out = tr
-			}
-
-			if written, errCopy := io.Copy(out, in); errCopy != nil && errCopy != io.EOF {
-				err = errCopy
-			} else {
-				c.logger.Debug(
-					"Stream copy finished",
-					"writtenBytes", written,
-				)
-			}
-		}
+		err = c.doTransfer(file, write)
 	}
 
 	// *ALWAYS* close the file but only save the error if there wasn't one before
@@ -110,6 +87,42 @@ func (c *clientHandler) transferFile(write bool, append bool) {
 			return
 		}
 	}
+}
+
+func (c *clientHandler) doTransfer(file FileTransfer, write bool) error {
+	var tr net.Conn
+	var err error
+
+	if tr, err = c.TransferOpen(); err == nil {
+		defer c.TransferClose()
+
+		// Copy the data
+		var in io.Reader
+		var out io.Writer
+
+		if write { // ... from the connection to the file
+			in = tr
+			out = file
+		} else { // ... from the file to the connection
+			in = file
+			out = tr
+		}
+		// for reads io.EOF isn't an error, for writes it must be considered an error
+		if written, errCopy := io.Copy(out, in); errCopy != nil && (errCopy != io.EOF || write) {
+			err = errCopy
+
+			if fileTransferError, ok := file.(FileTransferError); ok {
+				fileTransferError.TransferError(errCopy)
+			}
+		} else {
+			c.logger.Debug(
+				"Stream copy finished",
+				"writtenBytes", written,
+			)
+		}
+	}
+
+	return err
 }
 
 func (c *clientHandler) handleCHMOD(params string) {
