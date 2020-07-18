@@ -3,7 +3,9 @@ package ftpserver
 
 import (
 	"crypto/tls"
+	"io"
 	"net"
+	"os"
 
 	"github.com/spf13/afero"
 )
@@ -48,6 +50,25 @@ type ClientDriverExtensionChown interface {
 	Chown(name string, user string, group string) error
 }
 
+// ClientDriverExtensionFileList is a convenience extension to allow to return file listing
+// without requiring to implement the methods Open/Readdir for your custom afero.File
+type ClientDriverExtensionFileList interface {
+
+	// ReadDir reads the directory named by name and return a list of directory entries.
+	ReadDir(name string) ([]os.FileInfo, error)
+}
+
+// ClientDriverExtentionFileTransfer is a convenience extension to allow to transfer files
+// without requiring to implement the methods Create/Open/OpenFile for your custom afero.File.
+type ClientDriverExtentionFileTransfer interface {
+
+	// GetHandle return an handle to upload or download a file based on flags:
+	// os.O_RDONLY indicates a download
+	// os.O_WRONLY indicates an upload and can be combined with os.O_APPEND (resume) or
+	// os.O_CREATE (upload to new file/truncate)
+	GetHandle(name string, flags int) (FileTransfer, error)
+}
+
 // ClientContext is implemented on the server side to provide some access to few data around the client
 type ClientContext interface {
 	// Path provides the path of the current connection
@@ -70,6 +91,19 @@ type ClientContext interface {
 
 	// Client's version can be empty
 	GetClientVersion() string
+}
+
+// FileTransfer defines the inferface for file transfers.
+type FileTransfer interface {
+	io.Reader
+	io.Writer
+	io.Seeker
+	io.Closer
+}
+
+// FileTransferError is a FileTransfer extension used to notify errors.
+type FileTransferError interface {
+	TransferError(err error)
 }
 
 // PortRange is a range of ports
