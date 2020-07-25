@@ -107,6 +107,28 @@ func (c *clientHandler) GetClientVersion() string {
 	return c.clnt
 }
 
+// Close closes the active transfer, if any, and the control connection
+func (c *clientHandler) Close(code int, message string) error {
+	if c.transfer != nil {
+		if err := c.transfer.Close(); err != nil {
+			c.logger.Warn(
+				"Problem closing a transfer on external close request",
+				"err", err,
+			)
+		}
+	}
+
+	if code > 0 {
+		c.writeMessage(code, message)
+	}
+
+	if err := c.writer.Flush(); err != nil {
+		c.logger.Error("Flush error", "err", err)
+	}
+
+	return c.conn.Close()
+}
+
 func (c *clientHandler) end() {
 	c.server.driver.ClientDisconnected(c)
 	c.server.clientDeparture(c)
