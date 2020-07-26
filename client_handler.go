@@ -259,9 +259,15 @@ func (c *clientHandler) writeLine(line string) {
 }
 
 func (c *clientHandler) writeMessage(code int, message string) {
-	message = strings.ReplaceAll(message, "\n", "\\n")
-	message = strings.ReplaceAll(message, "\r", "\\r")
-	c.writeLine(fmt.Sprintf("%d %s", code, message))
+	lines := getMessageLines(message)
+
+	for idx, line := range lines {
+		if idx < len(lines)-1 {
+			c.writeLine(fmt.Sprintf("%d-%s", code, line))
+		} else {
+			c.writeLine(fmt.Sprintf("%d %s", code, line))
+		}
+	}
 }
 
 // ErrNoPassiveConnectionDeclared is defined when a transfer is openeed without any passive connection declared
@@ -333,4 +339,19 @@ func (c *clientHandler) multilineAnswer(code int, message string) func() {
 	return func() {
 		c.writeLine(fmt.Sprintf("%d End", code))
 	}
+}
+
+func getMessageLines(message string) []string {
+	lines := make([]string, 0, 1)
+	sc := bufio.NewScanner(strings.NewReader(message))
+
+	for sc.Scan() {
+		lines = append(lines, sc.Text())
+	}
+
+	if len(lines) == 0 {
+		lines = append(lines, "")
+	}
+
+	return lines
 }
