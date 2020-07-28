@@ -44,6 +44,11 @@ func (c *clientHandler) transferFile(write bool, append bool) {
 				fileFlag |= os.O_APPEND
 			} else {
 				fileFlag |= os.O_CREATE
+				// if this isn't a resume we add the truncate flag
+				// to be sure to overwrite an existing file
+				if c.ctxRest == 0 {
+					fileFlag |= os.O_TRUNC
+				}
 			}
 		} else {
 			fileFlag = os.O_RDONLY
@@ -54,9 +59,10 @@ func (c *clientHandler) transferFile(write bool, append bool) {
 			file, err = c.driver.OpenFile(path, fileFlag, filePerm)
 		}
 
-		// If this fail, can stop right here
+		// If this fail, can stop right here and reset the seek position
 		if err != nil {
 			c.writeMessage(550, "Could not access file: "+err.Error())
+			c.ctxRest = 0
 			return
 		}
 	}
