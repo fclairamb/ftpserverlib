@@ -94,8 +94,6 @@ func (c *clientHandler) doTransfer(file FileTransfer, write bool) error {
 	var err error
 
 	if tr, err = c.TransferOpen(); err == nil {
-		defer c.TransferClose()
-
 		// Copy the data
 		var in io.Reader
 		var out io.Writer
@@ -120,6 +118,8 @@ func (c *clientHandler) doTransfer(file FileTransfer, write bool) error {
 				"writtenBytes", written,
 			)
 		}
+
+		c.TransferClose(err)
 	}
 
 	return err

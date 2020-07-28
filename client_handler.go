@@ -299,9 +299,12 @@ func (c *clientHandler) TransferOpen() (net.Conn, error) {
 	return conn, err
 }
 
-func (c *clientHandler) TransferClose() {
+func (c *clientHandler) TransferClose(err error) {
 	if c.transfer != nil {
-		c.writeMessage(StatusClosingDataConn, "Closing transfer connection")
+		if err == nil {
+			// only send the OK status if there is no error
+			c.writeMessage(StatusClosingDataConn, "Closing transfer connection")
+		}
 
 		if err := c.transfer.Close(); err != nil {
 			c.logger.Warn(
