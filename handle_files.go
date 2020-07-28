@@ -242,14 +242,25 @@ func (c *clientHandler) handleSTATFile() error {
 
 		// c.writeLine(fmt.Sprintf("%d-Status follows:", StatusSystemStatus))
 		if info.IsDir() {
-			directory, errOpenFile := c.driver.Open(c.absPath(c.param))
+			var files []os.FileInfo
+			var errList error
 
-			if errOpenFile != nil {
-				c.writeMessage(500, fmt.Sprintf("Could not list: %v", errOpenFile))
-				return nil
+			directoryPath := c.absPath(c.param)
+
+			if fileList, ok := c.driver.(ClientDriverExtensionFileList); ok {
+				files, errList = fileList.ReadDir(directoryPath)
+			} else {
+				directory, errOpenFile := c.driver.Open(c.absPath(c.param))
+
+				if errOpenFile != nil {
+					c.writeMessage(500, fmt.Sprintf("Could not list: %v", errOpenFile))
+					return nil
+				}
+				files, errList = directory.Readdir(-1)
+				c.closeDirectory(directoryPath, directory)
 			}
 
-			if files, errList := directory.Readdir(-1); errList == nil {
+			if errList == nil {
 				for _, f := range files {
 					c.writeLine(fmt.Sprintf(" %s", c.fileStat(f)))
 				}
