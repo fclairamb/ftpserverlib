@@ -119,6 +119,9 @@ func (c *clientHandler) doTransfer(file FileTransfer, write bool) error {
 				"Stream copy finished",
 				"writtenBytes", written,
 			)
+			if written == 0 {
+				_, err = out.Write([]byte(""))
+			}
 		}
 
 		c.TransferClose(err)
