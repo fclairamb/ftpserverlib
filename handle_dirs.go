@@ -81,8 +81,10 @@ func (c *clientHandler) handlePWD() error {
 func (c *clientHandler) handleLIST() error {
 	if files, err := c.getFileList(); err == nil || err == io.EOF {
 		if tr, errTr := c.TransferOpen(); errTr == nil {
-			defer c.TransferClose(nil)
-			return c.dirTransferLIST(tr, files)
+			err = c.dirTransferLIST(tr, files)
+			c.TransferClose(err)
+
+			return err
 		}
 	} else {
 		c.writeMessage(StatusSyntaxErrorNotRecognised, fmt.Sprintf("Could not list: %v", err))
@@ -94,8 +96,10 @@ func (c *clientHandler) handleLIST() error {
 func (c *clientHandler) handleNLST() error {
 	if files, err := c.getFileList(); err == nil || err == io.EOF {
 		if tr, errTrOpen := c.TransferOpen(); errTrOpen == nil {
-			defer c.TransferClose(nil)
-			return c.dirTransferNLST(tr, files)
+			err = c.dirTransferNLST(tr, files)
+			c.TransferClose(err)
+
+			return err
 		}
 	} else {
 		c.writeMessage(500, fmt.Sprintf("Could not list: %v", err))
@@ -105,6 +109,11 @@ func (c *clientHandler) handleNLST() error {
 }
 
 func (c *clientHandler) dirTransferNLST(w io.Writer, files []os.FileInfo) error {
+	if len(files) == 0 {
+		_, err := w.Write([]byte(""))
+		return err
+	}
+
 	for _, file := range files {
 		if _, err := fmt.Fprintf(w, "%s\r\n", file.Name()); err != nil {
 			return err
@@ -122,8 +131,10 @@ func (c *clientHandler) handleMLSD() error {
 
 	if files, err := c.getFileList(); err == nil || err == io.EOF {
 		if tr, errTr := c.TransferOpen(); errTr == nil {
-			defer c.TransferClose(nil)
-			return c.dirTransferMLSD(tr, files)
+			err = c.dirTransferMLSD(tr, files)
+			c.TransferClose(err)
+
+			return err
 		}
 	} else {
 		c.writeMessage(StatusSyntaxErrorNotRecognised, fmt.Sprintf("Could not list: %v", err))
@@ -161,6 +172,11 @@ func (c *clientHandler) fileStat(file os.FileInfo) string {
 
 // fclairamb (2018-02-13): #64: Removed extra empty line
 func (c *clientHandler) dirTransferLIST(w io.Writer, files []os.FileInfo) error {
+	if len(files) == 0 {
+		_, err := w.Write([]byte(""))
+		return err
+	}
+
 	for _, file := range files {
 		if _, err := fmt.Fprintf(w, "%s\r\n", c.fileStat(file)); err != nil {
 			return err
@@ -172,6 +188,11 @@ func (c *clientHandler) dirTransferLIST(w io.Writer, files []os.FileInfo) error 
 
 // fclairamb (2018-02-13): #64: Removed extra empty line
 func (c *clientHandler) dirTransferMLSD(w io.Writer, files []os.FileInfo) error {
+	if len(files) == 0 {
+		_, err := w.Write([]byte(""))
+		return err
+	}
+
 	for _, file := range files {
 		if err := c.writeMLSxOutput(w, file); err != nil {
 			return err
