@@ -114,10 +114,6 @@ func (c *clientHandler) doTransfer(file FileTransfer, write bool) error {
 		// for reads io.EOF isn't an error, for writes it must be considered an error
 		if written, errCopy := io.Copy(out, in); errCopy != nil && (errCopy != io.EOF || write) {
 			err = errCopy
-
-			if fileTransferError, ok := file.(FileTransferError); ok {
-				fileTransferError.TransferError(errCopy)
-			}
 		} else {
 			c.logger.Debug(
 				"Stream copy finished",
@@ -126,6 +122,12 @@ func (c *clientHandler) doTransfer(file FileTransfer, write bool) error {
 		}
 
 		c.TransferClose(err)
+	}
+
+	if err != nil {
+		if fileTransferError, ok := file.(FileTransferError); ok {
+			fileTransferError.TransferError(err)
+		}
 	}
 
 	return err

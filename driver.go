@@ -91,6 +91,12 @@ type ClientContext interface {
 
 	// Client's version can be empty
 	GetClientVersion() string
+
+	// Close closes the connection and disconnects the client.
+	// You can optionally set a status code and a message to
+	// send to the client just before disconnecting it.
+	// Set status code to zero to close without further notice
+	Close(code int, message string) error
 }
 
 // FileTransfer defines the inferface for file transfers.
