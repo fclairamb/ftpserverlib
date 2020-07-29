@@ -44,6 +44,11 @@ func (c *clientHandler) transferFile(write bool, append bool) {
 				fileFlag |= os.O_APPEND
 			} else {
 				fileFlag |= os.O_CREATE
+				// if this isn't a resume we add the truncate flag
+				// to be sure to overwrite an existing file
+				if c.ctxRest == 0 {
+					fileFlag |= os.O_TRUNC
+				}
 			}
 		} else {
 			fileFlag = os.O_RDONLY
@@ -54,9 +59,10 @@ func (c *clientHandler) transferFile(write bool, append bool) {
 			file, err = c.driver.OpenFile(path, fileFlag, filePerm)
 		}
 
-		// If this fail, can stop right here
+		// If this fail, can stop right here and reset the seek position
 		if err != nil {
 			c.writeMessage(550, "Could not access file: "+err.Error())
+			c.ctxRest = 0
 			return
 		}
 	}
@@ -94,8 +100,6 @@ func (c *clientHandler) doTransfer(file FileTransfer, write bool) error {
 	var err error
 
 	if tr, err = c.TransferOpen(); err == nil {
-		defer c.TransferClose()
-
 		// Copy the data
 		var in io.Reader
 		var out io.Writer
@@ -116,6 +120,8 @@ func (c *clientHandler) doTransfer(file FileTransfer, write bool) error {
 				"writtenBytes", written,
 			)
 		}
+
+		c.TransferClose(err)
 	}
 
 	if err != nil {
@@ -238,14 +244,25 @@ func (c *clientHandler) handleSTATFile() error {
 
 		// c.writeLine(fmt.Sprintf("%d-Status follows:", StatusSystemStatus))
 		if info.IsDir() {
-			directory, errOpenFile := c.driver.Open(c.absPath(c.param))
+			var files []os.FileInfo
+			var errList error
 
-			if errOpenFile != nil {
-				c.writeMessage(500, fmt.Sprintf("Could not list: %v", errOpenFile))
-				return nil
+			directoryPath := c.absPath(c.param)
+
+			if fileList, ok := c.driver.(ClientDriverExtensionFileList); ok {
+				files, errList = fileList.ReadDir(directoryPath)
+			} else {
+				directory, errOpenFile := c.driver.Open(c.absPath(c.param))
+
+				if errOpenFile != nil {
+					c.writeMessage(500, fmt.Sprintf("Could not list: %v", errOpenFile))
+					return nil
+				}
+				files, errList = directory.Readdir(-1)
+				c.closeDirectory(directoryPath, directory)
 			}
 
-			if files, errList := directory.Readdir(-1); errList == nil {
+			if errList == nil {
 				for _, f := range files {
 					c.writeLine(fmt.Sprintf(" %s", c.fileStat(f)))
 				}
