@@ -69,6 +69,14 @@ type ClientDriverExtentionFileTransfer interface {
 	GetHandle(name string, flags int) (FileTransfer, error)
 }
 
+// ClientDriverExtensionRemoveDir is an extension to implement if you need to distinguish
+// between the FTP command DELE (remove a file) and RMD (remove a dir). If you don't
+// implement this extension they will be both mapped to the Remove method defined in your
+// afero.Fs implementation
+type ClientDriverExtensionRemoveDir interface {
+	RemoveDir(name string) error
+}
+
 // ClientContext is implemented on the server side to provide some access to few data around the client
 type ClientContext interface {
 	// Path provides the path of the current connection
