@@ -54,7 +54,7 @@ func (c *clientHandler) transferFile(write bool, append bool) {
 			fileFlag = os.O_RDONLY
 		}
 		if fileTransfer, ok := c.driver.(ClientDriverExtentionFileTransfer); ok {
-			file, err = fileTransfer.GetHandle(path, fileFlag)
+			file, err = fileTransfer.GetHandle(path, fileFlag, c.ctxRest)
 		} else {
 			file, err = c.driver.OpenFile(path, fileFlag, filePerm)
 		}

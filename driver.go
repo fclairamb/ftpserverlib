@@ -66,7 +66,9 @@ type ClientDriverExtentionFileTransfer interface {
 	// os.O_RDONLY indicates a download
 	// os.O_WRONLY indicates an upload and can be combined with os.O_APPEND (resume) or
 	// os.O_CREATE (upload to new file/truncate)
-	GetHandle(name string, flags int) (FileTransfer, error)
+	//
+	// offset is the argument of a previous REST command, if any, or 0
+	GetHandle(name string, flags int, offset int64) (FileTransfer, error)
 }
 
 // ClientDriverExtensionRemoveDir is an extension to implement if you need to distinguish
