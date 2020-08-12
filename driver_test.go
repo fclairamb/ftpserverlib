@@ -35,6 +35,14 @@ func NewTestServerWithDriver(driver *TestServerDriver) *FtpServer {
 		driver.Settings.ListenAddr = "127.0.0.1:0"
 	}
 
+	{
+		dir, _ := ioutil.TempDir("", "example")
+		if err := os.MkdirAll(dir, 0750); err != nil {
+			panic(err)
+		}
+		driver.fs = afero.NewBasePathFs(afero.NewOsFs(), dir)
+	}
+
 	s := NewFtpServer(driver)
 
 	// If we are in debug mode, we should log things
@@ -65,6 +73,7 @@ type TestServerDriver struct {
 
 	Settings     *Settings // Settings
 	FileOverride afero.File
+	fs           afero.Fs
 }
 
 // TestClientDriver defines a minimal serverftp client driver
@@ -75,14 +84,9 @@ type TestClientDriver struct {
 }
 
 // NewTestClientDriver creates a client driver
-func NewTestClientDriver() *TestClientDriver {
-	dir, _ := ioutil.TempDir("", "example")
-	if err := os.MkdirAll(dir, 0750); err != nil {
-		panic(err)
-	}
-
+func NewTestClientDriver(server *TestServerDriver) *TestClientDriver {
 	return &TestClientDriver{
-		Fs: afero.NewBasePathFs(afero.NewOsFs(), dir),
+		Fs: server.fs,
 	}
 }
 
@@ -101,9 +105,9 @@ func (driver *TestServerDriver) ClientConnected(cc ClientContext) (string, error
 }
 
 // AuthUser with authenticate users
-func (driver *TestServerDriver) AuthUser(cc ClientContext, user, pass string) (ClientDriver, error) {
+func (driver *TestServerDriver) AuthUser(_ ClientContext, user, pass string) (ClientDriver, error) {
 	if user == authUser && pass == authPass {
-		clientdriver := NewTestClientDriver()
+		clientdriver := NewTestClientDriver(driver)
 		clientdriver.user = user
 
 		if driver.FileOverride != nil {
@@ -117,7 +121,7 @@ func (driver *TestServerDriver) AuthUser(cc ClientContext, user, pass string) (C
 }
 
 // ClientDisconnected is called when the user disconnects
-func (driver *TestServerDriver) ClientDisconnected(cc ClientContext) {
+func (driver *TestServerDriver) ClientDisconnected(ClientContext) {
 
 }
 
@@ -166,7 +170,9 @@ func (driver *TestClientDriver) Chown(name string, user string, group string) er
 		return fmt.Errorf("only accepted chown group: %s", group)
 	}
 
-	return nil
+	_, err := driver.Fs.Stat(name)
+
+	return err
 }
 
 // (copied from net/http/httptest)

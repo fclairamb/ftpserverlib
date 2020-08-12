@@ -89,7 +89,7 @@ func (c *clientHandler) handleLIST() error {
 			return c.dirTransferLIST(tr, files)
 		}
 	} else {
-		c.writeMessage(StatusSyntaxErrorNotRecognised, fmt.Sprintf("Could not list: %v", err))
+		c.writeMessage(StatusActionNotTaken, fmt.Sprintf("Could not list: %v", err))
 	}
 
 	return nil
@@ -151,7 +151,7 @@ func (c *clientHandler) handleMLSD() error {
 			return c.dirTransferMLSD(tr, files)
 		}
 	} else {
-		c.writeMessage(StatusSyntaxErrorNotRecognised, fmt.Sprintf("Could not list: %v", err))
+		c.writeMessage(StatusActionNotTaken, fmt.Sprintf("Could not list: %v", err))
 	}
 
 	return nil
