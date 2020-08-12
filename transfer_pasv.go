@@ -68,6 +68,7 @@ func (c *clientHandler) findListenerWithinPortRange(portRange *PortRange) (*net.
 	}
 
 	for i := 0; i < nbAttempts; i++ {
+		// nolint: gosec
 		port := portRange.Start + rand.Intn(portRange.End-portRange.Start+1)
 		laddr, errResolve := net.ResolveTCPAddr("tcp", fmt.Sprintf("0.0.0.0:%d", port))
 

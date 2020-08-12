@@ -24,6 +24,7 @@ func createTemporaryFile(t *testing.T, targetSize int) *os.File {
 		return nil
 	}
 
+	// nolint: gosec
 	src := rand.New(rand.NewSource(0))
 	if _, err := io.CopyN(file, src, int64(targetSize)); err != nil {
 		t.Fatal("Couldn't copy:", err)
