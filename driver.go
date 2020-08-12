@@ -36,18 +36,28 @@ type ClientDriver interface {
 	afero.Fs
 }
 
-// ClientDriverExtensionAllocate is an extension to allow to support the allocation command
+// ClientDriverExtensionAllocate is an extension to support the "ALLO" - file allocation - command
 type ClientDriverExtensionAllocate interface {
 
 	// AllocateSpace reserves the space necessary to upload files
 	AllocateSpace(size int) error
 }
 
-// ClientDriverExtensionChown is an extension to allow to support the chown command
+// ClientDriverExtensionChown is an extension to support the "CHOWN" - owner change - command
 type ClientDriverExtensionChown interface {
 
 	// Chown changes the owner of a file
 	Chown(name string, user string, group string) error
+}
+
+// ClientDriverExtensionSymlink is an extension to support the "SITE SYMLINK" - symbolic link creation - command
+type ClientDriverExtensionSymlink interface {
+
+	// Symlink creates a symlink
+	Symlink(oldname, newname string) error
+
+	// SymlinkIfPossible allows to get the source of a symlink (but we don't need for now)
+	// ReadlinkIfPossible(name string) (string, error)
 }
 
 // ClientDriverExtensionFileList is a convenience extension to allow to return file listing

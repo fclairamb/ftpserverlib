@@ -186,6 +186,16 @@ func (driver *TestClientDriver) Chown(name string, user string, group string) er
 	return err
 }
 
+var errSymlinkNotImplemented = errors.New("symlink not implemented")
+
+func (driver *TestClientDriver) Symlink(oldname, newname string) error {
+	if linker, ok := driver.Fs.(afero.Linker); ok {
+		return linker.SymlinkIfPossible(oldname, newname)
+	} else {
+		return errSymlinkNotImplemented
+	}
+}
+
 // (copied from net/http/httptest)
 // localhostCert is a PEM-encoded TLS cert with SAN IPs
 // "127.0.0.1" and "[::1]", expiring at the last second of 2049 (the end

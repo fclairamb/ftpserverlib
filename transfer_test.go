@@ -30,6 +30,12 @@ func createTemporaryFile(t *testing.T, targetSize int) *os.File {
 		return nil
 	}
 
+	t.Cleanup(func() {
+		if err := os.Remove(file.Name()); err != nil {
+			t.Fatalf("Problem deleting file \"%s\": %v", file.Name(), err)
+		}
+	})
+
 	return file
 }
 

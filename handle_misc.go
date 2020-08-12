@@ -59,6 +59,9 @@ func (c *clientHandler) handleSITE() error {
 		case "CHOWN":
 			c.handleCHOWN(spl[1])
 			return nil
+		case "SYMLINK":
+			c.handleSYMLINK(spl[1])
+			return nil
 		}
 	}
 

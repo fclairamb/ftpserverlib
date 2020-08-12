@@ -161,3 +161,47 @@ func TestCHOWN(t *testing.T) {
 		t.Fatal("Should NOT have been accepted", err, rc)
 	}
 }
+
+func TestSYMLINK(t *testing.T) {
+	s := NewTestServer(t, true)
+
+	conf := goftp.Config{
+		User:     "test",
+		Password: "test",
+	}
+
+	var err error
+
+	var c *goftp.Client
+
+	if c, err = goftp.DialConfig(conf, s.Addr()); err != nil {
+		t.Fatal("Couldn't connect", err)
+	}
+
+	defer func() { panicOnError(c.Close()) }()
+
+	// Creating a tiny file
+	ftpUpload(t, c, createTemporaryFile(t, 10), "file")
+
+	var raw goftp.RawConn
+
+	if raw, err = c.OpenRawConn(); err != nil {
+		t.Fatal("Couldn't open raw connection")
+	}
+
+	// Creating a bad clunky is authorized
+	if rc, _, err := raw.SendCommand("SITE SYMLINK file3 file4"); err != nil || rc != 200 {
+		t.Fatal("Should have been accepted", err, rc)
+	}
+
+	// Overwriting a file is not authorized
+	if rc, _, err := raw.SendCommand("SITE SYMLINK file5 file"); rc != 550 {
+		t.Fatal("Should have been refused", err, rc)
+	}
+
+	// Good symlink
+	if rc, _, err := raw.SendCommand("SITE SYMLINK file test"); err != nil || rc != 200 {
+		t.Fatal("Should have been accepted", err, rc)
+	}
+
+}
