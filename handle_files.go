@@ -189,7 +189,8 @@ func (c *clientHandler) handleCHOWN(params string) {
 	}
 }
 
-// https://learn.akamai.com/en-us/webhelp/netstorage/netstorage-user-guide/GUID-AB301948-C6FF-4957-9291-FE3F02457FD0.html
+// https://learn.akamai.com/en-us/webhelp/netstorage/netstorage-user-guide/
+// GUID-AB301948-C6FF-4957-9291-FE3F02457FD0.html
 func (c *clientHandler) handleSYMLINK(params string) {
 	spl := strings.SplitN(params, " ", 2)
 

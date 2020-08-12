@@ -203,5 +203,4 @@ func TestSYMLINK(t *testing.T) {
 	if rc, _, err := raw.SendCommand("SITE SYMLINK file test"); err != nil || rc != 200 {
 		t.Fatal("Should have been accepted", err, rc)
 	}
-
 }
