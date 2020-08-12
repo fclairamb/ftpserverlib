@@ -6,6 +6,7 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
+	"testing"
 
 	gklog "github.com/go-kit/kit/log"
 	"github.com/spf13/afero"
@@ -20,12 +21,12 @@ const (
 )
 
 // NewTestServer provides a test server with or without debugging
-func NewTestServer(debug bool) *FtpServer {
-	return NewTestServerWithDriver(&TestServerDriver{Debug: debug})
+func NewTestServer(t *testing.T, debug bool) *FtpServer {
+	return NewTestServerWithDriver(t, &TestServerDriver{Debug: debug})
 }
 
 // NewTestServerWithDriver provides a server instantiated with some settings
-func NewTestServerWithDriver(driver *TestServerDriver) *FtpServer {
+func NewTestServerWithDriver(t *testing.T, driver *TestServerDriver) *FtpServer {
 	if driver.Settings == nil {
 		driver.Settings = &Settings{}
 	}
@@ -51,6 +52,10 @@ func NewTestServerWithDriver(driver *TestServerDriver) *FtpServer {
 			"caller", gokit.GKDefaultCaller,
 		)
 	}
+
+	t.Cleanup(func() {
+		mustStopServer(s)
+	})
 
 	if err := s.Listen(); err != nil {
 		return nil

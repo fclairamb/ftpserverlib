@@ -75,8 +75,7 @@ func TestMLSxEntryValidation(t *testing.T) {
 }
 
 func TestALLO(t *testing.T) {
-	s := NewTestServer(true)
-	defer mustStopServer(s)
+	s := NewTestServer(t, true)
 
 	conf := goftp.Config{
 		User:     "test",
@@ -111,8 +110,7 @@ func TestALLO(t *testing.T) {
 }
 
 func TestCHOWN(t *testing.T) {
-	s := NewTestServer(true)
-	defer mustStopServer(s)
+	s := NewTestServer(t, true)
 
 	conf := goftp.Config{
 		User:     "test",
