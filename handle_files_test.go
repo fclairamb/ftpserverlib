@@ -159,7 +159,7 @@ func TestCHOWN(t *testing.T) {
 	}
 
 	// Asking for a chown on a file that doesn't exist
-	if rc, _, err := raw.SendCommand("SITE CHOWN test file2"); err == nil || rc != 550 {
+	if rc, _, err := raw.SendCommand("SITE CHOWN test file2"); rc != 550 {
 		t.Fatal("Should NOT have been accepted", err, rc)
 	}
 }
