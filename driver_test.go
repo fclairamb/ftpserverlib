@@ -167,7 +167,7 @@ func (driver *TestClientDriver) AllocateSpace(size int) error {
 var errInvalidChownUser = errors.New("invalid chown group")
 var errInvalidChownGroup = errors.New("invalid chown group")
 
-func (driver *TestClientDriver) Chown(_ string, user string, group string) error {
+func (driver *TestClientDriver) Chown(name string, user string, group string) error {
 	if user != driver.user {
 		return errInvalidChownUser
 	}
