@@ -9,8 +9,6 @@ import (
 	"strconv"
 	"strings"
 	"time"
-
-	"github.com/spf13/afero"
 )
 
 func (c *clientHandler) handleSTOR() error {
@@ -31,8 +29,7 @@ func (c *clientHandler) handleRETR() error {
 // File transfer, read or write, seek or not, is basically the same.
 // To make sure we don't miss any step, we execute everything in order
 func (c *clientHandler) transferFile(write bool, append bool) {
-	var file afero.File
-
+	var file FileTransfer
 	var err error
 
 	path := c.absPath(c.param)
@@ -47,14 +44,25 @@ func (c *clientHandler) transferFile(write bool, append bool) {
 				fileFlag |= os.O_APPEND
 			} else {
 				fileFlag |= os.O_CREATE
+				// if this isn't a resume we add the truncate flag
+				// to be sure to overwrite an existing file
+				if c.ctxRest == 0 {
+					fileFlag |= os.O_TRUNC
+				}
 			}
 		} else {
 			fileFlag = os.O_RDONLY
 		}
+		if fileTransfer, ok := c.driver.(ClientDriverExtentionFileTransfer); ok {
+			file, err = fileTransfer.GetHandle(path, fileFlag, c.ctxRest)
+		} else {
+			file, err = c.driver.OpenFile(path, fileFlag, filePerm)
+		}
 
-		// If this fail, can stop right here
-		if file, err = c.driver.OpenFile(path, fileFlag, filePerm); err != nil {
+		// If this fail, can stop right here and reset the seek position
+		if err != nil {
 			c.writeMessage(550, "Could not access file: "+err.Error())
+			c.ctxRest = 0
 			return
 		}
 	}
@@ -64,41 +72,13 @@ func (c *clientHandler) transferFile(write bool, append bool) {
 		if _, errSeek := file.Seek(c.ctxRest, 0); errSeek != nil {
 			err = errSeek
 		}
-
 		// Whatever happens we should reset the seek position
 		c.ctxRest = 0
 	}
 
 	// Start the transfer
 	if err == nil {
-		var tr net.Conn
-
-		if tr, err = c.TransferOpen(); err == nil {
-			defer c.TransferClose()
-
-			// Copy the data
-
-			var in io.Reader
-
-			var out io.Writer
-
-			if write { // ... from the connection to the file
-				in = tr
-				out = file
-			} else { // ... from the file to the connection
-				in = file
-				out = tr
-			}
-
-			if written, errCopy := io.Copy(out, in); errCopy != nil && errCopy != io.EOF {
-				err = errCopy
-			} else {
-				c.logger.Debug(
-					"Stream copy finished",
-					"writtenBytes", written,
-				)
-			}
-		}
+		err = c.doTransfer(file, write)
 	}
 
 	// *ALWAYS* close the file but only save the error if there wasn't one before
@@ -107,9 +87,53 @@ func (c *clientHandler) transferFile(write bool, append bool) {
 	}
 
 	if err != nil {
-		c.writeMessage(StatusActionNotTaken, "Could not transfer file: "+err.Error())
-		return
+		// if the transfer could not be open we already sent an error
+		if _, isOpenTransferErr := err.(*openTransferError); !isOpenTransferErr {
+			c.writeMessage(StatusActionNotTaken, "Could not transfer file: "+err.Error())
+			return
+		}
 	}
+}
+
+func (c *clientHandler) doTransfer(file FileTransfer, write bool) error {
+	var tr net.Conn
+	var err error
+
+	if tr, err = c.TransferOpen(); err == nil {
+		// Copy the data
+		var in io.Reader
+		var out io.Writer
+
+		if write { // ... from the connection to the file
+			in = tr
+			out = file
+		} else { // ... from the file to the connection
+			in = file
+			out = tr
+		}
+		// for reads io.EOF isn't an error, for writes it must be considered an error
+		if written, errCopy := io.Copy(out, in); errCopy != nil && (errCopy != io.EOF || write) {
+			err = errCopy
+		} else {
+			c.logger.Debug(
+				"Stream copy finished",
+				"writtenBytes", written,
+			)
+			if written == 0 {
+				_, err = out.Write([]byte(""))
+			}
+		}
+
+		c.TransferClose(err)
+	}
+
+	if err != nil {
+		if fileTransferError, ok := file.(FileTransferError); ok {
+			fileTransferError.TransferError(err)
+		}
+	}
+
+	return err
 }
 
 func (c *clientHandler) handleCHMOD(params string) {
@@ -223,14 +247,25 @@ func (c *clientHandler) handleSTATFile() error {
 
 		// c.writeLine(fmt.Sprintf("%d-Status follows:", StatusSystemStatus))
 		if info.IsDir() {
-			directory, errOpenFile := c.driver.Open(c.absPath(c.param))
+			var files []os.FileInfo
+			var errList error
 
-			if errOpenFile != nil {
-				c.writeMessage(500, fmt.Sprintf("Could not list: %v", errOpenFile))
-				return nil
+			directoryPath := c.absPath(c.param)
+
+			if fileList, ok := c.driver.(ClientDriverExtensionFileList); ok {
+				files, errList = fileList.ReadDir(directoryPath)
+			} else {
+				directory, errOpenFile := c.driver.Open(c.absPath(c.param))
+
+				if errOpenFile != nil {
+					c.writeMessage(500, fmt.Sprintf("Could not list: %v", errOpenFile))
+					return nil
+				}
+				files, errList = directory.Readdir(-1)
+				c.closeDirectory(directoryPath, directory)
 			}
 
-			if files, errList := directory.Readdir(-1); errList == nil {
+			if errList == nil {
 				for _, f := range files {
 					c.writeLine(fmt.Sprintf(" %s", c.fileStat(f)))
 				}

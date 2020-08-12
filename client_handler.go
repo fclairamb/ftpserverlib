@@ -3,7 +3,6 @@ package ftpserver
 
 import (
 	"bufio"
-	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -12,6 +11,14 @@ import (
 
 	"github.com/fclairamb/ftpserverlib/log"
 )
+
+type openTransferError struct {
+	err string
+}
+
+func (e *openTransferError) Error() string {
+	return fmt.Sprintf("Unable to open transfer: %s", e.err)
+}
 
 // nolint: maligned
 type clientHandler struct {
@@ -93,6 +100,33 @@ func (c *clientHandler) RemoteAddr() net.Addr {
 // LocalAddr returns the local network address.
 func (c *clientHandler) LocalAddr() net.Addr {
 	return c.conn.LocalAddr()
+}
+
+// GetClientVersion returns the identified client, can be empty.
+func (c *clientHandler) GetClientVersion() string {
+	return c.clnt
+}
+
+// Close closes the active transfer, if any, and the control connection
+func (c *clientHandler) Close(code int, message string) error {
+	if c.transfer != nil {
+		if err := c.transfer.Close(); err != nil {
+			c.logger.Warn(
+				"Problem closing a transfer on external close request",
+				"err", err,
+			)
+		}
+	}
+
+	if code > 0 {
+		c.writeMessage(code, message)
+	}
+
+	if err := c.writer.Flush(); err != nil {
+		c.logger.Error("Flush error", "err", err)
+	}
+
+	return c.conn.Close()
 }
 
 func (c *clientHandler) end() {
@@ -247,21 +281,43 @@ func (c *clientHandler) writeLine(line string) {
 }
 
 func (c *clientHandler) writeMessage(code int, message string) {
-	message = strings.ReplaceAll(message, "\n", "\\n")
-	message = strings.ReplaceAll(message, "\r", "\\r")
-	c.writeLine(fmt.Sprintf("%d %s", code, message))
+	lines := getMessageLines(message)
+
+	for idx, line := range lines {
+		if idx < len(lines)-1 {
+			c.writeLine(fmt.Sprintf("%d-%s", code, line))
+		} else {
+			c.writeLine(fmt.Sprintf("%d %s", code, line))
+		}
+	}
 }
+
+// ErrNoPassiveConnectionDeclared is defined when a transfer is openeed without any passive connection declared
+// var ErrNoPassiveConnectionDeclared = errors.New("no passive connection declared")
 
 func (c *clientHandler) TransferOpen() (net.Conn, error) {
 	if c.transfer == nil {
-		c.writeMessage(StatusActionNotTaken, "No passive connection declared")
-		return nil, errors.New("no passive connection declared")
+		err := &openTransferError{err: "No passive connection declared"}
+		c.writeMessage(StatusActionNotTaken, err.Error())
+
+		return nil, err
+	}
+
+	conn, err := c.transfer.Open()
+	if err != nil {
+		c.logger.Warn(
+			"Unable to open transfer",
+			"error", err)
+
+		err = &openTransferError{err: err.Error()}
+		c.writeMessage(StatusCannotOpenDataConnection, err.Error())
+
+		return conn, err
 	}
 
 	c.writeMessage(StatusFileStatusOK, "Using transfer connection")
-	conn, err := c.transfer.Open()
 
-	if err == nil && c.debug {
+	if c.debug {
 		c.logger.Debug(
 			"Transfer connection opened",
 			"remoteAddr", conn.RemoteAddr().String(),
@@ -271,9 +327,12 @@ func (c *clientHandler) TransferOpen() (net.Conn, error) {
 	return conn, err
 }
 
-func (c *clientHandler) TransferClose() {
+func (c *clientHandler) TransferClose(err error) {
 	if c.transfer != nil {
-		c.writeMessage(StatusClosingDataConn, "Closing transfer connection")
+		if err == nil {
+			// only send the OK status if there is no error
+			c.writeMessage(StatusClosingDataConn, "Closing transfer connection")
+		}
 
 		if err := c.transfer.Close(); err != nil {
 			c.logger.Warn(
@@ -305,4 +364,19 @@ func (c *clientHandler) multilineAnswer(code int, message string) func() {
 	return func() {
 		c.writeLine(fmt.Sprintf("%d End", code))
 	}
+}
+
+func getMessageLines(message string) []string {
+	lines := make([]string, 0, 1)
+	sc := bufio.NewScanner(strings.NewReader(message))
+
+	for sc.Scan() {
+		lines = append(lines, sc.Text())
+	}
+
+	if len(lines) == 0 {
+		lines = append(lines, "")
+	}
+
+	return lines
 }

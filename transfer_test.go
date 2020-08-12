@@ -180,8 +180,7 @@ func TestFailedTransfer(t *testing.T) {
 
 func TestFailedFileClose(t *testing.T) {
 	driver := &TestServerDriver{
-		Debug:        true,
-		FileOverride: &failingCloser{},
+		Debug: true,
 	}
 
 	s := NewTestServerWithDriver(driver)
@@ -203,6 +202,7 @@ func TestFailedFileClose(t *testing.T) {
 	defer func() { panicOnError(c.Close()) }()
 
 	file := createTemporaryFile(t, 1*1024)
+	driver.FileOverride = &failingCloser{File: *file}
 	err = c.Store("file.bin", file)
 
 	if err == nil {

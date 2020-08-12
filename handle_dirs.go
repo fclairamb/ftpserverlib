@@ -8,6 +8,8 @@ import (
 	"path"
 	"strings"
 	"time"
+
+	"github.com/spf13/afero"
 )
 
 func (c *clientHandler) absPath(p string) string {
@@ -21,7 +23,7 @@ func (c *clientHandler) absPath(p string) string {
 func (c *clientHandler) handleCWD() error {
 	p := c.absPath(c.param)
 
-	if _, err := c.driver.Open(p); err == nil {
+	if _, err := c.driver.Stat(p); err == nil {
 		c.SetPath(p)
 		c.writeMessage(StatusFileOK, fmt.Sprintf("CD worked on %s", p))
 	} else {
@@ -45,8 +47,17 @@ func (c *clientHandler) handleMKD() error {
 }
 
 func (c *clientHandler) handleRMD() error {
+	var err error
+
 	p := c.absPath(c.param)
-	if err := c.driver.Remove(p); err == nil {
+
+	if rmd, ok := c.driver.(ClientDriverExtensionRemoveDir); ok {
+		err = rmd.RemoveDir(p)
+	} else {
+		err = c.driver.Remove(p)
+	}
+
+	if err == nil {
 		c.writeMessage(StatusFileOK, fmt.Sprintf("Deleted dir %s", p))
 	} else {
 		c.writeMessage(StatusActionNotTaken, fmt.Sprintf("Could not delete dir %s: %v", p, err))
@@ -77,16 +88,12 @@ func (c *clientHandler) handlePWD() error {
 }
 
 func (c *clientHandler) handleLIST() error {
-	directory, errOpenFile := c.driver.Open(c.absPath(c.param))
-	if errOpenFile != nil {
-		c.writeMessage(500, fmt.Sprintf("Could not list: %v", errOpenFile))
-		return nil
-	}
-
-	if files, err := directory.Readdir(-1); err == nil || err == io.EOF {
+	if files, err := c.getFileList(); err == nil || err == io.EOF {
 		if tr, errTr := c.TransferOpen(); errTr == nil {
-			defer c.TransferClose()
-			return c.dirTransferLIST(tr, files)
+			err = c.dirTransferLIST(tr, files)
+			c.TransferClose(err)
+
+			return err
 		}
 	} else {
 		c.writeMessage(StatusActionNotTaken, fmt.Sprintf("Could not list: %v", err))
@@ -96,16 +103,12 @@ func (c *clientHandler) handleLIST() error {
 }
 
 func (c *clientHandler) handleNLST() error {
-	directory, errOpenFile := c.driver.Open(c.absPath(c.param))
-	if errOpenFile != nil {
-		c.writeMessage(500, fmt.Sprintf("Could not list: %v", errOpenFile))
-		return nil
-	}
-
-	if files, err := directory.Readdir(-1); err == nil || err == io.EOF {
+	if files, err := c.getFileList(); err == nil || err == io.EOF {
 		if tr, errTrOpen := c.TransferOpen(); errTrOpen == nil {
-			defer c.TransferClose()
-			return c.dirTransferNLST(tr, files)
+			err = c.dirTransferNLST(tr, files)
+			c.TransferClose(err)
+
+			return err
 		}
 	} else {
 		c.writeMessage(500, fmt.Sprintf("Could not list: %v", err))
@@ -115,6 +118,11 @@ func (c *clientHandler) handleNLST() error {
 }
 
 func (c *clientHandler) dirTransferNLST(w io.Writer, files []os.FileInfo) error {
+	if len(files) == 0 {
+		_, err := w.Write([]byte(""))
+		return err
+	}
+
 	for _, file := range files {
 		if _, err := fmt.Fprintf(w, "%s\r\n", file.Name()); err != nil {
 			return err
@@ -130,25 +138,12 @@ func (c *clientHandler) handleMLSD() error {
 		return nil
 	}
 
-	directoryPath := c.absPath(c.param)
-
-	directory, errOpenFile := c.driver.Open(directoryPath)
-	if errOpenFile != nil {
-		c.writeMessage(500, fmt.Sprintf("Could not list: %v", errOpenFile))
-		return nil
-	}
-
-	// TODO: We have a lot of copy/paste around directory listing, we should refactor this.
-	defer func() {
-		if errClose := directory.Close(); errClose != nil {
-			c.logger.Error("Couldn't close directory", "err", errClose, "directory", directoryPath)
-		}
-	}()
-
-	if files, err := directory.Readdir(-1); err == nil || err == io.EOF {
+	if files, err := c.getFileList(); err == nil || err == io.EOF {
 		if tr, errTr := c.TransferOpen(); errTr == nil {
-			defer c.TransferClose()
-			return c.dirTransferMLSD(tr, files)
+			err = c.dirTransferMLSD(tr, files)
+			c.TransferClose(err)
+
+			return err
 		}
 	} else {
 		c.writeMessage(StatusActionNotTaken, fmt.Sprintf("Could not list: %v", err))
@@ -186,6 +181,11 @@ func (c *clientHandler) fileStat(file os.FileInfo) string {
 
 // fclairamb (2018-02-13): #64: Removed extra empty line
 func (c *clientHandler) dirTransferLIST(w io.Writer, files []os.FileInfo) error {
+	if len(files) == 0 {
+		_, err := w.Write([]byte(""))
+		return err
+	}
+
 	for _, file := range files {
 		if _, err := fmt.Fprintf(w, "%s\r\n", c.fileStat(file)); err != nil {
 			return err
@@ -197,6 +197,11 @@ func (c *clientHandler) dirTransferLIST(w io.Writer, files []os.FileInfo) error 
 
 // fclairamb (2018-02-13): #64: Removed extra empty line
 func (c *clientHandler) dirTransferMLSD(w io.Writer, files []os.FileInfo) error {
+	if len(files) == 0 {
+		_, err := w.Write([]byte(""))
+		return err
+	}
+
 	for _, file := range files {
 		if err := c.writeMLSxOutput(w, file); err != nil {
 			return err
@@ -223,6 +228,29 @@ func (c *clientHandler) writeMLSxOutput(w io.Writer, file os.FileInfo) error {
 	)
 
 	return err
+}
+
+func (c *clientHandler) getFileList() ([]os.FileInfo, error) {
+	directoryPath := c.absPath(c.param)
+
+	if fileList, ok := c.driver.(ClientDriverExtensionFileList); ok {
+		return fileList.ReadDir(directoryPath)
+	}
+
+	directory, errOpenFile := c.driver.Open(directoryPath)
+	if errOpenFile != nil {
+		return nil, errOpenFile
+	}
+
+	defer c.closeDirectory(directoryPath, directory)
+
+	return directory.Readdir(-1)
+}
+
+func (c *clientHandler) closeDirectory(directoryPath string, directory afero.File) {
+	if errClose := directory.Close(); errClose != nil {
+		c.logger.Error("Couldn't close directory", "err", errClose, "directory", directoryPath)
+	}
 }
 
 func quoteDoubling(s string) string {

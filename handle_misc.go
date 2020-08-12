@@ -85,7 +85,7 @@ func (c *clientHandler) handleSTATServer() error {
 		c.writeLine("Not logged in yet")
 	}
 
-	c.writeLine("ftpserver - golang FTP server")
+	c.writeLine(c.server.settings.Banner)
 
 	return nil
 }

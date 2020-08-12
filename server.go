@@ -103,6 +103,10 @@ func (server *FtpServer) loadSettings() error {
 		s.ConnectionTimeout = 30
 	}
 
+	if s.Banner == "" {
+		s.Banner = "ftpserver - golang FTP server"
+	}
+
 	server.settings = s
 
 	return nil
@@ -114,7 +118,7 @@ func (server *FtpServer) Listen() error {
 	err := server.loadSettings()
 
 	if err != nil {
-		return fmt.Errorf("could not load settings: %v", err)
+		return fmt.Errorf("could not load settings: %w", err)
 	}
 
 	// The driver can provide its own listener implementation
