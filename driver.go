@@ -66,7 +66,17 @@ type ClientDriverExtentionFileTransfer interface {
 	// os.O_RDONLY indicates a download
 	// os.O_WRONLY indicates an upload and can be combined with os.O_APPEND (resume) or
 	// os.O_CREATE (upload to new file/truncate)
-	GetHandle(name string, flags int) (FileTransfer, error)
+	//
+	// offset is the argument of a previous REST command, if any, or 0
+	GetHandle(name string, flags int, offset int64) (FileTransfer, error)
+}
+
+// ClientDriverExtensionRemoveDir is an extension to implement if you need to distinguish
+// between the FTP command DELE (remove a file) and RMD (remove a dir). If you don't
+// implement this extension they will be both mapped to the Remove method defined in your
+// afero.Fs implementation
+type ClientDriverExtensionRemoveDir interface {
+	RemoveDir(name string) error
 }
 
 // ClientContext is implemented on the server side to provide some access to few data around the client
@@ -136,4 +146,5 @@ type Settings struct {
 	DisableMLSD              bool             // Disable MLSD support
 	DisableMLST              bool             // Disable MLST support
 	DisableMFMT              bool             // Disable MFMT support (modify file mtime)
+	Banner                   string           // Banner to use in server status response
 }

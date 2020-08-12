@@ -47,8 +47,17 @@ func (c *clientHandler) handleMKD() error {
 }
 
 func (c *clientHandler) handleRMD() error {
+	var err error
+
 	p := c.absPath(c.param)
-	if err := c.driver.Remove(p); err == nil {
+
+	if rmd, ok := c.driver.(ClientDriverExtensionRemoveDir); ok {
+		err = rmd.RemoveDir(p)
+	} else {
+		err = c.driver.Remove(p)
+	}
+
+	if err == nil {
 		c.writeMessage(StatusFileOK, fmt.Sprintf("Deleted dir %s", p))
 	} else {
 		c.writeMessage(StatusActionNotTaken, fmt.Sprintf("Could not delete dir %s: %v", p, err))

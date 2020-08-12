@@ -103,6 +103,10 @@ func (server *FtpServer) loadSettings() error {
 		s.ConnectionTimeout = 30
 	}
 
+	if s.Banner == "" {
+		s.Banner = "ftpserver - golang FTP server"
+	}
+
 	server.settings = s
 
 	return nil
