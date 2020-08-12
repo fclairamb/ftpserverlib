@@ -9,7 +9,7 @@ import (
 
 // validMLSxEntryPattern ensures an entry follows RFC3659 (section 7.2)
 // https://tools.ietf.org/html/rfc3659#page-24
-var validMLSxEntryPattern = regexp.MustCompile(`^ *(?:\w+=[^\;]*;)* (.+)\r\n$`)
+var validMLSxEntryPattern = regexp.MustCompile(`^ *(?:\w+=[^;]*;)* (.+)\r\n$`)
 
 // exampleMLSTResponseEntry is taken from RFC3659 (section 7.7.2)
 // https://tools.ietf.org/html/rfc3659#page-38
@@ -75,8 +75,7 @@ func TestMLSxEntryValidation(t *testing.T) {
 }
 
 func TestALLO(t *testing.T) {
-	s := NewTestServer(true)
-	defer mustStopServer(s)
+	s := NewTestServer(t, true)
 
 	conf := goftp.Config{
 		User:     "test",
@@ -111,8 +110,7 @@ func TestALLO(t *testing.T) {
 }
 
 func TestCHOWN(t *testing.T) {
-	s := NewTestServer(true)
-	defer mustStopServer(s)
+	s := NewTestServer(t, true)
 
 	conf := goftp.Config{
 		User:     "test",
@@ -128,6 +126,9 @@ func TestCHOWN(t *testing.T) {
 	}
 
 	defer func() { panicOnError(c.Close()) }()
+
+	// Creating a tiny file
+	ftpUpload(t, c, createTemporaryFile(t, 10), "file")
 
 	var raw goftp.RawConn
 
@@ -153,5 +154,10 @@ func TestCHOWN(t *testing.T) {
 	// Asking for the right chown user
 	if rc, _, err := raw.SendCommand("SITE CHOWN test file"); err != nil || rc != 200 {
 		t.Fatal("Should have been accepted", err, rc)
+	}
+
+	// Asking for a chown on a file that doesn't exist
+	if rc, _, err := raw.SendCommand("SITE CHOWN test file2"); rc != 550 {
+		t.Fatal("Should NOT have been accepted", err, rc)
 	}
 }

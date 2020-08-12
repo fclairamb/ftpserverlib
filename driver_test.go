@@ -6,6 +6,7 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
+	"testing"
 
 	gklog "github.com/go-kit/kit/log"
 	"github.com/spf13/afero"
@@ -20,18 +21,26 @@ const (
 )
 
 // NewTestServer provides a test server with or without debugging
-func NewTestServer(debug bool) *FtpServer {
-	return NewTestServerWithDriver(&TestServerDriver{Debug: debug})
+func NewTestServer(t *testing.T, debug bool) *FtpServer {
+	return NewTestServerWithDriver(t, &TestServerDriver{Debug: debug})
 }
 
 // NewTestServerWithDriver provides a server instantiated with some settings
-func NewTestServerWithDriver(driver *TestServerDriver) *FtpServer {
+func NewTestServerWithDriver(t *testing.T, driver *TestServerDriver) *FtpServer {
 	if driver.Settings == nil {
 		driver.Settings = &Settings{}
 	}
 
 	if driver.Settings.ListenAddr == "" {
 		driver.Settings.ListenAddr = "127.0.0.1:0"
+	}
+
+	{
+		dir, _ := ioutil.TempDir("", "example")
+		if err := os.MkdirAll(dir, 0750); err != nil {
+			panic(err)
+		}
+		driver.fs = afero.NewBasePathFs(afero.NewOsFs(), dir)
 	}
 
 	s := NewFtpServer(driver)
@@ -43,6 +52,10 @@ func NewTestServerWithDriver(driver *TestServerDriver) *FtpServer {
 			"caller", gokit.GKDefaultCaller,
 		)
 	}
+
+	t.Cleanup(func() {
+		mustStopServer(s)
+	})
 
 	if err := s.Listen(); err != nil {
 		return nil
@@ -64,6 +77,7 @@ type TestServerDriver struct {
 
 	Settings     *Settings // Settings
 	FileOverride afero.File
+	fs           afero.Fs
 }
 
 // TestClientDriver defines a minimal serverftp client driver
@@ -74,14 +88,9 @@ type TestClientDriver struct {
 }
 
 // NewTestClientDriver creates a client driver
-func NewTestClientDriver() *TestClientDriver {
-	dir, _ := ioutil.TempDir("", "example")
-	if err := os.MkdirAll(dir, 0750); err != nil {
-		panic(err)
-	}
-
+func NewTestClientDriver(server *TestServerDriver) *TestClientDriver {
 	return &TestClientDriver{
-		Fs: afero.NewBasePathFs(afero.NewOsFs(), dir),
+		Fs: server.fs,
 	}
 }
 
@@ -104,7 +113,7 @@ var errBadUserNameOrPassword = errors.New("bad username or password")
 // AuthUser with authenticate users
 func (driver *TestServerDriver) AuthUser(_ ClientContext, user, pass string) (ClientDriver, error) {
 	if user == authUser && pass == authPass {
-		clientdriver := NewTestClientDriver()
+		clientdriver := NewTestClientDriver(driver)
 		clientdriver.user = user
 
 		if driver.FileOverride != nil {
@@ -118,7 +127,7 @@ func (driver *TestServerDriver) AuthUser(_ ClientContext, user, pass string) (Cl
 }
 
 // ClientDisconnected is called when the user disconnects
-func (driver *TestServerDriver) ClientDisconnected(_ ClientContext) {
+func (driver *TestServerDriver) ClientDisconnected(ClientContext) {
 
 }
 
@@ -163,7 +172,7 @@ func (driver *TestClientDriver) AllocateSpace(size int) error {
 var errInvalidChownUser = errors.New("invalid chown group")
 var errInvalidChownGroup = errors.New("invalid chown group")
 
-func (driver *TestClientDriver) Chown(_ string, user string, group string) error {
+func (driver *TestClientDriver) Chown(name string, user string, group string) error {
 	if user != driver.user {
 		return errInvalidChownUser
 	}
@@ -172,7 +181,9 @@ func (driver *TestClientDriver) Chown(_ string, user string, group string) error
 		return errInvalidChownGroup
 	}
 
-	return nil
+	_, err := driver.Fs.Stat(name)
+
+	return err
 }
 
 // (copied from net/http/httptest)

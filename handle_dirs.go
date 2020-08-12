@@ -96,7 +96,7 @@ func (c *clientHandler) handleLIST() error {
 			return err
 		}
 	} else {
-		c.writeMessage(StatusSyntaxErrorNotRecognised, fmt.Sprintf("Could not list: %v", err))
+		c.writeMessage(StatusActionNotTaken, fmt.Sprintf("Could not list: %v", err))
 	}
 
 	return nil
@@ -146,7 +146,7 @@ func (c *clientHandler) handleMLSD() error {
 			return err
 		}
 	} else {
-		c.writeMessage(StatusSyntaxErrorNotRecognised, fmt.Sprintf("Could not list: %v", err))
+		c.writeMessage(StatusActionNotTaken, fmt.Sprintf("Could not list: %v", err))
 	}
 
 	return nil

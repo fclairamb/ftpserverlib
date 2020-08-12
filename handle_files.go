@@ -183,7 +183,7 @@ func (c *clientHandler) handleCHOWN(params string) {
 		c.writeMessage(StatusCommandNotImplemented, "This extension hasn't been implemented !")
 	} else {
 		if err := chownInt.Chown(path, user, group); err != nil {
-			c.writeMessage(StatusActionNotTaken, fmt.Sprintf("Couldn't allocate: %v", err))
+			c.writeMessage(StatusActionNotTaken, fmt.Sprintf("Couldn't chown: %v", err))
 		} else {
 			c.writeMessage(StatusOK, "Done !")
 		}
