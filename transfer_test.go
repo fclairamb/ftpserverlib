@@ -24,11 +24,18 @@ func createTemporaryFile(t *testing.T, targetSize int) *os.File {
 		return nil
 	}
 
+	// nolint: gosec
 	src := rand.New(rand.NewSource(0))
 	if _, err := io.CopyN(file, src, int64(targetSize)); err != nil {
 		t.Fatal("Couldn't copy:", err)
 		return nil
 	}
+
+	t.Cleanup(func() {
+		if err := os.Remove(file.Name()); err != nil {
+			t.Fatalf("Problem deleting file \"%s\": %v", file.Name(), err)
+		}
+	})
 
 	return file
 }

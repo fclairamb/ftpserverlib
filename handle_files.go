@@ -157,7 +157,6 @@ func (c *clientHandler) handleCHMOD(params string) {
 
 // https://www.raidenftpd.com/en/raiden-ftpd-doc/help-sitecmd.html (wildcard isn't supported)
 func (c *clientHandler) handleCHOWN(params string) {
-	// TODO: Implement it
 	spl := strings.SplitN(params, " ", 2)
 
 	if len(spl) < 2 {
@@ -183,6 +182,31 @@ func (c *clientHandler) handleCHOWN(params string) {
 		c.writeMessage(StatusCommandNotImplemented, "This extension hasn't been implemented !")
 	} else {
 		if err := chownInt.Chown(path, user, group); err != nil {
+			c.writeMessage(StatusActionNotTaken, fmt.Sprintf("Couldn't chown: %v", err))
+		} else {
+			c.writeMessage(StatusOK, "Done !")
+		}
+	}
+}
+
+// https://learn.akamai.com/en-us/webhelp/netstorage/netstorage-user-guide/
+// GUID-AB301948-C6FF-4957-9291-FE3F02457FD0.html
+func (c *clientHandler) handleSYMLINK(params string) {
+	spl := strings.SplitN(params, " ", 2)
+
+	if len(spl) < 2 {
+		c.writeMessage(StatusSyntaxErrorParameters, "bad command")
+		return
+	}
+
+	oldname := c.absPath(spl[0])
+	newname := c.absPath(spl[1])
+
+	if symlinkInt, ok := c.driver.(ClientDriverExtensionSymlink); !ok {
+		// It's not implemented and that's not OK, it must be explicitly refused
+		c.writeMessage(StatusCommandNotImplemented, "This extension hasn't been implemented !")
+	} else {
+		if err := symlinkInt.Symlink(oldname, newname); err != nil {
 			c.writeMessage(StatusActionNotTaken, fmt.Sprintf("Couldn't chown: %v", err))
 		} else {
 			c.writeMessage(StatusOK, "Done !")

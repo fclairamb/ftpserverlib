@@ -144,7 +144,10 @@ func (driver *TestServerDriver) GetTLSConfig() (*tls.Config, error) {
 			return nil, err
 		}
 
-		return &tls.Config{Certificates: []tls.Certificate{keypair}}, nil
+		return &tls.Config{
+			MinVersion:   tls.VersionTLS12,
+			Certificates: []tls.Certificate{keypair},
+		}, nil
 	}
 
 	return nil, nil
@@ -184,6 +187,16 @@ func (driver *TestClientDriver) Chown(name string, user string, group string) er
 	_, err := driver.Fs.Stat(name)
 
 	return err
+}
+
+var errSymlinkNotImplemented = errors.New("symlink not implemented")
+
+func (driver *TestClientDriver) Symlink(oldname, newname string) error {
+	if linker, ok := driver.Fs.(afero.Linker); ok {
+		return linker.SymlinkIfPossible(oldname, newname)
+	}
+
+	return errSymlinkNotImplemented
 }
 
 // (copied from net/http/httptest)
