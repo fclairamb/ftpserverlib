@@ -92,3 +92,40 @@ func TestAuthTLS(t *testing.T) {
 		t.Fatal("Couldn't upgrade connection to TLS:", err)
 	}
 }
+
+func TestAuthTLSRequired(t *testing.T) {
+	s := NewTestServerWithDriver(t, &TestServerDriver{
+		Debug: true,
+		TLS:   true,
+	})
+	s.settings.TSLMode = 1
+
+	ftp, err := goftp.Connect(s.Addr())
+	if err != nil {
+		t.Fatal("Couldn't connect:", err)
+	}
+
+	defer func() { reportError(ftp.Quit()) }()
+
+	if err = ftp.Login("test", "test"); err == nil {
+		t.Fatal("Plain text login must fail, TLS is rquired")
+	} else if err.Error() != "421 TLS is required\r\n" {
+		t.Fatal("unexpected error:", err)
+	}
+
+	config := &tls.Config{
+		// nolint:gosec
+		InsecureSkipVerify: true,
+	}
+	if err = ftp.AuthTLS(config); err != nil {
+		t.Fatal("Couldn't upgrade connection to TLS:", err)
+	}
+
+	if err = ftp.Login("test", "test"); err != nil {
+		t.Fatal("Failed to login:", err)
+	}
+
+	if err := ftp.Noop(); err != nil {
+		t.Fatal("Couldn't NOOP:", err)
+	}
+}
