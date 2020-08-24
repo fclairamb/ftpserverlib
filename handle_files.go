@@ -207,7 +207,7 @@ func (c *clientHandler) handleSYMLINK(params string) {
 		c.writeMessage(StatusCommandNotImplemented, "This extension hasn't been implemented !")
 	} else {
 		if err := symlinkInt.Symlink(oldname, newname); err != nil {
-			c.writeMessage(StatusActionNotTaken, fmt.Sprintf("Couldn't chown: %v", err))
+			c.writeMessage(StatusActionNotTaken, fmt.Sprintf("Couldn't symlink: %v", err))
 		} else {
 			c.writeMessage(StatusOK, "Done !")
 		}
