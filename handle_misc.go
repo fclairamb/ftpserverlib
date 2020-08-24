@@ -15,6 +15,7 @@ func (c *clientHandler) handleAUTH() error {
 		c.conn = tls.Server(c.conn, tlsConfig)
 		c.reader = bufio.NewReader(c.conn)
 		c.writer = bufio.NewWriter(c.conn)
+		c.controlTLS = true
 	} else {
 		c.writeMessage(StatusActionNotTaken, fmt.Sprintf("Cannot get a TLS config: %v", err))
 	}
