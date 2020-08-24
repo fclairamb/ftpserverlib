@@ -276,7 +276,7 @@ func TestTLSTransfer(t *testing.T) {
 		Debug: true,
 		TLS:   true,
 	})
-	s.settings.TSLMode = 1
+	s.settings.TLSRequired = 1
 
 	ftp, err := goftp.Connect(s.Addr())
 	if err != nil {

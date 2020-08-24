@@ -304,7 +304,7 @@ func (c *clientHandler) TransferOpen() (net.Conn, error) {
 		return nil, err
 	}
 
-	if c.server.settings.TSLMode == 1 && !c.transferTLS {
+	if c.server.settings.TLSRequired == 1 && !c.transferTLS {
 		err := &openTransferError{err: "TLS is required"}
 		c.writeMessage(StatusServiceNotAvailable, err.Error())
 

@@ -5,7 +5,7 @@ import "fmt"
 
 // Handle the "USER" command
 func (c *clientHandler) handleUSER() error {
-	if c.server.settings.TSLMode == 1 && !c.controlTLS {
+	if c.server.settings.TLSRequired == 1 && !c.controlTLS {
 		c.writeMessage(StatusServiceNotAvailable, "TLS is required")
 		return nil
 	}
