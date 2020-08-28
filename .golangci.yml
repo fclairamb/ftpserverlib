@@ -199,6 +199,7 @@ linters:
         - megacheck
         - misspell
         - nakedret
+        - prealloc
         - nolintlint
         - rowserrcheck
         - scopelint
