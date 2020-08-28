@@ -39,6 +39,7 @@ type clientHandler struct {
 	debug       bool            // Show debugging info on the server side
 	transfer    transferHandler // Transfer connection (only passive is implemented at this stage)
 	transferTLS bool            // Use TLS for transfer connection
+	controlTLS  bool            // Use TLS for control connection
 	logger      log.Logger      // Client handler logging
 }
 
@@ -299,6 +300,13 @@ func (c *clientHandler) TransferOpen() (net.Conn, error) {
 	if c.transfer == nil {
 		err := &openTransferError{err: "No passive connection declared"}
 		c.writeMessage(StatusActionNotTaken, err.Error())
+
+		return nil, err
+	}
+
+	if c.server.settings.TLSRequired == 1 && !c.transferTLS {
+		err := &openTransferError{err: "TLS is required"}
+		c.writeMessage(StatusServiceNotAvailable, err.Error())
 
 		return nil, err
 	}
