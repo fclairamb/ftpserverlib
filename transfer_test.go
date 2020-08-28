@@ -60,7 +60,7 @@ func hashFile(t *testing.T, file *os.File) string {
 	return hash
 }
 
-func ftpUpload(t *testing.T, ftp *goftp.Client, file *os.File, filename string) {
+func ftpUpload(t *testing.T, ftp *goftp.Client, file io.ReadSeeker, filename string) {
 	if _, err := file.Seek(0, 0); err != nil {
 		t.Fatal("Couldn't seek:", err)
 	}
