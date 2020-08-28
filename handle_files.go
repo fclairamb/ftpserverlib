@@ -95,7 +95,7 @@ func (c *clientHandler) transferFile(write bool, append bool) {
 	}
 }
 
-func (c *clientHandler) doTransfer(file FileTransfer, write bool) error {
+func (c *clientHandler) doTransfer(file io.ReadWriter, write bool) error {
 	var tr net.Conn
 	var err error
 

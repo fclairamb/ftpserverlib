@@ -170,7 +170,9 @@ linters-settings:
   
 linters:
     enable:
+        - bodyclose
         - deadcode
+        - depguard
         - dogsled
         - dupl
         - errcheck
@@ -185,13 +187,21 @@ linters:
         - gofmt
         - goimports
         - golint
+        # - gomnd
+        - goprintffuncname
+        - gosec
+        - gosimple
         - govet
+        - ineffassign
+        - interfacer
         - lll
         - maligned
         - megacheck
         - misspell
         - nakedret
         - prealloc
+        - nolintlint
+        - rowserrcheck
         - scopelint
         - staticcheck
         - structcheck
