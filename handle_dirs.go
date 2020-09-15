@@ -88,6 +88,18 @@ func (c *clientHandler) handlePWD() error {
 }
 
 func (c *clientHandler) handleLIST() error {
+	if !c.server.settings.DisableLISTArgs {
+		param := strings.ToLower(c.param)
+		if param == "-a" || param == "-l" || param == "-al" || param == "-la" {
+			// a check for a non-existent directory error is more appropriate here
+			// but we cannot assume that the driver implementation will return an
+			// os.IsNotExist error.
+			if _, err := c.driver.Stat(c.param); err != nil {
+				c.param = ""
+			}
+		}
+	}
+
 	if files, err := c.getFileList(); err == nil || err == io.EOF {
 		if tr, errTr := c.TransferOpen(); errTr == nil {
 			err = c.dirTransferLIST(tr, files)
