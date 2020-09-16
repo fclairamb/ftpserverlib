@@ -2,6 +2,7 @@
 package ftpserver
 
 import (
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"net"
@@ -19,11 +20,21 @@ func (c *clientHandler) handlePORT() error {
 		return nil
 	}
 
-	c.writeMessage(StatusOK, "PORT command successful")
+	var tlsConfig *tls.Config
 
+	if c.transferTLS {
+		tlsConfig, err = c.server.driver.GetTLSConfig()
+		if err != nil {
+			c.writeMessage(StatusServiceNotAvailable, fmt.Sprintf("Cannot get a TLS config for active connection: %v", err))
+			return nil
+		}
+	}
+
+	c.writeMessage(StatusOK, "PORT command successful")
 	c.transfer = &activeTransferHandler{
-		raddr:    raddr,
-		settings: c.server.settings,
+		raddr:     raddr,
+		settings:  c.server.settings,
+		tlsConfig: tlsConfig,
 	}
 
 	return nil
@@ -31,9 +42,10 @@ func (c *clientHandler) handlePORT() error {
 
 // Active connection
 type activeTransferHandler struct {
-	raddr    *net.TCPAddr // Remote address of the client
-	conn     net.Conn     // Connection used to connect to him
-	settings *Settings    // Settings
+	raddr     *net.TCPAddr // Remote address of the client
+	conn      net.Conn     // Connection used to connect to him
+	settings  *Settings    // Settings
+	tlsConfig *tls.Config  // not nil if the active connection requires TLS
 }
 
 func (a *activeTransferHandler) Open() (net.Conn, error) {
@@ -51,6 +63,10 @@ func (a *activeTransferHandler) Open() (net.Conn, error) {
 
 	if err != nil {
 		return nil, fmt.Errorf("could not establish active connection: %w", err)
+	}
+
+	if a.tlsConfig != nil {
+		conn = tls.Server(conn, a.tlsConfig)
 	}
 
 	// keep connection as it will be closed by Close()
