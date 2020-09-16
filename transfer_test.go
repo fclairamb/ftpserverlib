@@ -2,6 +2,7 @@ package ftpserver
 
 import (
 	"crypto/sha256"
+	"crypto/tls"
 	"encoding/hex"
 	"errors"
 	"io"
@@ -114,15 +115,31 @@ func ftpDelete(t *testing.T, ftp *goftp.Client, filename string) {
 func TestTransfer(t *testing.T) {
 	s := NewTestServerWithDriver(t, &TestServerDriver{Debug: true, Settings: &Settings{ActiveTransferPortNon20: true}})
 
-	testTransferOnConnection(t, s, false)
-	testTransferOnConnection(t, s, true)
+	testTransferOnConnection(t, s, false, false)
+	testTransferOnConnection(t, s, true, false)
+
+	s = NewTestServerWithDriver(t, &TestServerDriver{
+		Debug: true,
+		TLS:   true,
+		Settings: &Settings{
+			ActiveTransferPortNon20: true}})
+
+	testTransferOnConnection(t, s, false, true)
+	testTransferOnConnection(t, s, true, true)
 }
 
-func testTransferOnConnection(t *testing.T, server *FtpServer, active bool) {
+func testTransferOnConnection(t *testing.T, server *FtpServer, active, enableTLS bool) {
 	conf := goftp.Config{
 		User:            "test",
 		Password:        "test",
 		ActiveTransfers: active,
+	}
+	if enableTLS {
+		conf.TLSConfig = &tls.Config{
+			// nolint:gosec
+			InsecureSkipVerify: true,
+		}
+		conf.TLSMode = goftp.TLSExplicit
 	}
 
 	var err error
