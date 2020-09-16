@@ -120,7 +120,7 @@ func (c *clientHandler) handlePASV() error {
 		if tlsConfig, err := c.server.driver.GetTLSConfig(); err == nil {
 			listener = tls.NewListener(tcpListener, tlsConfig)
 		} else {
-			c.writeMessage(StatusActionNotTaken, fmt.Sprintf("Cannot get a TLS config: %v", err))
+			c.writeMessage(StatusServiceNotAvailable, fmt.Sprintf("Cannot get a TLS config: %v", err))
 			return nil
 		}
 	} else {
