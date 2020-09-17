@@ -312,3 +312,52 @@ func TestTLSTransfer(t *testing.T) {
 		t.Fatal("unexpected error:", err)
 	}
 }
+
+func TestListArgs(t *testing.T) {
+	s := NewTestServer(t, true)
+	s.settings.DisableLISTArgs = true
+
+	var connErr error
+	var ftp *goftp.FTP
+
+	if ftp, connErr = goftp.Connect(s.Addr()); connErr != nil {
+		t.Fatal("Couldn't connect", connErr)
+	}
+
+	defer func() { panicOnError(ftp.Quit()) }()
+
+	if err := ftp.Login("test", "test"); err != nil {
+		t.Fatal("Failed to login:", err)
+	}
+
+	if _, err := ftp.List("-a"); err == nil {
+		t.Fatal("list args are disabled \"list -a\" must fail")
+	}
+
+	s.settings.DisableLISTArgs = false
+
+	if _, err := ftp.List("-a"); err != nil {
+		t.Fatal("unexpected error", err)
+	}
+
+	if err := ftp.Mkd("-a"); err != nil {
+		t.Fatal("unexpected error", err)
+	}
+
+	if err := ftp.Mkd("-a/testdir"); err != nil {
+		t.Fatal("unexpected error", err)
+	}
+
+	contents, err := ftp.List("-a")
+	if err != nil {
+		t.Fatal("unexpected error", err)
+	}
+
+	if len(contents) != 1 {
+		t.Fatal("unexpected dir contents", contents)
+	}
+
+	if !strings.Contains(contents[0], "testdir") {
+		t.Fatal("unexpected dir contents", contents)
+	}
+}
