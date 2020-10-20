@@ -39,6 +39,7 @@ github.com/creack/pty v1.1.7/go.mod h1:lj5s0c3V2DBrqTV7llrYr5NG6My20zk30Fl46Y7Do
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/dgrijalva/jwt-go v3.2.0+incompatible/go.mod h1:E3ru+11k8xSBh+hMPgOLZmtrrCbhqsmaPHjLKYnJCaQ=
+github.com/drakkan/goftp v0.0.0-20200609142545-aa2de14babf4/go.mod h1:K3yqfa64LwJzUpdUWC6b524HO7U7DmBnrJuBjxKSZOQ=
 github.com/drakkan/goftp v0.0.0-20200916091733-843d4cca4bb2 h1:aQCoXDfkaeU2/KqIvTZAcVnVmaiGdfrGF9PUnjNVjac=
 github.com/drakkan/goftp v0.0.0-20200916091733-843d4cca4bb2/go.mod h1:K3yqfa64LwJzUpdUWC6b524HO7U7DmBnrJuBjxKSZOQ=
 github.com/dustin/go-humanize v0.0.0-20171111073723-bb3d318650d4/go.mod h1:HtrtbFcZ19U5GC7JDqmcUSB87Iq5E25KnS6fMYU6eOk=
