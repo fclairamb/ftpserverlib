@@ -2,6 +2,7 @@ package ftpserver
 
 import (
 	"crypto/tls"
+	"fmt"
 	"runtime"
 	"strings"
 	"testing"
@@ -315,7 +316,6 @@ func TestTLSTransfer(t *testing.T) {
 
 func TestListArgs(t *testing.T) {
 	s := NewTestServer(t, true)
-	s.settings.DisableLISTArgs = true
 
 	var connErr error
 	var ftp *goftp.FTP
@@ -330,34 +330,51 @@ func TestListArgs(t *testing.T) {
 		t.Fatal("Failed to login:", err)
 	}
 
-	if _, err := ftp.List("-a"); err == nil {
-		t.Fatal("list args are disabled \"list -a\" must fail")
-	}
+	for _, arg := range supportedlistArgs {
+		s.settings.DisableLISTArgs = true
 
-	s.settings.DisableLISTArgs = false
+		if _, err := ftp.List(arg); err == nil {
+			t.Fatalf("list args are disabled \"list %v\" must fail", arg)
+		}
 
-	if _, err := ftp.List("-a"); err != nil {
-		t.Fatal("unexpected error", err)
-	}
+		s.settings.DisableLISTArgs = false
 
-	if err := ftp.Mkd("-a"); err != nil {
-		t.Fatal("unexpected error", err)
-	}
+		if _, err := ftp.List(arg); err != nil {
+			t.Fatal("unexpected error", err)
+		}
 
-	if err := ftp.Mkd("-a/testdir"); err != nil {
-		t.Fatal("unexpected error", err)
-	}
+		if err := ftp.Mkd(arg); err != nil {
+			t.Fatal("unexpected error", err)
+		}
 
-	contents, err := ftp.List("-a")
-	if err != nil {
-		t.Fatal("unexpected error", err)
-	}
+		if err := ftp.Mkd(fmt.Sprintf("%v/testdir", arg)); err != nil {
+			t.Fatal("unexpected error", err)
+		}
 
-	if len(contents) != 1 {
-		t.Fatal("unexpected dir contents", contents)
-	}
+		contents, err := ftp.List(arg)
+		if err != nil {
+			t.Fatal("unexpected error", err)
+		}
 
-	if !strings.Contains(contents[0], "testdir") {
-		t.Fatal("unexpected dir contents", contents)
+		if len(contents) != 1 {
+			t.Fatal("unexpected dir contents", contents)
+		}
+
+		if !strings.Contains(contents[0], "testdir") {
+			t.Fatal("unexpected dir contents", contents)
+		}
+
+		contents, err = ftp.List(fmt.Sprintf("%v %v", arg, arg))
+		if err != nil {
+			t.Fatal("unexpected error", err)
+		}
+
+		if len(contents) != 1 {
+			t.Fatal("unexpected dir contents", contents)
+		}
+
+		if !strings.Contains(contents[0], "testdir") {
+			t.Fatal("unexpected dir contents", contents)
+		}
 	}
 }

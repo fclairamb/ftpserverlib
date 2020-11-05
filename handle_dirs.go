@@ -12,6 +12,9 @@ import (
 	"github.com/spf13/afero"
 )
 
+// the order matter, put parameters with more characters first
+var supportedlistArgs = []string{"-al", "-la", "-a", "-l"}
+
 func (c *clientHandler) absPath(p string) string {
 	if strings.HasPrefix(p, "/") {
 		return path.Clean(p)
@@ -87,17 +90,29 @@ func (c *clientHandler) handlePWD() error {
 	return nil
 }
 
-func (c *clientHandler) handleLIST() error {
-	if !c.server.settings.DisableLISTArgs {
-		param := strings.ToLower(c.param)
-		if param == "-a" || param == "-l" || param == "-al" || param == "-la" {
+func (c *clientHandler) checkLISTArgs() {
+	param := strings.ToLower(c.param)
+
+	for _, arg := range supportedlistArgs {
+		if strings.HasPrefix(param, arg) {
 			// a check for a non-existent directory error is more appropriate here
 			// but we cannot assume that the driver implementation will return an
 			// os.IsNotExist error.
 			if _, err := c.driver.Stat(c.param); err != nil {
-				c.param = ""
+				params := strings.SplitN(c.param, " ", 2)
+				if len(params) == 1 {
+					c.param = ""
+				} else {
+					c.param = params[1]
+				}
 			}
 		}
+	}
+}
+
+func (c *clientHandler) handleLIST() error {
+	if !c.server.settings.DisableLISTArgs {
+		c.checkLISTArgs()
 	}
 
 	if files, err := c.getFileList(); err == nil || err == io.EOF {
