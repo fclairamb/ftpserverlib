@@ -76,6 +76,7 @@ var commandsMap = map[string]*CommandDescription{
 	"PASV": {Fn: (*clientHandler).handlePASV},
 	"EPSV": {Fn: (*clientHandler).handlePASV},
 	"PORT": {Fn: (*clientHandler).handlePORT},
+	"EPRT": {Fn: (*clientHandler).handlePORT},
 }
 
 // FtpServer is where everything is stored

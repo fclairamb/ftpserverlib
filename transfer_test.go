@@ -111,6 +111,22 @@ func ftpDelete(t *testing.T, ftp *goftp.Client, filename string) {
 	}
 }
 
+func TestTransferIPv6(t *testing.T) {
+	s := NewTestServerWithDriver(
+		t,
+		&TestServerDriver{
+			Debug: true,
+			Settings: &Settings{
+				ActiveTransferPortNon20: true,
+				ListenAddr:              "[::1]:0",
+			},
+		},
+	)
+
+	t.Run("active", func(t *testing.T) { testTransferOnConnection(t, s, true, false, false) })
+	t.Run("passive", func(t *testing.T) { testTransferOnConnection(t, s, false, false, false) })
+}
+
 // TestTransfer validates the upload of file in both active and passive mode
 func TestTransfer(t *testing.T) {
 	t.Run("without-tls", func(t *testing.T) {
@@ -265,6 +281,86 @@ func TestFailedTransfer(t *testing.T) {
 
 	if err = c.Store("file.bin", file); err != nil {
 		t.Fatal("This upload should have succeeded", err)
+	}
+}
+
+func TestBogusTransferStart(t *testing.T) {
+	s := NewTestServer(t, true)
+
+	c, err := goftp.DialConfig(goftp.Config{User: "test", Password: "test"}, s.Addr())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	rc, err := c.OpenRawConn()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	{ // Completely bogus port declaration
+		status, resp, err := rc.SendCommand("PORT something")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if status != StatusSyntaxErrorNotRecognised {
+			t.Fatal("Bad status:", status, resp)
+		}
+	}
+
+	{ // Completely bogus port declaration
+		status, resp, err := rc.SendCommand("EPRT something")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if status != StatusSyntaxErrorNotRecognised {
+			t.Fatal("Bad status:", status, resp)
+		}
+	}
+
+	{ // Bad port number: 0
+		status, resp, err := rc.SendCommand("EPRT |2|::1|0|")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if status != StatusSyntaxErrorNotRecognised {
+			t.Fatal("Bad status:", status, resp)
+		}
+	}
+
+	{ // Bad IP
+		status, resp, err := rc.SendCommand("EPRT |1|253.254.255.256|2000|")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if status != StatusSyntaxErrorNotRecognised {
+			t.Fatal("Bad status:", status, resp)
+		}
+	}
+
+	{ // Bad protocol type: 3
+		status, resp, err := rc.SendCommand("EPRT |3|::1|2000|")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if status != StatusSyntaxErrorNotRecognised {
+			t.Fatal("Bad status:", status, resp)
+		}
+	}
+
+	{ // We end-up on a positive note
+		status, resp, err := rc.SendCommand("EPRT |1|::1|2000|")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if status != StatusOK {
+			t.Fatal("Bad status:", status, resp)
+		}
 	}
 }
 
