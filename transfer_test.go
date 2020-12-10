@@ -124,8 +124,8 @@ func TestTransfer(t *testing.T) {
 			},
 		)
 
-		testTransferOnConnection(t, s, false, false)
-		testTransferOnConnection(t, s, true, false)
+		testTransferOnConnection(t, s, false, false, false)
+		testTransferOnConnection(t, s, true, false, false)
 	})
 	t.Run("with-tls", func(t *testing.T) {
 		s := NewTestServerWithDriver(
@@ -139,15 +139,28 @@ func TestTransfer(t *testing.T) {
 			},
 		)
 
-		testTransferOnConnection(t, s, false, true)
-		testTransferOnConnection(t, s, true, true)
+		testTransferOnConnection(t, s, false, true, false)
+		testTransferOnConnection(t, s, true, true, false)
+	})
+
+	t.Run("with-implicit-tls", func(t *testing.T) {
+		s := NewTestServerWithDriver(t, &TestServerDriver{
+			Debug: true,
+			TLS:   true,
+			Settings: &Settings{
+				ActiveTransferPortNon20: true,
+				TLSRequired:             ImplicitEncryption,
+			}})
+
+		testTransferOnConnection(t, s, false, true, true)
+		testTransferOnConnection(t, s, true, true, true)
 	})
 }
 
-func testTransferOnConnection(t *testing.T, server *FtpServer, active, enableTLS bool) {
+func testTransferOnConnection(t *testing.T, server *FtpServer, active, enableTLS, implicitTLS bool) {
 	conf := goftp.Config{
-		User:            "test",
-		Password:        "test",
+		User:            authUser,
+		Password:        authPass,
 		ActiveTransfers: active,
 	}
 	if enableTLS {
@@ -155,11 +168,14 @@ func testTransferOnConnection(t *testing.T, server *FtpServer, active, enableTLS
 			// nolint:gosec
 			InsecureSkipVerify: true,
 		}
-		conf.TLSMode = goftp.TLSExplicit
+		if implicitTLS {
+			conf.TLSMode = goftp.TLSImplicit
+		} else {
+			conf.TLSMode = goftp.TLSExplicit
+		}
 	}
 
 	var err error
-
 	var c *goftp.Client
 
 	if c, err = goftp.DialConfig(conf, server.Addr()); err != nil {
@@ -196,8 +212,8 @@ func TestActiveModeDisabled(t *testing.T) {
 	})
 
 	conf := goftp.Config{
-		User:            "test",
-		Password:        "test",
+		User:            authUser,
+		Password:        authPass,
 		ActiveTransfers: true,
 	}
 
@@ -227,8 +243,8 @@ func TestFailedTransfer(t *testing.T) {
 	s := NewTestServer(t, true)
 
 	conf := goftp.Config{
-		User:     "test",
-		Password: "test",
+		User:     authUser,
+		Password: authPass,
 	}
 
 	var err error
@@ -260,8 +276,8 @@ func TestFailedFileClose(t *testing.T) {
 	s := NewTestServerWithDriver(t, driver)
 
 	conf := goftp.Config{
-		User:     "test",
-		Password: "test",
+		User:     authUser,
+		Password: authPass,
 	}
 
 	var err error

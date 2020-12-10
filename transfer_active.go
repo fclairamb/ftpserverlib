@@ -26,7 +26,7 @@ func (c *clientHandler) handlePORT() error {
 
 	var tlsConfig *tls.Config
 
-	if c.transferTLS {
+	if c.transferTLS || c.server.settings.TLSRequired == ImplicitEncryption {
 		tlsConfig, err = c.server.driver.GetTLSConfig()
 		if err != nil {
 			c.writeMessage(StatusServiceNotAvailable, fmt.Sprintf("Cannot get a TLS config for active connection: %v", err))
