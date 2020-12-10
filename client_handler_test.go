@@ -53,7 +53,7 @@ func TestTLSMethods(t *testing.T) {
 		require.False(t, cc.HasTLSForTransfers())
 	})
 
-	t.Run("wit-implicit-tls", func(t *testing.T) {
+	t.Run("with-implicit-tls", func(t *testing.T) {
 		s := NewTestServerWithDriver(t, &TestServerDriver{
 			Settings: &Settings{
 				TLSRequired: ImplicitEncryption,
