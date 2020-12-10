@@ -29,6 +29,7 @@ func NewTestServer(t *testing.T, debug bool) *FtpServer {
 // NewTestServerWithDriver provides a server instantiated with some settings
 func NewTestServerWithDriver(t *testing.T, driver *TestServerDriver) *FtpServer {
 	t.Parallel()
+
 	if driver.Settings == nil {
 		driver.Settings = &Settings{}
 	}
