@@ -23,6 +23,7 @@ const (
 
 // NewTestServer provides a test server with or without debugging
 func NewTestServer(t *testing.T, debug bool) *FtpServer {
+	t.Parallel()
 	return NewTestServerWithDriver(t, &TestServerDriver{Debug: debug})
 }
 
