@@ -122,6 +122,7 @@ func TestTransferIPv6(t *testing.T) {
 			},
 		},
 	)
+
 	t.Run("active", func(t *testing.T) { testTransferOnConnection(t, s, true, false) })
 	t.Run("passive", func(t *testing.T) { testTransferOnConnection(t, s, false, false) })
 }
