@@ -136,22 +136,22 @@ func TestCHOWN(t *testing.T) {
 		t.Fatal("Couldn't open raw connection")
 	}
 
-	// Asking for a user change that isn't authorized
-	if rc, _, err := raw.SendCommand("SITE CHOWN user:group file"); err != nil || rc != 550 {
+	// Asking for a userId change that isn't authorized
+	if rc, _, err := raw.SendCommand("SITE CHOWN userId:group file"); err != nil || rc != 550 {
 		t.Fatal("Should have been refused", err, rc)
 	}
 
-	// Asking for a user change that isn't authorized
-	if rc, _, err := raw.SendCommand("SITE CHOWN user file"); err != nil || rc != 550 {
+	// Asking for a userId change that isn't authorized
+	if rc, _, err := raw.SendCommand("SITE CHOWN userId file"); err != nil || rc != 550 {
 		t.Fatal("Should have been refused", err, rc)
 	}
 
-	// Asking for the right chown user
+	// Asking for the right chown userId
 	if rc, _, err := raw.SendCommand("SITE CHOWN test:test file"); err != nil || rc != 200 {
 		t.Fatal("Should have been accepted", err, rc)
 	}
 
-	// Asking for the right chown user
+	// Asking for the right chown userId
 	if rc, _, err := raw.SendCommand("SITE CHOWN test file"); err != nil || rc != 200 {
 		t.Fatal("Should have been accepted", err, rc)
 	}

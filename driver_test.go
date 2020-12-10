@@ -15,9 +15,10 @@ import (
 )
 
 const (
-	authUser  = "test"
-	authPass  = "test"
-	authGroup = "test"
+	authUser    = "test"
+	authPass    = "test"
+	authUserId  = 1000
+	authGroupId = 500
 )
 
 // NewTestServer provides a test server with or without debugging
@@ -83,7 +84,6 @@ type TestServerDriver struct {
 // TestClientDriver defines a minimal serverftp client driver
 type TestClientDriver struct {
 	FileOverride afero.File
-	user         string
 	afero.Fs
 }
 
@@ -114,7 +114,6 @@ var errBadUserNameOrPassword = errors.New("bad username or password")
 func (driver *TestServerDriver) AuthUser(_ ClientContext, user, pass string) (ClientDriver, error) {
 	if user == authUser && pass == authPass {
 		clientdriver := NewTestClientDriver(driver)
-		clientdriver.user = user
 
 		if driver.FileOverride != nil {
 			clientdriver.FileOverride = driver.FileOverride
@@ -126,7 +125,7 @@ func (driver *TestServerDriver) AuthUser(_ ClientContext, user, pass string) (Cl
 	return nil, errBadUserNameOrPassword
 }
 
-// ClientDisconnected is called when the user disconnects
+// ClientDisconnected is called when the userId disconnects
 func (driver *TestServerDriver) ClientDisconnected(ClientContext) {
 
 }
@@ -172,15 +171,15 @@ func (driver *TestClientDriver) AllocateSpace(size int) error {
 	return errTooMuchSpaceRequested
 }
 
-var errInvalidChownUser = errors.New("invalid chown group")
-var errInvalidChownGroup = errors.New("invalid chown group")
+var errInvalidChownUser = errors.New("invalid chown on user")
+var errInvalidChownGroup = errors.New("invalid chown on group")
 
-func (driver *TestClientDriver) Chown(name string, user string, group string) error {
-	if user != driver.user {
+func (driver *TestClientDriver) Chown(name string, uid int, gid int) error {
+	if uid != 0 && gid != authUserId {
 		return errInvalidChownUser
 	}
 
-	if group != "" && group != authGroup {
+	if gid != 0 && gid != authGroupId {
 		return errInvalidChownGroup
 	}
 

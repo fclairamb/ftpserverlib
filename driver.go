@@ -20,10 +20,10 @@ type MainDriver interface {
 	// ClientConnected is called to send the very first welcome message
 	ClientConnected(cc ClientContext) (string, error)
 
-	// ClientDisconnected is called when the user disconnects, even if he never authenticated
+	// ClientDisconnected is called when the userId disconnects, even if he never authenticated
 	ClientDisconnected(cc ClientContext)
 
-	// AuthUser authenticates the user and selects an handling driver
+	// AuthUser authenticates the userId and selects an handling driver
 	AuthUser(cc ClientContext, user, pass string) (ClientDriver, error)
 
 	// GetTLSConfig returns a TLS Certificate to use
