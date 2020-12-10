@@ -125,7 +125,7 @@ func (driver *TestServerDriver) AuthUser(_ ClientContext, user, pass string) (Cl
 	return nil, errBadUserNameOrPassword
 }
 
-// ClientDisconnected is called when the userId disconnects
+// ClientDisconnected is called when the user disconnects
 func (driver *TestServerDriver) ClientDisconnected(ClientContext) {
 
 }
