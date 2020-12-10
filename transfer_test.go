@@ -170,6 +170,42 @@ func testTransferOnConnection(t *testing.T, server *FtpServer, active, enableTLS
 	}
 }
 
+func TestActiveModeDisabled(t *testing.T) {
+	server := NewTestServerWithDriver(t, &TestServerDriver{
+		Debug: true,
+		Settings: &Settings{
+			ActiveTransferPortNon20: true,
+			DisableActiveMode:       true,
+		},
+	})
+
+	conf := goftp.Config{
+		User:            "test",
+		Password:        "test",
+		ActiveTransfers: true,
+	}
+
+	var err error
+	var c *goftp.Client
+
+	if c, err = goftp.DialConfig(conf, server.Addr()); err != nil {
+		t.Fatal("Couldn't connect", err)
+	}
+
+	defer func() { panicOnError(c.Close()) }()
+
+	file := createTemporaryFile(t, 10*1024)
+	err = c.Store("file.bin", file)
+
+	if err == nil {
+		t.Fatal("active mode is disabled, upload must fail")
+	}
+
+	if !strings.Contains(err.Error(), "421-PORT command is disabled") {
+		t.Fatal("unexpected error", err)
+	}
+}
+
 // TestFailedTransfer validates the handling of failed transfer caused by file access issues
 func TestFailedTransfer(t *testing.T) {
 	s := NewTestServer(t, true)
