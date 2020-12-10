@@ -137,22 +137,22 @@ func TestCHOWN(t *testing.T) {
 	}
 
 	// Asking for a userId change that isn't authorized
-	if rc, _, err := raw.SendCommand("SITE CHOWN userId:group file"); err != nil || rc != 550 {
+	if rc, _, err := raw.SendCommand("SITE CHOWN 1001:500 file"); err != nil || rc != 550 {
 		t.Fatal("Should have been refused", err, rc)
 	}
 
 	// Asking for a userId change that isn't authorized
-	if rc, _, err := raw.SendCommand("SITE CHOWN userId file"); err != nil || rc != 550 {
+	if rc, _, err := raw.SendCommand("SITE CHOWN 1001 file"); err != nil || rc != 550 {
 		t.Fatal("Should have been refused", err, rc)
 	}
 
 	// Asking for the right chown userId
-	if rc, _, err := raw.SendCommand("SITE CHOWN test:test file"); err != nil || rc != 200 {
+	if rc, _, err := raw.SendCommand("SITE CHOWN 1000:500 file"); err != nil || rc != 200 {
 		t.Fatal("Should have been accepted", err, rc)
 	}
 
 	// Asking for the right chown userId
-	if rc, _, err := raw.SendCommand("SITE CHOWN test file"); err != nil || rc != 200 {
+	if rc, _, err := raw.SendCommand("SITE CHOWN 1000 file"); err != nil || rc != 200 {
 		t.Fatal("Should have been accepted", err, rc)
 	}
 

@@ -17,8 +17,8 @@ import (
 const (
 	authUser    = "test"
 	authPass    = "test"
-	authUserId  = 1000
-	authGroupId = 500
+	authUserID  = 1000
+	authGroupID = 500
 )
 
 // NewTestServer provides a test server with or without debugging
@@ -175,11 +175,11 @@ var errInvalidChownUser = errors.New("invalid chown on user")
 var errInvalidChownGroup = errors.New("invalid chown on group")
 
 func (driver *TestClientDriver) Chown(name string, uid int, gid int) error {
-	if uid != 0 && gid != authUserId {
+	if uid != 0 && gid != authUserID {
 		return errInvalidChownUser
 	}
 
-	if gid != 0 && gid != authGroupId {
+	if gid != 0 && gid != authGroupID {
 		return errInvalidChownGroup
 	}
 
