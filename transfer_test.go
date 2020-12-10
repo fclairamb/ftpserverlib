@@ -285,6 +285,7 @@ func TestBogusTransferStart(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	if status != StatusSyntaxErrorNotRecognised {
 		t.Fatal("Bad status:", status, resp)
 	}
