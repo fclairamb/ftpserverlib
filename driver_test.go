@@ -175,7 +175,7 @@ var errInvalidChownUser = errors.New("invalid chown on user")
 var errInvalidChownGroup = errors.New("invalid chown on group")
 
 func (driver *TestClientDriver) Chown(name string, uid int, gid int) error {
-	if uid != 0 && gid != authUserID {
+	if uid != 0 && uid != authUserID {
 		return errInvalidChownUser
 	}
 
