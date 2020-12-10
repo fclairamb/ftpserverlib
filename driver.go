@@ -163,4 +163,5 @@ type Settings struct {
 	// is in place or no login will be allowed
 	TLSRequired     int
 	DisableLISTArgs bool // Disable ls like options (-a,-la etc.) for directory listing
+	DisableSite     bool // Disable SITE command
 }
