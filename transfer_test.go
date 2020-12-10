@@ -113,19 +113,35 @@ func ftpDelete(t *testing.T, ftp *goftp.Client, filename string) {
 
 // TestTransfer validates the upload of file in both active and passive mode
 func TestTransfer(t *testing.T) {
-	s := NewTestServerWithDriver(t, &TestServerDriver{Debug: true, Settings: &Settings{ActiveTransferPortNon20: true}})
+	t.Run("without-tls", func(t *testing.T) {
+		s := NewTestServerWithDriver(
+			t,
+			&TestServerDriver{
+				Debug: true,
+				Settings: &Settings{
+					ActiveTransferPortNon20: true,
+				},
+			},
+		)
 
-	testTransferOnConnection(t, s, false, false)
-	testTransferOnConnection(t, s, true, false)
+		testTransferOnConnection(t, s, false, false)
+		testTransferOnConnection(t, s, true, false)
+	})
+	t.Run("with-tls", func(t *testing.T) {
+		s := NewTestServerWithDriver(
+			t,
+			&TestServerDriver{
+				Debug: true,
+				TLS:   true,
+				Settings: &Settings{
+					ActiveTransferPortNon20: true,
+				},
+			},
+		)
 
-	s = NewTestServerWithDriver(t, &TestServerDriver{
-		Debug: true,
-		TLS:   true,
-		Settings: &Settings{
-			ActiveTransferPortNon20: true}})
-
-	testTransferOnConnection(t, s, false, true)
-	testTransferOnConnection(t, s, true, true)
+		testTransferOnConnection(t, s, false, true)
+		testTransferOnConnection(t, s, true, true)
+	})
 }
 
 func testTransferOnConnection(t *testing.T, server *FtpServer, active, enableTLS bool) {
