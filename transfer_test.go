@@ -111,6 +111,21 @@ func ftpDelete(t *testing.T, ftp *goftp.Client, filename string) {
 	}
 }
 
+func TestTransferIPv6(t *testing.T) {
+	s := NewTestServerWithDriver(
+		t,
+		&TestServerDriver{
+			Debug: true,
+			Settings: &Settings{
+				ActiveTransferPortNon20: true,
+				ListenAddr:              "[::1]:0",
+			},
+		},
+	)
+	t.Run("active", func(t *testing.T) { testTransferOnConnection(t, s, true, false) })
+	t.Run("passive", func(t *testing.T) { testTransferOnConnection(t, s, false, false) })
+}
+
 // TestTransfer validates the upload of file in both active and passive mode
 func TestTransfer(t *testing.T) {
 	t.Run("without-tls", func(t *testing.T) {
