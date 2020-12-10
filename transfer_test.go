@@ -281,40 +281,59 @@ func TestBogusTransferStart(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	status, resp, err := rc.SendCommand("PORT something")
-	if err != nil {
-		t.Fatal(err)
+	{ // Completely bogus port declaration
+		status, resp, err := rc.SendCommand("PORT something")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if status != StatusSyntaxErrorNotRecognised {
+			t.Fatal("Bad status:", status, resp)
+		}
 	}
 
-	if status != StatusSyntaxErrorNotRecognised {
-		t.Fatal("Bad status:", status, resp)
+	{ // Completely bogus port declaration
+		status, resp, err := rc.SendCommand("EPRT something")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if status != StatusSyntaxErrorNotRecognised {
+			t.Fatal("Bad status:", status, resp)
+		}
 	}
 
-	status, resp, err = rc.SendCommand("EPRT something")
-	if err != nil {
-		t.Fatal(err)
+	{ // Bad port number: 0
+		status, resp, err := rc.SendCommand("EPRT |2|::1|0|")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if status != StatusSyntaxErrorNotRecognised {
+			t.Fatal("Bad status:", status, resp)
+		}
 	}
 
-	if status != StatusSyntaxErrorNotRecognised {
-		t.Fatal("Bad status:", status, resp)
+	{ // Bad protocol type: 3
+		status, resp, err := rc.SendCommand("EPRT |3|::1|2000|")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if status != StatusSyntaxErrorNotRecognised {
+			t.Fatal("Bad status:", status, resp)
+		}
 	}
 
-	status, resp, err = rc.SendCommand("EPRT |2|::1|0|")
-	if err != nil {
-		t.Fatal(err)
-	}
+	{ // We end-up on a positive note
+		status, resp, err := rc.SendCommand("EPRT |1|::1|2000|")
+		if err != nil {
+			t.Fatal(err)
+		}
 
-	if status != StatusSyntaxErrorNotRecognised {
-		t.Fatal("Bad status:", status, resp)
-	}
-
-	status, resp, err = rc.SendCommand("EPRT |3|::1|2000|")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if status != StatusSyntaxErrorNotRecognised {
-		t.Fatal("Bad status:", status, resp)
+		if status != StatusOK {
+			t.Fatal("Bad status:", status, resp)
+		}
 	}
 }
 
