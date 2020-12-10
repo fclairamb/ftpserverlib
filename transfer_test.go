@@ -330,6 +330,17 @@ func TestBogusTransferStart(t *testing.T) {
 		}
 	}
 
+	{ // Bad IP
+		status, resp, err := rc.SendCommand("EPRT |1|253.254.255.256|0|")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if status != StatusSyntaxErrorNotRecognised {
+			t.Fatal("Bad status:", status, resp)
+		}
+	}
+
 	{ // Bad protocol type: 3
 		status, resp, err := rc.SendCommand("EPRT |3|::1|2000|")
 		if err != nil {
