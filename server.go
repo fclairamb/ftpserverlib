@@ -2,6 +2,7 @@
 package ftpserver
 
 import (
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"net"
@@ -136,6 +137,17 @@ func (server *FtpServer) Listen() error {
 		if err != nil {
 			server.Logger.Error("Cannot listen", "err", err)
 			return err
+		}
+		if server.settings.TLSRequired == ImplicitEncryption {
+			// implicit TLS
+			var tlsConfig *tls.Config
+
+			tlsConfig, err = server.driver.GetTLSConfig()
+			if err != nil {
+				server.Logger.Error("Cannot get tls config", "err", err)
+				return err
+			}
+			server.listener = tls.NewListener(server.listener, tlsConfig)
 		}
 	}
 
