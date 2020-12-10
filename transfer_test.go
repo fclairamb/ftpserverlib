@@ -123,8 +123,8 @@ func TestTransferIPv6(t *testing.T) {
 		},
 	)
 
-	t.Run("active", func(t *testing.T) { testTransferOnConnection(t, s, true, false) })
-	t.Run("passive", func(t *testing.T) { testTransferOnConnection(t, s, false, false) })
+	t.Run("active", func(t *testing.T) { testTransferOnConnection(t, s, true, false, false) })
+	t.Run("passive", func(t *testing.T) { testTransferOnConnection(t, s, false, false, false) })
 }
 
 // TestTransfer validates the upload of file in both active and passive mode
