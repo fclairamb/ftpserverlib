@@ -331,7 +331,7 @@ func TestBogusTransferStart(t *testing.T) {
 	}
 
 	{ // Bad IP
-		status, resp, err := rc.SendCommand("EPRT |1|253.254.255.256|0|")
+		status, resp, err := rc.SendCommand("EPRT |1|253.254.255.256|2000|")
 		if err != nil {
 			t.Fatal(err)
 		}
