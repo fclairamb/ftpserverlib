@@ -268,6 +268,52 @@ func TestFailedTransfer(t *testing.T) {
 	}
 }
 
+func TestBogusTransferStart(t *testing.T) {
+	s := NewTestServer(t, true)
+
+	c, err := goftp.DialConfig(goftp.Config{User: "test", Password: "test"}, s.Addr())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	rc, err := c.OpenRawConn()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	status, resp, err := rc.SendCommand("PORT something")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if status != StatusSyntaxErrorNotRecognised {
+		t.Fatal("Bad status:", status, resp)
+	}
+
+	status, resp, err = rc.SendCommand("EPRT something")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if status != StatusSyntaxErrorNotRecognised {
+		t.Fatal("Bad status:", status, resp)
+	}
+
+	status, resp, err = rc.SendCommand("EPRT |2|::1|0|")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if status != StatusSyntaxErrorNotRecognised {
+		t.Fatal("Bad status:", status, resp)
+	}
+
+	status, resp, err = rc.SendCommand("EPRT |3|::1|2000|")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if status != StatusSyntaxErrorNotRecognised {
+		t.Fatal("Bad status:", status, resp)
+	}
+}
+
 func TestFailedFileClose(t *testing.T) {
 	driver := &TestServerDriver{
 		Debug: true,

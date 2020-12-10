@@ -22,9 +22,9 @@ func (c *clientHandler) handlePORT() error {
 	var raddr *net.TCPAddr
 
 	if c.command == "EPRT" {
-		raddr, err = parseEPRTcommand(c.param)
+		raddr, err = parseEPRTAddr(c.param)
 	} else { // PORT
-		raddr, err = parseRemoteAddr(c.param)
+		raddr, err = parsePORTAddr(c.param)
 	}
 
 	if err != nil {
@@ -101,13 +101,13 @@ var remoteAddrRegex = regexp.MustCompile(`^([0-9]{1,3},){5}[0-9]{1,3}$`)
 // ErrRemoteAddrFormat is returned when the remote address has a bad format
 var ErrRemoteAddrFormat = errors.New("remote address has a bad format")
 
-// parseRemoteAddr parses remote address of the client from param. This address
+// parsePORTAddr parses remote address of the client from param. This address
 // is used for establishing a connection with the client.
 //
 // Param Format: 192,168,150,80,14,178
 // Host: 192.168.150.80
 // Port: (14 * 256) + 148
-func parseRemoteAddr(param string) (*net.TCPAddr, error) {
+func parsePORTAddr(param string) (*net.TCPAddr, error) {
 	if !remoteAddrRegex.Match([]byte(param)) {
 		return nil, fmt.Errorf("could not parse %s: %w", param, ErrRemoteAddrFormat)
 	}
@@ -135,7 +135,7 @@ func parseRemoteAddr(param string) (*net.TCPAddr, error) {
 // Parse EPRT parameter. Full EPRT command format:
 // - IPv4 : "EPRT |1|h1.h2.h3.h4|port|\r\n"
 // - IPv6 : "EPRT |2|h1::h2:h3:h4:h5|port|\r\n"
-func parseEPRTcommand(param string) (addr *net.TCPAddr, err error) {
+func parseEPRTAddr(param string) (addr *net.TCPAddr, err error) {
 	params := strings.Split(param, "|")
 	if len(params) != 5 {
 		return nil, ErrRemoteAddrFormat
