@@ -13,6 +13,10 @@ import (
 )
 
 func (c *clientHandler) handlePORT() error {
+	if c.server.settings.DisableActiveMode {
+		c.writeMessage(StatusServiceNotAvailable, "PORT command is disabled")
+	}
+
 	raddr, err := parseRemoteAddr(c.param)
 
 	if err != nil {

@@ -199,6 +199,15 @@ func TestSYMLINK(t *testing.T) {
 		t.Fatal("Should have been refused", err, rc)
 	}
 
+	// disable SITE
+	s.settings.DisableSite = true
+
+	if rc, _, err := raw.SendCommand("SITE SYMLINK file test"); err != nil || rc != 500 {
+		t.Fatal("Should have been refused", err, rc)
+	}
+
+	s.settings.DisableSite = false
+
 	// Good symlink
 	if rc, _, err := raw.SendCommand("SITE SYMLINK file test"); err != nil || rc != 200 {
 		t.Fatal("Should have been accepted", err, rc)

@@ -51,6 +51,11 @@ func (c *clientHandler) handleSTAT() error {
 }
 
 func (c *clientHandler) handleSITE() error {
+	if c.server.settings.DisableSite {
+		c.writeMessage(StatusSyntaxErrorNotRecognised, "SITE support is disabled")
+		return nil
+	}
+
 	spl := strings.SplitN(c.param, " ", 2)
 	if len(spl) > 1 {
 		switch strings.ToUpper(spl[0]) {
