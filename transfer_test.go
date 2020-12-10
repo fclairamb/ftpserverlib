@@ -113,19 +113,35 @@ func ftpDelete(t *testing.T, ftp *goftp.Client, filename string) {
 
 // TestTransfer validates the upload of file in both active and passive mode
 func TestTransfer(t *testing.T) {
-	s := NewTestServerWithDriver(t, &TestServerDriver{Debug: true, Settings: &Settings{ActiveTransferPortNon20: true}})
+	t.Run("without-tls", func(t *testing.T) {
+		s := NewTestServerWithDriver(
+			t,
+			&TestServerDriver{
+				Debug: true,
+				Settings: &Settings{
+					ActiveTransferPortNon20: true,
+				},
+			},
+		)
 
-	testTransferOnConnection(t, s, false, false)
-	testTransferOnConnection(t, s, true, false)
+		testTransferOnConnection(t, s, false, false)
+		testTransferOnConnection(t, s, true, false)
+	})
+	t.Run("with-tls", func(t *testing.T) {
+		s := NewTestServerWithDriver(
+			t,
+			&TestServerDriver{
+				Debug: true,
+				TLS:   true,
+				Settings: &Settings{
+					ActiveTransferPortNon20: true,
+				},
+			},
+		)
 
-	s = NewTestServerWithDriver(t, &TestServerDriver{
-		Debug: true,
-		TLS:   true,
-		Settings: &Settings{
-			ActiveTransferPortNon20: true}})
-
-	testTransferOnConnection(t, s, false, true)
-	testTransferOnConnection(t, s, true, true)
+		testTransferOnConnection(t, s, false, true)
+		testTransferOnConnection(t, s, true, true)
+	})
 }
 
 func testTransferOnConnection(t *testing.T, server *FtpServer, active, enableTLS bool) {
@@ -167,6 +183,42 @@ func testTransferOnConnection(t *testing.T, server *FtpServer, active, enableTLS
 	// We make sure the hashes of the two files match
 	if hashUpload != hashDownload {
 		t.Fatal("The two files don't have the same hash:", hashUpload, "!=", hashDownload)
+	}
+}
+
+func TestActiveModeDisabled(t *testing.T) {
+	server := NewTestServerWithDriver(t, &TestServerDriver{
+		Debug: true,
+		Settings: &Settings{
+			ActiveTransferPortNon20: true,
+			DisableActiveMode:       true,
+		},
+	})
+
+	conf := goftp.Config{
+		User:            "test",
+		Password:        "test",
+		ActiveTransfers: true,
+	}
+
+	var err error
+	var c *goftp.Client
+
+	if c, err = goftp.DialConfig(conf, server.Addr()); err != nil {
+		t.Fatal("Couldn't connect", err)
+	}
+
+	defer func() { panicOnError(c.Close()) }()
+
+	file := createTemporaryFile(t, 10*1024)
+	err = c.Store("file.bin", file)
+
+	if err == nil {
+		t.Fatal("active mode is disabled, upload must fail")
+	}
+
+	if !strings.Contains(err.Error(), "421-PORT command is disabled") {
+		t.Fatal("unexpected error", err)
 	}
 }
 

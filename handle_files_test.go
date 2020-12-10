@@ -136,23 +136,23 @@ func TestCHOWN(t *testing.T) {
 		t.Fatal("Couldn't open raw connection")
 	}
 
-	// Asking for a user change that isn't authorized
-	if rc, _, err := raw.SendCommand("SITE CHOWN user:group file"); err != nil || rc != 550 {
+	// Asking for a chown user change that isn't authorized
+	if rc, _, err := raw.SendCommand("SITE CHOWN 1001:500 file"); err != nil || rc != 550 {
 		t.Fatal("Should have been refused", err, rc)
 	}
 
-	// Asking for a user change that isn't authorized
-	if rc, _, err := raw.SendCommand("SITE CHOWN user file"); err != nil || rc != 550 {
+	// Asking for a chown user change that isn't authorized
+	if rc, _, err := raw.SendCommand("SITE CHOWN 1001 file"); err != nil || rc != 550 {
 		t.Fatal("Should have been refused", err, rc)
 	}
 
 	// Asking for the right chown user
-	if rc, _, err := raw.SendCommand("SITE CHOWN test:test file"); err != nil || rc != 200 {
+	if rc, _, err := raw.SendCommand("SITE CHOWN 1000:500 file"); err != nil || rc != 200 {
 		t.Fatal("Should have been accepted", err, rc)
 	}
 
 	// Asking for the right chown user
-	if rc, _, err := raw.SendCommand("SITE CHOWN test file"); err != nil || rc != 200 {
+	if rc, _, err := raw.SendCommand("SITE CHOWN 1000 file"); err != nil || rc != 200 {
 		t.Fatal("Should have been accepted", err, rc)
 	}
 
@@ -198,6 +198,15 @@ func TestSYMLINK(t *testing.T) {
 	if rc, _, err := raw.SendCommand("SITE SYMLINK file5 file"); rc != 550 {
 		t.Fatal("Should have been refused", err, rc)
 	}
+
+	// disable SITE
+	s.settings.DisableSite = true
+
+	if rc, _, err := raw.SendCommand("SITE SYMLINK file test"); err != nil || rc != 500 {
+		t.Fatal("Should have been refused", err, rc)
+	}
+
+	s.settings.DisableSite = false
 
 	// Good symlink
 	if rc, _, err := raw.SendCommand("SITE SYMLINK file test"); err != nil || rc != 200 {

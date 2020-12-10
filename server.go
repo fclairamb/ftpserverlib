@@ -58,6 +58,8 @@ var commandsMap = map[string]*CommandDescription{
 	// Directory handling
 	"CWD":  {Fn: (*clientHandler).handleCWD},
 	"PWD":  {Fn: (*clientHandler).handlePWD},
+	"XCWD": {Fn: (*clientHandler).handleCWD},
+	"XPWD": {Fn: (*clientHandler).handlePWD},
 	"CDUP": {Fn: (*clientHandler).handleCDUP},
 	"NLST": {Fn: (*clientHandler).handleNLST},
 	"LIST": {Fn: (*clientHandler).handleLIST},
@@ -65,6 +67,8 @@ var commandsMap = map[string]*CommandDescription{
 	"MLST": {Fn: (*clientHandler).handleMLST},
 	"MKD":  {Fn: (*clientHandler).handleMKD},
 	"RMD":  {Fn: (*clientHandler).handleRMD},
+	"XMKD": {Fn: (*clientHandler).handleMKD},
+	"XRMD": {Fn: (*clientHandler).handleRMD},
 
 	// Connection handling
 	"TYPE": {Fn: (*clientHandler).handleTYPE},

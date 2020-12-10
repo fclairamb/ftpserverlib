@@ -38,7 +38,7 @@ func (c *clientHandler) getCurrentIP() ([]string, error) {
 
 	// If we don't have an IP address, we can take the one that was used for the current connection
 	if ip == "" {
-		// Defer to the user provided resolver.
+		// Defer to the user-provided resolver.
 		if c.server.settings.PublicIPResolver != nil {
 			var err error
 			ip, err = c.server.settings.PublicIPResolver(c)
