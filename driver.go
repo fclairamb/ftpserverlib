@@ -161,6 +161,8 @@ type Settings struct {
 	// 1 means TLS in required for both control and data connection
 	// Do not enable this blindly, please check that a proper TLS config
 	// is in place or no login will be allowed
-	TLSRequired     int
-	DisableLISTArgs bool // Disable ls like options (-a,-la etc.) for directory listing
+	TLSRequired       int
+	DisableLISTArgs   bool // Disable ls like options (-a,-la etc.) for directory listing
+	DisableSite       bool // Disable SITE command
+	DisableActiveMode bool // Disable Active FTP
 }
