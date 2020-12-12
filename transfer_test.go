@@ -108,6 +108,22 @@ func ftpDelete(t *testing.T, ftp *goftp.Client, filename string) {
 	}
 }
 
+func TestTransferIPv6(t *testing.T) {
+	s := NewTestServerWithDriver(
+		t,
+		&TestServerDriver{
+			Debug: true,
+			Settings: &Settings{
+				ActiveTransferPortNon20: true,
+				ListenAddr:              "[::1]:0",
+			},
+		},
+	)
+
+	t.Run("active", func(t *testing.T) { testTransferOnConnection(t, s, true, false, false) })
+	t.Run("passive", func(t *testing.T) { testTransferOnConnection(t, s, false, false, false) })
+}
+
 // TestTransfer validates the upload of file in both active and passive mode
 func TestTransfer(t *testing.T) {
 	t.Run("without-tls", func(t *testing.T) {
@@ -121,8 +137,8 @@ func TestTransfer(t *testing.T) {
 			},
 		)
 
-		testTransferOnConnection(t, s, false, false)
-		testTransferOnConnection(t, s, true, false)
+		testTransferOnConnection(t, s, false, false, false)
+		testTransferOnConnection(t, s, true, false, false)
 	})
 	t.Run("with-tls", func(t *testing.T) {
 		s := NewTestServerWithDriver(
@@ -136,15 +152,28 @@ func TestTransfer(t *testing.T) {
 			},
 		)
 
-		testTransferOnConnection(t, s, false, true)
-		testTransferOnConnection(t, s, true, true)
+		testTransferOnConnection(t, s, false, true, false)
+		testTransferOnConnection(t, s, true, true, false)
+	})
+
+	t.Run("with-implicit-tls", func(t *testing.T) {
+		s := NewTestServerWithDriver(t, &TestServerDriver{
+			Debug: true,
+			TLS:   true,
+			Settings: &Settings{
+				ActiveTransferPortNon20: true,
+				TLSRequired:             ImplicitEncryption,
+			}})
+
+		testTransferOnConnection(t, s, false, true, true)
+		testTransferOnConnection(t, s, true, true, true)
 	})
 }
 
-func testTransferOnConnection(t *testing.T, server *FtpServer, active, enableTLS bool) {
+func testTransferOnConnection(t *testing.T, server *FtpServer, active, enableTLS, implicitTLS bool) {
 	conf := goftp.Config{
-		User:            "test",
-		Password:        "test",
+		User:            authUser,
+		Password:        authPass,
 		ActiveTransfers: active,
 	}
 	if enableTLS {
@@ -152,11 +181,14 @@ func testTransferOnConnection(t *testing.T, server *FtpServer, active, enableTLS
 			// nolint:gosec
 			InsecureSkipVerify: true,
 		}
-		conf.TLSMode = goftp.TLSExplicit
+		if implicitTLS {
+			conf.TLSMode = goftp.TLSImplicit
+		} else {
+			conf.TLSMode = goftp.TLSExplicit
+		}
 	}
 
 	var err error
-
 	var c *goftp.Client
 
 	if c, err = goftp.DialConfig(conf, server.Addr()); err != nil {
@@ -193,8 +225,8 @@ func TestActiveModeDisabled(t *testing.T) {
 	})
 
 	conf := goftp.Config{
-		User:            "test",
-		Password:        "test",
+		User:            authUser,
+		Password:        authPass,
 		ActiveTransfers: true,
 	}
 
@@ -224,8 +256,8 @@ func TestFailedTransfer(t *testing.T) {
 	s := NewTestServer(t, true)
 
 	conf := goftp.Config{
-		User:     "test",
-		Password: "test",
+		User:     authUser,
+		Password: authPass,
 	}
 
 	var err error
@@ -249,6 +281,86 @@ func TestFailedTransfer(t *testing.T) {
 	}
 }
 
+func TestBogusTransferStart(t *testing.T) {
+	s := NewTestServer(t, true)
+
+	c, err := goftp.DialConfig(goftp.Config{User: "test", Password: "test"}, s.Addr())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	rc, err := c.OpenRawConn()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	{ // Completely bogus port declaration
+		status, resp, err := rc.SendCommand("PORT something")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if status != StatusSyntaxErrorNotRecognised {
+			t.Fatal("Bad status:", status, resp)
+		}
+	}
+
+	{ // Completely bogus port declaration
+		status, resp, err := rc.SendCommand("EPRT something")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if status != StatusSyntaxErrorNotRecognised {
+			t.Fatal("Bad status:", status, resp)
+		}
+	}
+
+	{ // Bad port number: 0
+		status, resp, err := rc.SendCommand("EPRT |2|::1|0|")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if status != StatusSyntaxErrorNotRecognised {
+			t.Fatal("Bad status:", status, resp)
+		}
+	}
+
+	{ // Bad IP
+		status, resp, err := rc.SendCommand("EPRT |1|253.254.255.256|2000|")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if status != StatusSyntaxErrorNotRecognised {
+			t.Fatal("Bad status:", status, resp)
+		}
+	}
+
+	{ // Bad protocol type: 3
+		status, resp, err := rc.SendCommand("EPRT |3|::1|2000|")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if status != StatusSyntaxErrorNotRecognised {
+			t.Fatal("Bad status:", status, resp)
+		}
+	}
+
+	{ // We end-up on a positive note
+		status, resp, err := rc.SendCommand("EPRT |1|::1|2000|")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if status != StatusOK {
+			t.Fatal("Bad status:", status, resp)
+		}
+	}
+}
+
 func TestFailedFileClose(t *testing.T) {
 	driver := &TestServerDriver{
 		Debug: true,
@@ -257,8 +369,8 @@ func TestFailedFileClose(t *testing.T) {
 	s := NewTestServerWithDriver(t, driver)
 
 	conf := goftp.Config{
-		User:     "test",
-		Password: "test",
+		User:     authUser,
+		Password: authPass,
 	}
 
 	var err error
