@@ -273,12 +273,11 @@ func (c *clientHandler) handleSTATFile() error {
 	path := c.absPath(c.param)
 
 	if info, err := c.driver.Stat(path); err == nil {
-		defer c.multilineAnswer(StatusSystemStatus, "System status")()
-
-		// c.writeLine(fmt.Sprintf("%d-Status follows:", StatusSystemStatus))
 		if info.IsDir() {
 			var files []os.FileInfo
 			var errList error
+
+			defer c.multilineAnswer(StatusDirectoryStatus, fmt.Sprintf("STAT %v", c.param))()
 
 			directoryPath := c.absPath(c.param)
 
@@ -301,6 +300,8 @@ func (c *clientHandler) handleSTATFile() error {
 				}
 			}
 		} else {
+			defer c.multilineAnswer(StatusFileStatus, fmt.Sprintf("STAT %v", c.param))()
+
 			c.writeLine(fmt.Sprintf(" %s", c.fileStat(info)))
 		}
 	} else {

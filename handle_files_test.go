@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/secsy/goftp"
+	"github.com/stretchr/testify/require"
 )
 
 // validMLSxEntryPattern ensures an entry follows RFC3659 (section 7.2)
@@ -113,8 +114,8 @@ func TestCHOWN(t *testing.T) {
 	s := NewTestServer(t, true)
 
 	conf := goftp.Config{
-		User:     "test",
-		Password: "test",
+		User:     authUser,
+		Password: authPass,
 	}
 
 	var err error
@@ -166,8 +167,8 @@ func TestSYMLINK(t *testing.T) {
 	s := NewTestServer(t, true)
 
 	conf := goftp.Config{
-		User:     "test",
-		Password: "test",
+		User:     authUser,
+		Password: authPass,
 	}
 
 	var err error
@@ -212,4 +213,50 @@ func TestSYMLINK(t *testing.T) {
 	if rc, _, err := raw.SendCommand("SITE SYMLINK file test"); err != nil || rc != 200 {
 		t.Fatal("Should have been accepted", err, rc)
 	}
+}
+
+func TestSTATFile(t *testing.T) {
+	s := NewTestServer(t, true)
+
+	conf := goftp.Config{
+		User:     authUser,
+		Password: authPass,
+	}
+
+	var err error
+
+	var c *goftp.Client
+
+	c, err = goftp.DialConfig(conf, s.Addr())
+	require.NoError(t, err, "Couldn't connect")
+
+	defer func() { panicOnError(c.Close()) }()
+
+	// Creating a tiny file
+	ftpUpload(t, c, createTemporaryFile(t, 10), "file")
+
+	// Create a directory with a subdir
+	_, err = c.Mkdir("dir")
+	require.NoError(t, err)
+
+	_, err = c.Mkdir("/dir/sub")
+	require.NoError(t, err)
+
+	var raw goftp.RawConn
+
+	raw, err = c.OpenRawConn()
+	require.NoError(t, err, "Couldn't open raw connection")
+
+	rc, _, err := raw.SendCommand("STAT file")
+	require.NoError(t, err)
+	require.Equal(t, StatusFileStatus, rc)
+
+	rc, _, err = raw.SendCommand("STAT dir")
+	require.NoError(t, err)
+	require.Equal(t, StatusDirectoryStatus, rc)
+
+	// finally stat a missing file dir
+	rc, _, err = raw.SendCommand("STAT missing")
+	require.NoError(t, err)
+	require.Equal(t, StatusFileActionNotTaken, rc)
 }

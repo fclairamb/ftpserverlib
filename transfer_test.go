@@ -13,6 +13,7 @@ import (
 	"testing"
 
 	"github.com/secsy/goftp"
+	"github.com/stretchr/testify/require"
 )
 
 func createTemporaryFile(t *testing.T, targetSize int) *os.File {
@@ -62,21 +63,17 @@ func hashFile(t *testing.T, file *os.File) string {
 }
 
 func ftpUpload(t *testing.T, ftp *goftp.Client, file io.ReadSeeker, filename string) {
-	if _, err := file.Seek(0, 0); err != nil {
-		t.Fatal("Couldn't seek:", err)
-	}
+	_, err := file.Seek(0, 0)
+	require.NoError(t, err, "Couldn't seek")
 
-	if err := ftp.Store(filename+".tmp", file); err != nil {
-		t.Fatal("Couldn't upload bin:", err)
-	}
+	err = ftp.Store(filename+".tmp", file)
+	require.NoError(t, err, "Couldn't upload bin")
 
-	if err := ftp.Rename(filename+".tmp", filename); err != nil {
-		t.Fatal("Can't rename file:", err)
-	}
+	err = ftp.Rename(filename+".tmp", filename)
+	require.NoError(t, err, "Can't rename file")
 
-	if _, err := ftp.Stat(filename); err != nil {
-		t.Fatal("Couldn't get the size of file1.bin:", err)
-	}
+	_, err = ftp.Stat(filename)
+	require.NoError(t, err, "Couldn't get the size of file1.bin")
 
 	if stats, err := ftp.Stat(filename); err != nil {
 		// That's acceptable for now
