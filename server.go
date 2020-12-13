@@ -34,12 +34,20 @@ var commandsMap = map[string]*CommandDescription{
 	"PBSZ": {Fn: (*clientHandler).handlePBSZ, Open: true},
 
 	// Misc
-	"CLNT": {Fn: (*clientHandler).handleCLNT, Open: true},
-	"FEAT": {Fn: (*clientHandler).handleFEAT, Open: true},
-	"SYST": {Fn: (*clientHandler).handleSYST, Open: true},
-	"NOOP": {Fn: (*clientHandler).handleNOOP, Open: true},
-	"OPTS": {Fn: (*clientHandler).handleOPTS, Open: true},
-	"QUIT": {Fn: (*clientHandler).handleQUIT, Open: true},
+	"CLNT":    {Fn: (*clientHandler).handleCLNT, Open: true},
+	"FEAT":    {Fn: (*clientHandler).handleFEAT, Open: true},
+	"SYST":    {Fn: (*clientHandler).handleSYST, Open: true},
+	"NOOP":    {Fn: (*clientHandler).handleNOOP, Open: true},
+	"OPTS":    {Fn: (*clientHandler).handleOPTS, Open: true},
+	"QUIT":    {Fn: (*clientHandler).handleQUIT, Open: true},
+	"HASH":    {Fn: (*clientHandler).handleHASH},
+	"XCRC":    {Fn: (*clientHandler).handleCRC32},
+	"MD5":     {Fn: (*clientHandler).handleMD5},
+	"XMD5":    {Fn: (*clientHandler).handleMD5},
+	"XSHA":    {Fn: (*clientHandler).handleSHA1},
+	"XSHA1":   {Fn: (*clientHandler).handleSHA1},
+	"XSHA256": {Fn: (*clientHandler).handleSHA256},
+	"XSHA512": {Fn: (*clientHandler).handleSHA512},
 
 	// File access
 	"SIZE": {Fn: (*clientHandler).handleSIZE},

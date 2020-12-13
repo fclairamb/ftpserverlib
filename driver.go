@@ -173,4 +173,5 @@ type Settings struct {
 	DisableLISTArgs          bool             // Disable ls like options (-a,-la etc.) for directory listing
 	DisableSite              bool             // Disable SITE command
 	DisableActiveMode        bool             // Disable Active FTP
+	EnableHASH               bool             // Enable support for calculating hash value of files
 }
