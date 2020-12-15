@@ -40,6 +40,7 @@ var commandsMap = map[string]*CommandDescription{
 	"NOOP": {Fn: (*clientHandler).handleNOOP, Open: true},
 	"OPTS": {Fn: (*clientHandler).handleOPTS, Open: true},
 	"QUIT": {Fn: (*clientHandler).handleQUIT, Open: true},
+	"AVBL": {Fn: (*clientHandler).handleAVBL},
 
 	// File access
 	"SIZE":    {Fn: (*clientHandler).handleSIZE},
