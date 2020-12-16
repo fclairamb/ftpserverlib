@@ -1,6 +1,7 @@
 # Golang FTP Server library
 
 ![Build](https://github.com/fclairamb/ftpserverlib/workflows/Build/badge.svg)
+[![codecov](https://codecov.io/gh/fclairamb/ftpserverlib/branch/master/graph/badge.svg?token=IVeoGgl1rj)](https://codecov.io/gh/fclairamb/ftpserverlib)
 [![Go Report Card](https://goreportcard.com/badge/fclairamb/ftpserverlib)](https://goreportcard.com/report/fclairamb/ftpserverlib)
 [![GoDoc](https://godoc.org/github.com/fclairamb/ftpserverlib?status.svg)](https://godoc.org/github.com/fclairamb/ftpserverlib)
 
