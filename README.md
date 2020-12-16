@@ -6,7 +6,8 @@
 
 This library allows to easily build a simple and fully-featured FTP server using [afero](https://github.com/spf13/afero) as the backend filesystem.
 
-If you're interested in a fully featured FTP server, you should use [ftpserver](https://github.com/fclairamb/ftpserver).
+If you're interested in a fully featured FTP server, you should use [ftpserver](https://github.com/fclairamb/ftpserver) 
+or [sftpgo](https://github.com/drakkan/).
 
 ## Current status of the project
 
@@ -17,8 +18,9 @@ If you're interested in a fully featured FTP server, you should use [ftpserver](
  * File and directory deletion and renaming
  * TLS support (AUTH + PROT)
  * File download/upload resume support (REST)
- * Passive socket connections (EPSV and PASV commands)
- * Active socket connections (PORT command)
+ * Passive socket connections (PASV and EPSV commands)
+ * Active socket connections (PORT and EPRT commands)
+ * IPv6 support (EPSV + EPRT)
  * Small memory footprint
  * Clean code: No sync, no sleep, no panic
  * Uses only the standard library except for:
@@ -28,6 +30,7 @@ If you're interested in a fully featured FTP server, you should use [ftpserver](
    * [AUTH](https://tools.ietf.org/html/rfc2228#page-6) - Control session protection
    * [AUTH TLS](https://tools.ietf.org/html/rfc4217#section-4.1) - TLS session
    * [PROT](https://tools.ietf.org/html/rfc2228#page-8) - Transfer protection
+   * [EPRT/EPSV](https://tools.ietf.org/html/rfc2428) - IPv6 support
    * [MDTM](https://tools.ietf.org/html/rfc3659#page-8) - File Modification Time
    * [SIZE](https://tools.ietf.org/html/rfc3659#page-11) - Size of a file
    * [REST](https://tools.ietf.org/html/rfc3659#page-13) - Restart of interrupted transfer
@@ -124,7 +127,6 @@ type Settings struct {
 	ListenHost     string     // Host to receive connections on
 	ListenPort     int        // Port to listen on
 	PublicHost     string     // Public IP to expose (only an IP address is accepted at this stage)
-	MaxConnections int        // Max number of connections to accept
 	DataPortRange  *PortRange // Port Range for data connections. Random one will be used if not specified
 }
 ```

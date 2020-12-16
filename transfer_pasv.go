@@ -38,7 +38,7 @@ func (c *clientHandler) getCurrentIP() ([]string, error) {
 
 	// If we don't have an IP address, we can take the one that was used for the current connection
 	if ip == "" {
-		// Defer to the user provided resolver.
+		// Defer to the user-provided resolver.
 		if c.server.settings.PublicIPResolver != nil {
 			var err error
 			ip, err = c.server.settings.PublicIPResolver(c)
@@ -116,7 +116,7 @@ func (c *clientHandler) handlePASV() error {
 	// The listener will either be plain TCP or TLS
 	var listener net.Listener
 
-	if c.transferTLS {
+	if c.transferTLS || c.server.settings.TLSRequired == ImplicitEncryption {
 		if tlsConfig, err := c.server.driver.GetTLSConfig(); err == nil {
 			listener = tls.NewListener(tcpListener, tlsConfig)
 		} else {

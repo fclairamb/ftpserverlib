@@ -1,14 +1,16 @@
 package ftpserver
 
 import (
+	"fmt"
 	"sync"
 	"testing"
 
-	"gopkg.in/dutchcoders/goftp.v1"
+	"github.com/secsy/goftp"
+	"github.com/stretchr/testify/require"
 )
 
 func TestConcurrency(t *testing.T) {
-	s := NewTestServer(t, false)
+	server := NewTestServer(t, false)
 
 	nbClients := 100
 
@@ -17,24 +19,52 @@ func TestConcurrency(t *testing.T) {
 
 	for i := 0; i < nbClients; i++ {
 		go func() {
+			conf := goftp.Config{
+				User:     authUser,
+				Password: authPass,
+			}
+
 			var err error
-			var ftp *goftp.FTP
+			var c *goftp.Client
 
-			if ftp, err = goftp.Connect(s.Addr()); err != nil {
-				panic(err)
+			if c, err = goftp.DialConfig(conf, server.Addr()); err != nil {
+				panic(fmt.Sprintf("Couldn't connect: %v", err))
 			}
 
-			defer func() { panicOnError(ftp.Close()) }()
-
-			if err = ftp.Login("test", "test"); err != nil {
-				panic(err)
+			if _, err = c.ReadDir("/"); err != nil {
+				panic(fmt.Sprintf("Couldn't list dir: %v", err))
 			}
+
+			defer func() { panicOnError(c.Close()) }()
 
 			waitGroup.Done()
 		}()
 	}
 
 	waitGroup.Wait()
+}
+
+func TestTLSMethods(t *testing.T) {
+	t.Run("without-tls", func(t *testing.T) {
+		cc := clientHandler{
+			server: NewTestServer(t, true),
+		}
+		require.False(t, cc.HasTLSForControl())
+		require.False(t, cc.HasTLSForTransfers())
+	})
+
+	t.Run("with-implicit-tls", func(t *testing.T) {
+		s := NewTestServerWithDriver(t, &TestServerDriver{
+			Settings: &Settings{
+				TLSRequired: ImplicitEncryption,
+			},
+		})
+		cc := clientHandler{
+			server: s,
+		}
+		require.True(t, cc.HasTLSForControl())
+		require.True(t, cc.HasTLSForTransfers())
+	})
 }
 
 type multilineMessage struct {

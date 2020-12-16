@@ -2,6 +2,7 @@
 package ftpserver
 
 import (
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"net"
@@ -58,6 +59,8 @@ var commandsMap = map[string]*CommandDescription{
 	// Directory handling
 	"CWD":  {Fn: (*clientHandler).handleCWD},
 	"PWD":  {Fn: (*clientHandler).handlePWD},
+	"XCWD": {Fn: (*clientHandler).handleCWD},
+	"XPWD": {Fn: (*clientHandler).handlePWD},
 	"CDUP": {Fn: (*clientHandler).handleCDUP},
 	"NLST": {Fn: (*clientHandler).handleNLST},
 	"LIST": {Fn: (*clientHandler).handleLIST},
@@ -65,12 +68,15 @@ var commandsMap = map[string]*CommandDescription{
 	"MLST": {Fn: (*clientHandler).handleMLST},
 	"MKD":  {Fn: (*clientHandler).handleMKD},
 	"RMD":  {Fn: (*clientHandler).handleRMD},
+	"XMKD": {Fn: (*clientHandler).handleMKD},
+	"XRMD": {Fn: (*clientHandler).handleRMD},
 
 	// Connection handling
 	"TYPE": {Fn: (*clientHandler).handleTYPE},
 	"PASV": {Fn: (*clientHandler).handlePASV},
 	"EPSV": {Fn: (*clientHandler).handlePASV},
 	"PORT": {Fn: (*clientHandler).handlePORT},
+	"EPRT": {Fn: (*clientHandler).handlePORT},
 }
 
 // FtpServer is where everything is stored
@@ -131,6 +137,17 @@ func (server *FtpServer) Listen() error {
 		if err != nil {
 			server.Logger.Error("Cannot listen", "err", err)
 			return err
+		}
+		if server.settings.TLSRequired == ImplicitEncryption {
+			// implicit TLS
+			var tlsConfig *tls.Config
+
+			tlsConfig, err = server.driver.GetTLSConfig()
+			if err != nil {
+				server.Logger.Error("Cannot get tls config", "err", err)
+				return err
+			}
+			server.listener = tls.NewListener(server.listener, tlsConfig)
 		}
 	}
 

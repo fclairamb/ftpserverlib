@@ -3,7 +3,7 @@ package ftpserver
 import "testing"
 
 func TestPortCommandFormatOK(t *testing.T) {
-	net, err := parseRemoteAddr("127,0,0,1,239,163")
+	net, err := parsePORTAddr("127,0,0,1,239,163")
 	if err != nil {
 		t.Fatal("Problem parsing", err)
 	}
@@ -23,7 +23,7 @@ func TestPortCommandFormatInvalid(t *testing.T) {
 		"127,0,0,1,1,1,1",
 	}
 	for _, f := range badFormats {
-		_, err := parseRemoteAddr(f)
+		_, err := parsePORTAddr(f)
 		if err == nil {
 			t.Fatal("This should have failed", f)
 		}

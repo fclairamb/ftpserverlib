@@ -164,28 +164,34 @@ func (c *clientHandler) handleCHOWN(params string) {
 		return
 	}
 
-	var user, group string
+	var userID, groupID int
 	{
 		usergroup := strings.Split(spl[0], ":")
-		user = usergroup[0]
-		if len(usergroup) > 1 {
-			group = usergroup[1]
+		userName := usergroup[0]
+		if id, err := strconv.ParseInt(userName, 10, 32); err == nil {
+			userID = int(id)
 		} else {
-			group = ""
+			userID = 0
+		}
+
+		if len(usergroup) > 1 {
+			groupName := usergroup[1]
+			if id, err := strconv.ParseInt(groupName, 10, 32); err == nil {
+				groupID = int(id)
+			} else {
+				groupID = 0
+			}
+		} else {
+			groupID = 0
 		}
 	}
 
 	path := c.absPath(spl[1])
 
-	if chownInt, ok := c.driver.(ClientDriverExtensionChown); !ok {
-		// It's not implemented and that's not OK, it must be explicitly refused
-		c.writeMessage(StatusCommandNotImplemented, "This extension hasn't been implemented !")
+	if err := c.driver.Chown(path, userID, groupID); err != nil {
+		c.writeMessage(StatusActionNotTaken, fmt.Sprintf("Couldn't chown: %v", err))
 	} else {
-		if err := chownInt.Chown(path, user, group); err != nil {
-			c.writeMessage(StatusActionNotTaken, fmt.Sprintf("Couldn't chown: %v", err))
-		} else {
-			c.writeMessage(StatusOK, "Done !")
-		}
+		c.writeMessage(StatusOK, "Done !")
 	}
 }
 

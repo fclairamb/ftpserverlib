@@ -108,6 +108,24 @@ func (c *clientHandler) GetClientVersion() string {
 	return c.clnt
 }
 
+// HasTLSForControl returns true if the control connection is over TLS
+func (c *clientHandler) HasTLSForControl() bool {
+	if c.server.settings.TLSRequired == ImplicitEncryption {
+		return true
+	}
+
+	return c.controlTLS
+}
+
+// HasTLSForTransfers returns true if the transfer connection is over TLS
+func (c *clientHandler) HasTLSForTransfers() bool {
+	if c.server.settings.TLSRequired == ImplicitEncryption {
+		return true
+	}
+
+	return c.transferTLS
+}
+
 // Close closes the active transfer, if any, and the control connection
 func (c *clientHandler) Close(code int, message string) error {
 	if c.transfer != nil {
@@ -304,7 +322,7 @@ func (c *clientHandler) TransferOpen() (net.Conn, error) {
 		return nil, err
 	}
 
-	if c.server.settings.TLSRequired == 1 && !c.transferTLS {
+	if c.server.settings.TLSRequired == MandatoryEncryption && !c.transferTLS {
 		err := &openTransferError{err: "TLS is required"}
 		c.writeMessage(StatusServiceNotAvailable, err.Error())
 
