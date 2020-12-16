@@ -204,7 +204,7 @@ func TestMFMT(t *testing.T) {
 		t.Fatal("Should have failed:", err, rc)
 	}
 
-	// bad date format
+	// Good (to make sure we are still in sync)
 	if rc, _, err := raw.SendCommand("MFMT 20201209211059 file"); err != nil || rc != 213 {
 		t.Fatal("Should have succeeded:", err, rc)
 	}
