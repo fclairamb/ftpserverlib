@@ -39,7 +39,7 @@ func TestLoginSuccess(t *testing.T) {
 	require.NoError(t, err)
 
 	response := string(buf[:n])
-	require.Equal(t, response, "220 TEST Server\r\n")
+	require.Equal(t, "220 TEST Server\r\n", response)
 
 	_, err = conn.Write([]byte("NOOP\r\n"))
 	require.NoError(t, err)
@@ -48,7 +48,7 @@ func TestLoginSuccess(t *testing.T) {
 	require.NoError(t, err)
 
 	response = string(buf[:n])
-	require.Equal(t, response, "200 OK\r\n")
+	require.Equal(t, "200 OK\r\n", response)
 
 	conf := goftp.Config{
 		User:     authUser,
