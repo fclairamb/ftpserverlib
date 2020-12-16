@@ -379,12 +379,14 @@ func (c *clientHandler) handleMFMT() error {
 	if len(params) != 2 {
 		c.writeMessage(StatusSyntaxErrorNotRecognised, fmt.Sprintf(
 			"Couldn't set mtime, not enough params, given: %s", c.param))
+		return nil
 	}
 
 	mtime, err := time.Parse("20060102150405", params[0])
 	if err != nil {
 		c.writeMessage(StatusSyntaxErrorParameters, fmt.Sprintf(
 			"Couldn't parse mtime, given: %s, err: %v", params[0], err))
+		return nil
 	}
 
 	path := c.absPath(params[1])
@@ -392,6 +394,7 @@ func (c *clientHandler) handleMFMT() error {
 	if err := c.driver.Chtimes(path, mtime, mtime); err != nil {
 		c.writeMessage(StatusActionNotTaken, fmt.Sprintf(
 			"Couldn't set mtime %q for %q, err: %v", mtime.Format(time.RFC3339), path, err))
+		return nil
 	}
 
 	c.writeMessage(StatusFileStatus, fmt.Sprintf("Modify=%s; %s", params[0], params[1]))

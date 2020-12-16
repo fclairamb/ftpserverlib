@@ -163,6 +163,54 @@ func TestCHOWN(t *testing.T) {
 	}
 }
 
+func TestMFMT(t *testing.T) {
+	s := NewTestServer(t, true)
+
+	conf := goftp.Config{
+		User:     "test",
+		Password: "test",
+	}
+
+	var err error
+
+	var c *goftp.Client
+
+	if c, err = goftp.DialConfig(conf, s.Addr()); err != nil {
+		t.Fatal("Couldn't connect", err)
+	}
+
+	defer func() { panicOnError(c.Close()) }()
+
+	// Creating a tiny file
+	ftpUpload(t, c, createTemporaryFile(t, 10), "file")
+
+	var raw goftp.RawConn
+
+	if raw, err = c.OpenRawConn(); err != nil {
+		t.Fatal("Couldn't open raw connection")
+	}
+
+	// Good
+	if rc, _, err := raw.SendCommand("MFMT 20201209211059 file"); err != nil || rc != 213 {
+		t.Fatal("Should have succeeded:", err, rc)
+	}
+
+	// 3 params instead of 2
+	if rc, _, err := raw.SendCommand("MFMT 20201209211059 file somethingelse"); err != nil || rc == 213 {
+		t.Fatal("Should have failed:", err, rc)
+	}
+
+	// 1 param instead of 2
+	if rc, _, err := raw.SendCommand("MFMT 202012092110 file"); err != nil || rc != 501 {
+		t.Fatal("Should have failed:", err, rc)
+	}
+
+	// Good (to make sure we are still in sync)
+	if rc, _, err := raw.SendCommand("MFMT 20201209211059 file"); err != nil || rc != 213 {
+		t.Fatal("Should have succeeded:", err, rc)
+	}
+}
+
 func TestSYMLINK(t *testing.T) {
 	s := NewTestServer(t, true)
 
