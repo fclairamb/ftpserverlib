@@ -203,6 +203,10 @@ func (c *clientHandler) handleFEAT() error {
 		features = append(features, nonStandardHashImpl...)
 	}
 
+	if _, ok := c.driver.(ClientDriverExtensionAvailableSpace); ok {
+		features = append(features, "AVBL")
+	}
+
 	for _, f := range features {
 		c.writeLine(" " + f)
 	}
@@ -227,6 +231,35 @@ func (c *clientHandler) handleQUIT() error {
 	c.writeMessage(StatusClosingControlConn, "Goodbye")
 	c.disconnect()
 	c.reader = nil
+
+	return nil
+}
+
+func (c *clientHandler) handleAVBL() error {
+	if avbl, ok := c.driver.(ClientDriverExtensionAvailableSpace); ok {
+		path := c.absPath(c.param)
+
+		info, err := c.driver.Stat(path)
+		if err != nil {
+			c.writeMessage(StatusActionNotTaken, fmt.Sprintf("Couldn't access %s: %v", path, err))
+			return nil
+		}
+
+		if !info.IsDir() {
+			c.writeMessage(StatusActionNotTaken, fmt.Sprintf("%s: is not a directory", path))
+			return nil
+		}
+
+		available, err := avbl.GetAvailableSpace(path)
+		if err != nil {
+			c.writeMessage(StatusActionNotTaken, fmt.Sprintf("Couldn't get space for path %s: %v", path, err))
+			return nil
+		}
+
+		c.writeMessage(StatusFileStatus, fmt.Sprintf("%d", available))
+	} else {
+		c.writeMessage(StatusNotImplemented, "This extension hasn't been implemented !")
+	}
 
 	return nil
 }

@@ -173,6 +173,16 @@ func (driver *TestClientDriver) AllocateSpace(size int) error {
 	return errTooMuchSpaceRequested
 }
 
+var errAvblNotPermitted = errors.New("you're not allowed to request available space for this directory")
+
+func (driver *TestClientDriver) GetAvailableSpace(dirName string) (int64, error) {
+	if dirName == "/noavbl" {
+		return 0, errAvblNotPermitted
+	}
+
+	return int64(123), nil
+}
+
 var errInvalidChownUser = errors.New("invalid chown on user")
 var errInvalidChownGroup = errors.New("invalid chown on group")
 

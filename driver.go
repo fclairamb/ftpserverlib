@@ -97,6 +97,12 @@ type ClientDriverExtensionHasher interface {
 	ComputeHash(name string, algo HASHAlgo, startOffset, endOffset int64) (string, error)
 }
 
+// ClientDriverExtensionAvailableSpace is an extension to implement to support
+// the AVBL ftp command
+type ClientDriverExtensionAvailableSpace interface {
+	GetAvailableSpace(dirName string) (int64, error)
+}
+
 // ClientContext is implemented on the server side to provide some access to few data around the client
 type ClientContext interface {
 	// Path provides the path of the current connection
