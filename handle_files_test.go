@@ -91,9 +91,7 @@ func TestALLO(t *testing.T) {
 
 	defer func() { panicOnError(c.Close()) }()
 
-	var raw goftp.RawConn
-
-	raw, err = c.OpenRawConn()
+	raw, err := c.OpenRawConn()
 	require.NoError(t, err, "Couldn't open raw connection")
 
 	// Asking for too much (2MB)

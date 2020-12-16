@@ -83,7 +83,7 @@ func TestStat(t *testing.T) {
 
 	rc, str, err := raw.SendCommand("STAT")
 	require.NoError(t, err)
-	require.Equal(t, StatusFileStatus, rc)
+	require.Equal(t, StatusSystemStatus, rc)
 
 	count := strings.Count(str, "\n")
 	require.GreaterOrEqual(t, count, 4)

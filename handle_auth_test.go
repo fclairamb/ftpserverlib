@@ -3,9 +3,12 @@ package ftpserver
 import (
 	"crypto/tls"
 	"fmt"
+	"net"
 	"testing"
+	"time"
 
-	"gopkg.in/dutchcoders/goftp.v1"
+	"github.com/secsy/goftp"
+	"github.com/stretchr/testify/require"
 )
 
 func panicOnError(err error) {
@@ -22,52 +25,69 @@ func reportError(err error) {
 
 func TestLoginSuccess(t *testing.T) {
 	s := NewTestServer(t, true)
+	// send a NOOP before the login, this doesn't seems possible using secsy/goftp so use the old way ...
+	conn, err := net.DialTimeout("tcp", s.Addr(), 5*time.Second)
+	require.NoError(t, err)
 
-	var err error
+	defer func() {
+		err = conn.Close()
+		require.NoError(t, err)
+	}()
 
-	var ftp *goftp.FTP
+	buf := make([]byte, 1024)
+	n, err := conn.Read(buf)
+	require.NoError(t, err)
 
-	if ftp, err = goftp.Connect(s.Addr()); err != nil {
-		t.Fatal("Couldn't connect", err)
+	response := string(buf[:n])
+	require.Equal(t, response, "220 TEST Server\r\n")
+
+	_, err = conn.Write([]byte("NOOP\r\n"))
+	require.NoError(t, err)
+
+	n, err = conn.Read(buf)
+	require.NoError(t, err)
+
+	response = string(buf[:n])
+	require.Equal(t, response, "200 OK\r\n")
+
+	conf := goftp.Config{
+		User:     authUser,
+		Password: authPass,
 	}
 
-	defer func() { panicOnError(ftp.Quit()) }()
+	c, err := goftp.DialConfig(conf, s.Addr())
+	require.NoError(t, err, "Couldn't connect")
 
-	if err = ftp.Noop(); err != nil {
-		t.Fatal("Couldn't NOOP before login:", err)
-	}
+	defer func() { panicOnError(c.Close()) }()
 
-	if err = ftp.Login("test", "test"); err != nil {
-		t.Fatal("Failed to login:", err)
-	}
+	raw, err := c.OpenRawConn()
+	require.NoError(t, err, "Couldn't open raw connection")
 
-	if err := ftp.Noop(); err != nil {
-		t.Fatal("Couldn't NOOP:", err)
-	}
+	rc, _, err := raw.SendCommand("NOOP")
+	require.NoError(t, err)
+	require.Equal(t, StatusOK, rc, "Couldn't NOOP")
 
-	if line, err := ftp.Syst(); err != nil {
-		t.Fatal("Couldn't SYST:", err)
-	} else if line != "UNIX Type: L8" {
-		t.Fatal("SYST:", line)
-	}
+	rc, response, err = raw.SendCommand("SYST")
+	require.NoError(t, err)
+	require.Equal(t, StatusSystemType, rc)
+	require.Equal(t, "UNIX Type: L8", response)
 }
 
 func TestLoginFailure(t *testing.T) {
 	s := NewTestServer(t, true)
 
-	var err error
-
-	var ftp *goftp.FTP
-
-	if ftp, err = goftp.Connect(s.Addr()); err != nil {
-		t.Fatal("Couldn't connect:", err)
+	conf := goftp.Config{
+		User:     authUser,
+		Password: authPass + "_wrong",
 	}
 
-	defer func() { reportError(ftp.Quit()) }()
+	c, err := goftp.DialConfig(conf, s.Addr())
+	require.NoError(t, err, "Couldn't connect")
 
-	if err = ftp.Login("test", "test2"); err == nil {
-		t.Fatal("We should have failed to login")
-	}
+	defer func() { panicOnError(c.Close()) }()
+
+	_, err = c.OpenRawConn()
+	require.Error(t, err, "We should have failed to login")
 }
 
 func TestAuthTLS(t *testing.T) {
@@ -76,21 +96,23 @@ func TestAuthTLS(t *testing.T) {
 		TLS:   true,
 	})
 
-	ftp, err := goftp.Connect(s.Addr())
-	if err != nil {
-		t.Fatal("Couldn't connect:", err)
+	conf := goftp.Config{
+		User:     authUser,
+		Password: authPass,
+		TLSConfig: &tls.Config{
+			// nolint:gosec
+			InsecureSkipVerify: true,
+		},
+		TLSMode: goftp.TLSExplicit,
 	}
 
-	defer func() { reportError(ftp.Quit()) }()
+	c, err := goftp.DialConfig(conf, s.Addr())
+	require.NoError(t, err, "Couldn't connect")
 
-	config := &tls.Config{
-		// nolint:gosec
-		InsecureSkipVerify: true,
-		ClientAuth:         tls.RequestClientCert,
-	}
-	if err := ftp.AuthTLS(config); err != nil {
-		t.Fatal("Couldn't upgrade connection to TLS:", err)
-	}
+	defer func() { panicOnError(c.Close()) }()
+
+	_, err = c.OpenRawConn()
+	require.NoError(t, err, "Couldn't upgrade connection to TLS")
 }
 
 func TestAuthTLSRequired(t *testing.T) {
@@ -100,32 +122,33 @@ func TestAuthTLSRequired(t *testing.T) {
 	})
 	s.settings.TLSRequired = MandatoryEncryption
 
-	ftp, err := goftp.Connect(s.Addr())
-	if err != nil {
-		t.Fatal("Couldn't connect:", err)
+	conf := goftp.Config{
+		User:     authUser,
+		Password: authPass,
 	}
 
-	defer func() { reportError(ftp.Quit()) }()
+	c, err := goftp.DialConfig(conf, s.Addr())
+	require.NoError(t, err, "Couldn't connect")
 
-	if err = ftp.Login("test", "test"); err == nil {
-		t.Fatal("Plain text login must fail, TLS is rquired")
-	} else if err.Error() != "421 TLS is required\r\n" {
-		t.Fatal("unexpected error:", err)
-	}
+	defer func() { panicOnError(c.Close()) }()
 
-	config := &tls.Config{
+	_, err = c.OpenRawConn()
+	require.Error(t, err, "Plain text login must fail, TLS is required")
+	require.EqualError(t, err, "unexpected response: 421-TLS is required")
+
+	conf.TLSConfig = &tls.Config{
 		// nolint:gosec
 		InsecureSkipVerify: true,
 	}
-	if err = ftp.AuthTLS(config); err != nil {
-		t.Fatal("Couldn't upgrade connection to TLS:", err)
-	}
+	conf.TLSMode = goftp.TLSExplicit
 
-	if err = ftp.Login("test", "test"); err != nil {
-		t.Fatal("Failed to login:", err)
-	}
+	c, err = goftp.DialConfig(conf, s.Addr())
+	require.NoError(t, err, "Couldn't connect")
 
-	if err := ftp.Noop(); err != nil {
-		t.Fatal("Couldn't NOOP:", err)
-	}
+	raw, err := c.OpenRawConn()
+	require.NoError(t, err, "Couldn't open raw connection")
+
+	rc, _, err := raw.SendCommand("STAT")
+	require.NoError(t, err)
+	require.Equal(t, StatusSystemStatus, rc)
 }
