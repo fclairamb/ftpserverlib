@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/secsy/goftp"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -42,6 +43,11 @@ func TestConcurrency(t *testing.T) {
 	}
 
 	waitGroup.Wait()
+}
+
+func TestLastCommand(t *testing.T) {
+	cc := clientHandler{}
+	assert.Empty(t, cc.GetLastCommand())
 }
 
 func TestTLSMethods(t *testing.T) {
