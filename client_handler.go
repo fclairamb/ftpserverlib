@@ -142,6 +142,11 @@ func (c *clientHandler) HasTLSForControl() bool {
 	return c.controlTLS
 }
 
+// GetLastCommand returns the last received command
+func (c *clientHandler) GetLastCommand() string {
+	return c.command
+}
+
 // HasTLSForTransfers returns true if the transfer connection is over TLS
 func (c *clientHandler) HasTLSForTransfers() bool {
 	if c.server.settings.TLSRequired == ImplicitEncryption {
