@@ -2,8 +2,7 @@
 package ftpserver
 
 import (
-	"bufio" //nolint:gosec
-	//nolint:gosec
+	"bufio"
 	"crypto/tls"
 	"errors"
 	"fmt"
