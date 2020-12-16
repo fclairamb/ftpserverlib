@@ -1,6 +1,7 @@
 package ftpserver
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
@@ -215,4 +216,52 @@ func TestOPTSHASH(t *testing.T) {
 	rc, _, err = raw.SendCommand("OPTS HASH")
 	require.NoError(t, err)
 	require.Equal(t, StatusSyntaxErrorNotRecognised, rc)
+}
+
+func TestAVBL(t *testing.T) {
+	s := NewTestServer(t, true)
+
+	conf := goftp.Config{
+		User:     authUser,
+		Password: authPass,
+	}
+
+	var err error
+	var c *goftp.Client
+
+	c, err = goftp.DialConfig(conf, s.Addr())
+	require.NoError(t, err, "Couldn't connect")
+
+	defer func() { panicOnError(c.Close()) }()
+
+	var raw goftp.RawConn
+
+	raw, err = c.OpenRawConn()
+	require.NoError(t, err, "Couldn't open raw connection")
+
+	rc, response, err := raw.SendCommand("AVBL")
+	require.NoError(t, err)
+	require.Equal(t, StatusFileStatus, rc)
+	require.Equal(t, "123", response)
+
+	// a missing dir
+	rc, _, err = raw.SendCommand("AVBL missing")
+	require.NoError(t, err)
+	require.Equal(t, StatusActionNotTaken, rc)
+
+	// AVBL on a file path
+	ftpUpload(t, c, createTemporaryFile(t, 10), "file")
+
+	rc, response, err = raw.SendCommand("AVBL file")
+	require.NoError(t, err)
+	require.Equal(t, StatusActionNotTaken, rc)
+	require.Equal(t, "/file: is not a directory", response)
+
+	noavblDir, err := c.Mkdir("noavbl")
+	require.NoError(t, err)
+
+	rc, response, err = raw.SendCommand(fmt.Sprintf("AVBL %v", noavblDir))
+	require.NoError(t, err)
+	require.Equal(t, StatusActionNotTaken, rc)
+	require.Equal(t, fmt.Sprintf("Couldn't get space for path %v: %v", noavblDir, errAvblNotPermitted.Error()), response)
 }
