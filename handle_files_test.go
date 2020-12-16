@@ -81,17 +81,12 @@ func TestMLSxEntryValidation(t *testing.T) {
 
 func TestALLO(t *testing.T) {
 	s := NewTestServer(t, true)
-
 	conf := goftp.Config{
 		User:     authUser,
 		Password: authPass,
 	}
 
-	var err error
-
-	var c *goftp.Client
-
-	c, err = goftp.DialConfig(conf, s.Addr())
+	c, err := goftp.DialConfig(conf, s.Addr())
 	require.NoError(t, err, "Couldn't connect")
 
 	defer func() { panicOnError(c.Close()) }()
@@ -114,17 +109,12 @@ func TestALLO(t *testing.T) {
 
 func TestCHOWN(t *testing.T) {
 	s := NewTestServer(t, true)
-
 	conf := goftp.Config{
 		User:     authUser,
 		Password: authPass,
 	}
 
-	var err error
-
-	var c *goftp.Client
-
-	c, err = goftp.DialConfig(conf, s.Addr())
+	c, err := goftp.DialConfig(conf, s.Addr())
 	require.NoError(t, err, "Couldn't connect")
 
 	defer func() { panicOnError(c.Close()) }()
@@ -132,9 +122,7 @@ func TestCHOWN(t *testing.T) {
 	// Creating a tiny file
 	ftpUpload(t, c, createTemporaryFile(t, 10), "file")
 
-	var raw goftp.RawConn
-
-	raw, err = c.OpenRawConn()
+	raw, err := c.OpenRawConn()
 	require.NoError(t, err, "Couldn't open raw connection")
 
 	// Asking for a chown user change that isn't authorized
@@ -165,17 +153,12 @@ func TestCHOWN(t *testing.T) {
 
 func TestMFMT(t *testing.T) {
 	s := NewTestServer(t, true)
-
 	conf := goftp.Config{
 		User:     authUser,
 		Password: authPass,
 	}
 
-	var err error
-
-	var c *goftp.Client
-
-	c, err = goftp.DialConfig(conf, s.Addr())
+	c, err := goftp.DialConfig(conf, s.Addr())
 	require.NoError(t, err, "Couldn't connect")
 
 	defer func() { panicOnError(c.Close()) }()
@@ -216,17 +199,12 @@ func TestMFMT(t *testing.T) {
 
 func TestSYMLINK(t *testing.T) {
 	s := NewTestServer(t, true)
-
 	conf := goftp.Config{
 		User:     authUser,
 		Password: authPass,
 	}
 
-	var err error
-
-	var c *goftp.Client
-
-	c, err = goftp.DialConfig(conf, s.Addr())
+	c, err := goftp.DialConfig(conf, s.Addr())
 	require.NoError(t, err, "Couldn't connect")
 
 	defer func() { panicOnError(c.Close()) }()
@@ -266,17 +244,12 @@ func TestSYMLINK(t *testing.T) {
 
 func TestSTATFile(t *testing.T) {
 	s := NewTestServer(t, true)
-
 	conf := goftp.Config{
 		User:     authUser,
 		Password: authPass,
 	}
 
-	var err error
-
-	var c *goftp.Client
-
-	c, err = goftp.DialConfig(conf, s.Addr())
+	c, err := goftp.DialConfig(conf, s.Addr())
 	require.NoError(t, err, "Couldn't connect")
 
 	defer func() { panicOnError(c.Close()) }()

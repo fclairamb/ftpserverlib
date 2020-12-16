@@ -12,16 +12,12 @@ import (
 
 func TestSiteCommand(t *testing.T) {
 	s := NewTestServer(t, true)
-
 	conf := goftp.Config{
 		User:     authUser,
 		Password: authPass,
 	}
 
-	var err error
-	var c *goftp.Client
-
-	c, err = goftp.DialConfig(conf, s.Addr())
+	c, err := goftp.DialConfig(conf, s.Addr())
 	require.NoError(t, err, "Couldn't connect")
 
 	defer func() { panicOnError(c.Close()) }()
@@ -44,23 +40,17 @@ func TestSiteCommand(t *testing.T) {
 // interested to fix this bug
 func TestIdleTimeout(t *testing.T) {
 	s := NewTestServerWithDriver(t, &TestServerDriver{Debug: true, Settings: &Settings{IdleTimeout: 2}})
-
 	conf := goftp.Config{
 		User:     authUser,
 		Password: authPass,
 	}
 
-	var err error
-	var c *goftp.Client
-
-	c, err = goftp.DialConfig(conf, s.Addr())
+	c, err := goftp.DialConfig(conf, s.Addr())
 	require.NoError(t, err, "Couldn't connect")
 
 	defer func() { panicOnError(c.Close()) }()
 
-	var raw goftp.RawConn
-
-	raw, err = c.OpenRawConn()
+	raw, err := c.OpenRawConn()
 	require.NoError(t, err, "Couldn't open raw connection")
 
 	time.Sleep(time.Second * 1) // < 2s : OK
@@ -78,23 +68,17 @@ func TestIdleTimeout(t *testing.T) {
 
 func TestStat(t *testing.T) {
 	s := NewTestServer(t, true)
-
 	conf := goftp.Config{
 		User:     authUser,
 		Password: authPass,
 	}
 
-	var err error
-	var c *goftp.Client
-
-	c, err = goftp.DialConfig(conf, s.Addr())
+	c, err := goftp.DialConfig(conf, s.Addr())
 	require.NoError(t, err, "Couldn't connect")
 
 	defer func() { panicOnError(c.Close()) }()
 
-	var raw goftp.RawConn
-
-	raw, err = c.OpenRawConn()
+	raw, err := c.OpenRawConn()
 	require.NoError(t, err, "Couldn't open raw connection")
 
 	rc, str, err := raw.SendCommand("STAT")
@@ -108,16 +92,12 @@ func TestStat(t *testing.T) {
 
 func TestCLNT(t *testing.T) {
 	s := NewTestServer(t, true)
-
 	conf := goftp.Config{
 		User:     authUser,
 		Password: authPass,
 	}
 
-	var err error
-	var c *goftp.Client
-
-	c, err = goftp.DialConfig(conf, s.Addr())
+	c, err := goftp.DialConfig(conf, s.Addr())
 	require.NoError(t, err, "Couldn't connect")
 
 	defer func() { panicOnError(c.Close()) }()
@@ -134,16 +114,12 @@ func TestCLNT(t *testing.T) {
 
 func TestOPTSUTF8(t *testing.T) {
 	s := NewTestServer(t, true)
-
 	conf := goftp.Config{
 		User:     authUser,
 		Password: authPass,
 	}
 
-	var err error
-	var c *goftp.Client
-
-	c, err = goftp.DialConfig(conf, s.Addr())
+	c, err := goftp.DialConfig(conf, s.Addr())
 	require.NoError(t, err, "Couldn't connect")
 
 	defer func() { panicOnError(c.Close()) }()
@@ -176,10 +152,7 @@ func TestOPTSHASH(t *testing.T) {
 		Password: authPass,
 	}
 
-	var err error
-	var c *goftp.Client
-
-	c, err = goftp.DialConfig(conf, s.Addr())
+	c, err := goftp.DialConfig(conf, s.Addr())
 	require.NoError(t, err, "Couldn't connect")
 
 	defer func() { panicOnError(c.Close()) }()
