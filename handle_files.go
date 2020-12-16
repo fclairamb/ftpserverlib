@@ -2,7 +2,14 @@
 package ftpserver
 
 import (
+	"crypto/md5"  //nolint:gosec
+	"crypto/sha1" //nolint:gosec
+	"crypto/sha256"
+	"crypto/sha512"
+	"encoding/hex"
 	"fmt"
+	"hash"
+	"hash/crc32"
 	"io"
 	"net"
 	"os"
@@ -400,4 +407,148 @@ func (c *clientHandler) handleMFMT() error {
 	c.writeMessage(StatusFileStatus, fmt.Sprintf("Modify=%s; %s", params[0], params[1]))
 
 	return nil
+}
+
+func (c *clientHandler) handleHASH() error {
+	return c.handleGenericHash(c.selectedHashAlgo, false)
+}
+
+func (c *clientHandler) handleCRC32() error {
+	return c.handleGenericHash(HASHAlgoCRC32, true)
+}
+
+func (c *clientHandler) handleMD5() error {
+	return c.handleGenericHash(HASHAlgoMD5, true)
+}
+
+func (c *clientHandler) handleSHA1() error {
+	return c.handleGenericHash(HASHAlgoSHA1, true)
+}
+
+func (c *clientHandler) handleSHA256() error {
+	return c.handleGenericHash(HASHAlgoSHA256, true)
+}
+
+func (c *clientHandler) handleSHA512() error {
+	return c.handleGenericHash(HASHAlgoSHA512, true)
+}
+
+func (c *clientHandler) handleGenericHash(algo HASHAlgo, isCustomMode bool) error {
+	args := strings.SplitN(c.param, " ", 3)
+	info, err := c.driver.Stat(args[0])
+
+	if err != nil {
+		c.writeMessage(StatusActionNotTaken, fmt.Sprintf("%v: %v", c.param, err))
+		return nil
+	}
+
+	if !info.Mode().IsRegular() {
+		c.writeMessage(StatusActionNotTakenNoFile, fmt.Sprintf("%v is not a regular file", c.param))
+		return nil
+	}
+
+	start := int64(0)
+	end := info.Size()
+
+	if isCustomMode {
+		// for custom command the range can be specified in this way:
+		// XSHA1 <file> <start> <end>
+		if len(args) > 1 {
+			start, err = strconv.ParseInt(args[1], 10, 64)
+			if err != nil {
+				c.writeMessage(StatusSyntaxErrorParameters, fmt.Sprintf("invalid start offset %v: %v", args[1], err))
+				return nil
+			}
+		}
+
+		if len(args) > 2 {
+			end, err = strconv.ParseInt(args[2], 10, 64)
+			if err != nil {
+				c.writeMessage(StatusSyntaxErrorParameters, fmt.Sprintf("invalid end offset %v2: %v", args[2], err))
+				return nil
+			}
+		}
+	}
+	// to support partial hash also for the HASH command we should implement RANG too,
+	// but this apply also to uploads/downloads and so complicat the things, we'll add
+	// this support in future improvements
+	var result string
+	if hasher, ok := c.driver.(ClientDriverExtensionHasher); ok {
+		result, err = hasher.ComputeHash(c.absPath(args[0]), algo, start, end)
+	} else {
+		result, err = c.computeHashForFile(c.absPath(args[0]), algo, start, end)
+	}
+
+	if err != nil {
+		c.writeMessage(StatusActionNotTaken, fmt.Sprintf("%v: %v", args[0], err))
+		return nil
+	}
+
+	hashMapping := getHashMapping()
+	hashName := ""
+
+	for k, v := range hashMapping {
+		if v == algo {
+			hashName = k
+		}
+	}
+
+	firstLine := fmt.Sprintf("Computing %v digest", hashName)
+
+	if isCustomMode {
+		c.writeMessage(StatusFileOK, fmt.Sprintf("%v\r\n%v", firstLine, result))
+		return nil
+	}
+
+	response := fmt.Sprintf("%v\r\n%v %v-%v %v %v", firstLine, hashName, start, end, result, args[0])
+	c.writeMessage(StatusFileStatus, response)
+
+	return nil
+}
+
+func (c *clientHandler) computeHashForFile(filePath string, algo HASHAlgo, start, end int64) (string, error) {
+	var h hash.Hash
+	var file FileTransfer
+	var err error
+
+	switch algo {
+	case HASHAlgoCRC32:
+		h = crc32.NewIEEE()
+	case HASHAlgoMD5:
+		h = md5.New() //nolint:gosec
+	case HASHAlgoSHA1:
+		h = sha1.New() //nolint:gosec
+	case HASHAlgoSHA256:
+		h = sha256.New()
+	case HASHAlgoSHA512:
+		h = sha512.New()
+	default:
+		return "", errUnknowHash
+	}
+
+	if fileTransfer, ok := c.driver.(ClientDriverExtentionFileTransfer); ok {
+		file, err = fileTransfer.GetHandle(filePath, os.O_RDONLY, start)
+	} else {
+		file, err = c.driver.OpenFile(filePath, os.O_RDONLY, os.ModePerm)
+	}
+
+	if err != nil {
+		return "", err
+	}
+
+	if start > 0 {
+		_, err = file.Seek(start, io.SeekStart)
+		if err != nil {
+			return "", err
+		}
+	}
+
+	_, err = io.CopyN(h, file, end-start)
+	defer file.Close() //nolint:errcheck // we ignore close error here
+
+	if err != nil && err != io.EOF {
+		return "", err
+	}
+
+	return hex.EncodeToString(h.Sum(nil)), nil
 }

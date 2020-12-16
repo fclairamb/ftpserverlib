@@ -12,6 +12,29 @@ import (
 	"github.com/fclairamb/ftpserverlib/log"
 )
 
+// HASHAlgo is the enumerable that represents the supported HASH algorithms
+type HASHAlgo int
+
+// Supported hash algorithms
+const (
+	HASHAlgoCRC32 HASHAlgo = iota
+	HASHAlgoMD5
+	HASHAlgoSHA1
+	HASHAlgoSHA256
+	HASHAlgoSHA512
+)
+
+func getHashMapping() map[string]HASHAlgo {
+	mapping := make(map[string]HASHAlgo)
+	mapping["CRC32"] = HASHAlgoCRC32
+	mapping["MD5"] = HASHAlgoMD5
+	mapping["SHA-1"] = HASHAlgoSHA1
+	mapping["SHA-256"] = HASHAlgoSHA256
+	mapping["SHA-512"] = HASHAlgoSHA512
+
+	return mapping
+}
+
 type openTransferError struct {
 	err string
 }
@@ -22,38 +45,40 @@ func (e *openTransferError) Error() string {
 
 // nolint: maligned
 type clientHandler struct {
-	id          uint32          // ID of the client
-	server      *FtpServer      // Server on which the connection was accepted
-	driver      ClientDriver    // Client handling driver
-	conn        net.Conn        // TCP connection
-	writer      *bufio.Writer   // Writer on the TCP connection
-	reader      *bufio.Reader   // Reader on the TCP connection
-	user        string          // Authenticated user
-	path        string          // Current path
-	clnt        string          // Identified client
-	command     string          // Command received on the connection
-	param       string          // Param of the FTP command
-	connectedAt time.Time       // Date of connection
-	ctxRnfr     string          // Rename from
-	ctxRest     int64           // Restart point
-	debug       bool            // Show debugging info on the server side
-	transfer    transferHandler // Transfer connection (only passive is implemented at this stage)
-	transferTLS bool            // Use TLS for transfer connection
-	controlTLS  bool            // Use TLS for control connection
-	logger      log.Logger      // Client handler logging
+	id               uint32          // ID of the client
+	server           *FtpServer      // Server on which the connection was accepted
+	driver           ClientDriver    // Client handling driver
+	conn             net.Conn        // TCP connection
+	writer           *bufio.Writer   // Writer on the TCP connection
+	reader           *bufio.Reader   // Reader on the TCP connection
+	user             string          // Authenticated user
+	path             string          // Current path
+	clnt             string          // Identified client
+	command          string          // Command received on the connection
+	param            string          // Param of the FTP command
+	connectedAt      time.Time       // Date of connection
+	ctxRnfr          string          // Rename from
+	ctxRest          int64           // Restart point
+	debug            bool            // Show debugging info on the server side
+	transfer         transferHandler // Transfer connection (only passive is implemented at this stage)
+	transferTLS      bool            // Use TLS for transfer connection
+	controlTLS       bool            // Use TLS for control connection
+	selectedHashAlgo HASHAlgo        // algorithm used when we receive the HASH command
+	logger           log.Logger      // Client handler logging
 }
 
 // newClientHandler initializes a client handler when someone connects
 func (server *FtpServer) newClientHandler(connection net.Conn, id uint32) *clientHandler {
 	p := &clientHandler{
-		server:      server,
-		conn:        connection,
-		id:          id,
-		writer:      bufio.NewWriter(connection),
-		reader:      bufio.NewReader(connection),
-		connectedAt: time.Now().UTC(),
-		path:        "/",
-		logger:      server.Logger.With("clientId", id),
+		server:           server,
+		conn:             connection,
+		id:               id,
+		writer:           bufio.NewWriter(connection),
+		reader:           bufio.NewReader(connection),
+		connectedAt:      time.Now().UTC(),
+		path:             "/",
+		selectedHashAlgo: HASHAlgoSHA256,
+		logger:           server.Logger.With("clientId", id),
 	}
 
 	return p

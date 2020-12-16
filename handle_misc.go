@@ -4,10 +4,13 @@ package ftpserver
 import (
 	"bufio"
 	"crypto/tls"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
 )
+
+var errUnknowHash = errors.New("unknown hash algorithm")
 
 func (c *clientHandler) handleAUTH() error {
 	if tlsConfig, err := c.server.driver.GetTLSConfig(); err == nil {
@@ -103,9 +106,38 @@ func (c *clientHandler) handleOPTS() error {
 	args := strings.SplitN(c.param, " ", 2)
 	if strings.EqualFold(args[0], "UTF8") {
 		c.writeMessage(StatusOK, "I'm in UTF8 only anyway")
-	} else {
-		c.writeMessage(StatusSyntaxErrorNotRecognised, "Don't know this option")
+		return nil
 	}
+
+	if strings.EqualFold(args[0], "HASH") && c.server.settings.EnableHASH {
+		hashMapping := getHashMapping()
+
+		if len(args) > 1 {
+			// try to change the current hash algorithm to the requested one
+			if value, ok := hashMapping[args[1]]; ok {
+				c.selectedHashAlgo = value
+				c.writeMessage(StatusOK, args[1])
+			} else {
+				c.writeMessage(StatusSyntaxErrorParameters, "Unknown algorithm, current selection not changed")
+			}
+
+			return nil
+		}
+		// return the current hash algorithm
+		var currentHash string
+
+		for k, v := range hashMapping {
+			if v == c.selectedHashAlgo {
+				currentHash = k
+			}
+		}
+
+		c.writeMessage(StatusOK, currentHash)
+
+		return nil
+	}
+
+	c.writeMessage(StatusSyntaxErrorNotRecognised, "Don't know this option")
 
 	return nil
 }
@@ -149,6 +181,26 @@ func (c *clientHandler) handleFEAT() error {
 	// This code made me think about adding this: https://github.com/stianstr/ftpserver/commit/387f2ba
 	if tlsConfig, err := c.server.driver.GetTLSConfig(); tlsConfig != nil && err == nil {
 		features = append(features, "AUTH TLS")
+	}
+
+	if c.server.settings.EnableHASH {
+		var hashLine strings.Builder
+
+		nonStandardHashImpl := []string{"XCRC", "MD5", "XMD5", "XSHA", "XSHA1", "XSHA256", "XSHA512"}
+		hashMapping := getHashMapping()
+
+		for k, v := range hashMapping {
+			hashLine.WriteString(k)
+
+			if v == c.selectedHashAlgo {
+				hashLine.WriteString("*")
+			}
+
+			hashLine.WriteString(";")
+		}
+
+		features = append(features, hashLine.String())
+		features = append(features, nonStandardHashImpl...)
 	}
 
 	for _, f := range features {
