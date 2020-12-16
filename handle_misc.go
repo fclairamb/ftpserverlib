@@ -80,7 +80,7 @@ func (c *clientHandler) handleSITE() error {
 }
 
 func (c *clientHandler) handleSTATServer() error {
-	defer c.multilineAnswer(StatusFileStatus, "Server status")()
+	defer c.multilineAnswer(StatusSystemStatus, "Server status")()
 
 	duration := time.Now().UTC().Sub(c.connectedAt)
 	duration -= duration % time.Second

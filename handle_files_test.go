@@ -81,107 +81,83 @@ func TestMLSxEntryValidation(t *testing.T) {
 
 func TestALLO(t *testing.T) {
 	s := NewTestServer(t, true)
-
 	conf := goftp.Config{
-		User:     "test",
-		Password: "test",
+		User:     authUser,
+		Password: authPass,
 	}
 
-	var err error
-
-	var c *goftp.Client
-
-	if c, err = goftp.DialConfig(conf, s.Addr()); err != nil {
-		t.Fatal("Couldn't connect", err)
-	}
+	c, err := goftp.DialConfig(conf, s.Addr())
+	require.NoError(t, err, "Couldn't connect")
 
 	defer func() { panicOnError(c.Close()) }()
 
-	var raw goftp.RawConn
-
-	if raw, err = c.OpenRawConn(); err != nil {
-		t.Fatal("Couldn't open raw connection")
-	}
+	raw, err := c.OpenRawConn()
+	require.NoError(t, err, "Couldn't open raw connection")
 
 	// Asking for too much (2MB)
-	if rc, _, err := raw.SendCommand("ALLO 2000000"); err != nil || rc != 550 {
-		t.Fatal("Should have been refused", err, rc)
-	}
+	rc, _, err := raw.SendCommand("ALLO 2000000")
+	require.NoError(t, err)
+	require.Equal(t, StatusActionNotTaken, rc, "Should have been refused")
 
 	// Asking for the right amount of space (500KB)
-	if rc, _, err := raw.SendCommand("ALLO 500000"); err != nil || rc != 200 {
-		t.Fatal("Should have been accepted", err, rc)
-	}
+	rc, _, err = raw.SendCommand("ALLO 500000")
+	require.NoError(t, err)
+	require.Equal(t, StatusOK, rc, "Should have been accepted")
 }
 
 func TestCHOWN(t *testing.T) {
 	s := NewTestServer(t, true)
-
 	conf := goftp.Config{
 		User:     authUser,
 		Password: authPass,
 	}
 
-	var err error
-
-	var c *goftp.Client
-
-	if c, err = goftp.DialConfig(conf, s.Addr()); err != nil {
-		t.Fatal("Couldn't connect", err)
-	}
+	c, err := goftp.DialConfig(conf, s.Addr())
+	require.NoError(t, err, "Couldn't connect")
 
 	defer func() { panicOnError(c.Close()) }()
 
 	// Creating a tiny file
 	ftpUpload(t, c, createTemporaryFile(t, 10), "file")
 
-	var raw goftp.RawConn
-
-	if raw, err = c.OpenRawConn(); err != nil {
-		t.Fatal("Couldn't open raw connection")
-	}
+	raw, err := c.OpenRawConn()
+	require.NoError(t, err, "Couldn't open raw connection")
 
 	// Asking for a chown user change that isn't authorized
-	if rc, _, err := raw.SendCommand("SITE CHOWN 1001:500 file"); err != nil || rc != 550 {
-		t.Fatal("Should have been refused", err, rc)
-	}
+	rc, _, err := raw.SendCommand("SITE CHOWN 1001:500 file")
+	require.NoError(t, err)
+	require.Equal(t, StatusActionNotTaken, rc, "Should have been refused")
 
 	// Asking for a chown user change that isn't authorized
-	if rc, _, err := raw.SendCommand("SITE CHOWN 1001 file"); err != nil || rc != 550 {
-		t.Fatal("Should have been refused", err, rc)
-	}
+	rc, _, err = raw.SendCommand("SITE CHOWN 1001 file")
+	require.NoError(t, err)
+	require.Equal(t, StatusActionNotTaken, rc, "Should have been refused")
 
 	// Asking for the right chown user
-	if rc, _, err := raw.SendCommand("SITE CHOWN 1000:500 file"); err != nil || rc != 200 {
-		t.Fatal("Should have been accepted", err, rc)
-	}
+	rc, _, err = raw.SendCommand("SITE CHOWN 1000:500 file")
+	require.NoError(t, err)
+	require.Equal(t, StatusOK, rc, "Should have been accepted")
 
 	// Asking for the right chown user
-	if rc, _, err := raw.SendCommand("SITE CHOWN 1000 file"); err != nil || rc != 200 {
-		t.Fatal("Should have been accepted", err, rc)
-	}
+	rc, _, err = raw.SendCommand("SITE CHOWN 1000 file")
+	require.NoError(t, err)
+	require.Equal(t, StatusOK, rc, "Should have been accepted")
 
 	// Asking for a chown on a file that doesn't exist
-	if rc, _, err := raw.SendCommand("SITE CHOWN test file2"); rc != 550 {
-		t.Fatal("Should NOT have been accepted", err, rc)
-	}
+	rc, _, err = raw.SendCommand("SITE CHOWN test file2")
+	require.NoError(t, err)
+	require.Equal(t, StatusActionNotTaken, rc, "Should NOT have been accepted")
 }
 
 func TestMFMT(t *testing.T) {
 	s := NewTestServer(t, true)
-
 	conf := goftp.Config{
-		User:     "test",
-		Password: "test",
+		User:     authUser,
+		Password: authPass,
 	}
 
-	var err error
-
-	var c *goftp.Client
-
-	if c, err = goftp.DialConfig(conf, s.Addr()); err != nil {
-		t.Fatal("Couldn't connect", err)
-	}
+	c, err := goftp.DialConfig(conf, s.Addr())
+	require.NoError(t, err, "Couldn't connect")
 
 	defer func() { panicOnError(c.Close()) }()
 
@@ -190,46 +166,44 @@ func TestMFMT(t *testing.T) {
 
 	var raw goftp.RawConn
 
-	if raw, err = c.OpenRawConn(); err != nil {
-		t.Fatal("Couldn't open raw connection")
-	}
+	raw, err = c.OpenRawConn()
+	require.NoError(t, err, "Couldn't open raw connection")
 
 	// Good
-	if rc, _, err := raw.SendCommand("MFMT 20201209211059 file"); err != nil || rc != 213 {
-		t.Fatal("Should have succeeded:", err, rc)
-	}
+	rc, _, err := raw.SendCommand("MFMT 20201209211059 file")
+	require.NoError(t, err)
+	require.Equal(t, StatusFileStatus, rc, "Should have succeeded")
 
 	// 3 params instead of 2
-	if rc, _, err := raw.SendCommand("MFMT 20201209211059 file somethingelse"); err != nil || rc == 213 {
-		t.Fatal("Should have failed:", err, rc)
-	}
+	rc, _, err = raw.SendCommand("MFMT 20201209211059 file somethingelse")
+	require.NoError(t, err)
+	require.NotEqual(t, StatusFileStatus, rc, "Should have failed")
 
 	// 1 param instead of 2
-	if rc, _, err := raw.SendCommand("MFMT 202012092110 file"); err != nil || rc != 501 {
-		t.Fatal("Should have failed:", err, rc)
-	}
+	rc, _, err = raw.SendCommand("MFMT 202012092110 file")
+	require.NoError(t, err)
+	require.Equal(t, StatusSyntaxErrorParameters, rc, "Should have failed")
+
+	// no parameters
+	rc, _, err = raw.SendCommand("MFMT")
+	require.NoError(t, err)
+	require.Equal(t, StatusSyntaxErrorNotRecognised, rc, "Should have failed")
 
 	// Good (to make sure we are still in sync)
-	if rc, _, err := raw.SendCommand("MFMT 20201209211059 file"); err != nil || rc != 213 {
-		t.Fatal("Should have succeeded:", err, rc)
-	}
+	rc, _, err = raw.SendCommand("MFMT 20201209211059 file")
+	require.NoError(t, err)
+	require.Equal(t, StatusFileStatus, rc, "Should have succeeded")
 }
 
 func TestSYMLINK(t *testing.T) {
 	s := NewTestServer(t, true)
-
 	conf := goftp.Config{
 		User:     authUser,
 		Password: authPass,
 	}
 
-	var err error
-
-	var c *goftp.Client
-
-	if c, err = goftp.DialConfig(conf, s.Addr()); err != nil {
-		t.Fatal("Couldn't connect", err)
-	}
+	c, err := goftp.DialConfig(conf, s.Addr())
+	require.NoError(t, err, "Couldn't connect")
 
 	defer func() { panicOnError(c.Close()) }()
 
@@ -238,48 +212,42 @@ func TestSYMLINK(t *testing.T) {
 
 	var raw goftp.RawConn
 
-	if raw, err = c.OpenRawConn(); err != nil {
-		t.Fatal("Couldn't open raw connection")
-	}
+	raw, err = c.OpenRawConn()
+	require.NoError(t, err, "Couldn't open raw connection")
 
 	// Creating a bad clunky is authorized
-	if rc, _, err := raw.SendCommand("SITE SYMLINK file3 file4"); err != nil || rc != 200 {
-		t.Fatal("Should have been accepted", err, rc)
-	}
+	rc, _, err := raw.SendCommand("SITE SYMLINK file3 file4")
+	require.NoError(t, err)
+	require.Equal(t, StatusOK, rc, "Should have been accepted")
 
 	// Overwriting a file is not authorized
-	if rc, _, err := raw.SendCommand("SITE SYMLINK file5 file"); rc != 550 {
-		t.Fatal("Should have been refused", err, rc)
-	}
+	rc, _, err = raw.SendCommand("SITE SYMLINK file5 file")
+	require.NoError(t, err)
+	require.Equal(t, StatusActionNotTaken, rc, "Should have been refused")
 
 	// disable SITE
 	s.settings.DisableSite = true
 
-	if rc, _, err := raw.SendCommand("SITE SYMLINK file test"); err != nil || rc != 500 {
-		t.Fatal("Should have been refused", err, rc)
-	}
+	rc, _, err = raw.SendCommand("SITE SYMLINK file test")
+	require.NoError(t, err)
+	require.Equal(t, StatusSyntaxErrorNotRecognised, rc, "Should have been refused")
 
 	s.settings.DisableSite = false
 
 	// Good symlink
-	if rc, _, err := raw.SendCommand("SITE SYMLINK file test"); err != nil || rc != 200 {
-		t.Fatal("Should have been accepted", err, rc)
-	}
+	rc, _, err = raw.SendCommand("SITE SYMLINK file test")
+	require.NoError(t, err)
+	require.Equal(t, StatusOK, rc, "Should have been accepted")
 }
 
 func TestSTATFile(t *testing.T) {
 	s := NewTestServer(t, true)
-
 	conf := goftp.Config{
 		User:     authUser,
 		Password: authPass,
 	}
 
-	var err error
-
-	var c *goftp.Client
-
-	c, err = goftp.DialConfig(conf, s.Addr())
+	c, err := goftp.DialConfig(conf, s.Addr())
 	require.NoError(t, err, "Couldn't connect")
 
 	defer func() { panicOnError(c.Close()) }()
