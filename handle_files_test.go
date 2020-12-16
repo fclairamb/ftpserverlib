@@ -105,6 +105,38 @@ func TestALLO(t *testing.T) {
 	require.Equal(t, StatusOK, rc, "Should have been accepted")
 }
 
+func TestCHMOD(t *testing.T) {
+	s := NewTestServerWithDriver(t, &TestServerDriver{
+		Debug: true,
+		TLS:   true,
+	})
+	conf := goftp.Config{
+		User:     authUser,
+		Password: authPass,
+		TLSConfig: &tls.Config{
+			// nolint:gosec
+			InsecureSkipVerify: true,
+		},
+		TLSMode: goftp.TLSExplicit,
+	}
+	c, err := goftp.DialConfig(conf, s.Addr())
+	require.NoError(t, err, "Couldn't connect")
+
+	// Creating a tiny file
+	ftpUpload(t, c, createTemporaryFile(t, 10), "file")
+
+	raw, err := c.OpenRawConn()
+	require.NoError(t, err, "Couldn't open raw connection")
+
+	rc, _, err := raw.SendCommand("SITE CHMOD a file")
+	require.NoError(t, err)
+	require.Equal(t, StatusActionNotTaken, rc, "Should have been refused")
+
+	rc, _, err = raw.SendCommand("SITE CHMOD 600 file")
+	require.NoError(t, err)
+	require.Equal(t, StatusOK, rc, "Should have been accepted")
+}
+
 func TestCHOWN(t *testing.T) {
 	s := NewTestServer(t, true)
 	conf := goftp.Config{
@@ -247,7 +279,6 @@ func TestSTATFile(t *testing.T) {
 		User:     authUser,
 		Password: authPass,
 	}
-
 	c, err := goftp.DialConfig(conf, s.Addr())
 	require.NoError(t, err, "Couldn't connect")
 
@@ -278,6 +309,32 @@ func TestSTATFile(t *testing.T) {
 	rc, _, err = raw.SendCommand("STAT missing")
 	require.NoError(t, err)
 	require.Equal(t, StatusFileActionNotTaken, rc)
+}
+
+func TestMDTM(t *testing.T) {
+	s := NewTestServer(t, true)
+	conf := goftp.Config{
+		User:     authUser,
+		Password: authPass,
+	}
+	c, err := goftp.DialConfig(conf, s.Addr())
+	require.NoError(t, err, "Couldn't connect")
+
+	defer func() { panicOnError(c.Close()) }()
+
+	// Creating a tiny file
+	ftpUpload(t, c, createTemporaryFile(t, 10), "file")
+
+	raw, err := c.OpenRawConn()
+	require.NoError(t, err, "Couldn't open raw connection")
+
+	rc, _, err := raw.SendCommand("MDTM file")
+	require.NoError(t, err)
+	require.Equal(t, StatusFileStatus, rc)
+
+	rc, _, err = raw.SendCommand("MDTM missing")
+	require.NoError(t, err)
+	require.Equal(t, StatusActionNotTaken, rc)
 }
 
 func TestHASHCommand(t *testing.T) {

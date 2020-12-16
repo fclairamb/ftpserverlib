@@ -186,16 +186,11 @@ func TestOPTSHASH(t *testing.T) {
 
 func TestAVBL(t *testing.T) {
 	s := NewTestServer(t, true)
-
 	conf := goftp.Config{
 		User:     authUser,
 		Password: authPass,
 	}
-
-	var err error
-	var c *goftp.Client
-
-	c, err = goftp.DialConfig(conf, s.Addr())
+	c, err := goftp.DialConfig(conf, s.Addr())
 	require.NoError(t, err, "Couldn't connect")
 
 	defer func() { panicOnError(c.Close()) }()
@@ -235,7 +230,6 @@ func TestQuit(t *testing.T) {
 		Debug: true,
 		TLS:   true,
 	})
-
 	conf := goftp.Config{
 		User:     authUser,
 		Password: authPass,
@@ -245,7 +239,6 @@ func TestQuit(t *testing.T) {
 		},
 		TLSMode: goftp.TLSExplicit,
 	}
-
 	c, err := goftp.DialConfig(conf, s.Addr())
 	require.NoError(t, err, "Couldn't connect")
 

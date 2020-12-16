@@ -79,9 +79,9 @@ func TestDirHandling(t *testing.T) {
 	defer func() { panicOnError(c.Close()) }()
 
 	// Getwd will send a PWD command
-	path, err := c.Getwd()
+	p, err := c.Getwd()
 	require.NoError(t, err)
-	require.Equal(t, "/", path, "Bad path")
+	require.Equal(t, "/", p, "Bad path")
 
 	raw, err := c.OpenRawConn()
 	require.NoError(t, err, "Couldn't open raw connection")
@@ -89,11 +89,6 @@ func TestDirHandling(t *testing.T) {
 	rc, _, err := raw.SendCommand("CWD /unknown")
 	require.NoError(t, err)
 	require.Equal(t, StatusActionNotTaken, rc)
-
-	rc, response, err := raw.SendCommand("CWD /")
-	require.NoError(t, err)
-	require.Equal(t, StatusFileOK, rc)
-	require.Equal(t, "CD worked on /", response)
 
 	_, err = c.Mkdir("/" + DirKnown)
 	require.NoError(t, err)
@@ -103,12 +98,28 @@ func TestDirHandling(t *testing.T) {
 	require.Len(t, contents, 1)
 	require.Equal(t, DirKnown, contents[0].Name())
 
-	rc, response, err = raw.SendCommand("CWD /" + DirKnown)
+	rc, _, err = raw.SendCommand("CWD /" + DirKnown)
 	require.NoError(t, err)
 	require.Equal(t, StatusFileOK, rc)
-	require.Equal(t, "CD worked on /"+DirKnown, response)
 
-	err = c.Rmdir("/" + DirKnown)
+	testSubdir := " strange\\ sub dìr"
+	rc, _, err = raw.SendCommand(fmt.Sprintf("MKD %v", testSubdir))
+	require.NoError(t, err)
+	require.Equal(t, StatusPathCreated, rc)
+
+	rc, response, err := raw.SendCommand(fmt.Sprintf("CWD %v", testSubdir))
+	require.NoError(t, err)
+	require.Equal(t, StatusFileOK, rc, response)
+
+	rc, response, err = raw.SendCommand("CDUP")
+	require.NoError(t, err)
+	require.Equal(t, StatusFileOK, rc)
+	require.Equal(t, "CDUP worked on /"+DirKnown, response)
+
+	err = c.Rmdir(path.Join("/", DirKnown, testSubdir))
+	require.NoError(t, err)
+
+	err = c.Rmdir(path.Join("/", DirKnown))
 	require.NoError(t, err)
 
 	err = c.Rmdir("/" + DirKnown)
@@ -229,7 +240,6 @@ func TestTLSTransfer(t *testing.T) {
 
 func TestDirListingBeforeLogin(t *testing.T) {
 	s := NewTestServer(t, true)
-
 	conn, err := net.DialTimeout("tcp", s.Addr(), 5*time.Second)
 	require.NoError(t, err)
 
