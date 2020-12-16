@@ -1,6 +1,7 @@
 package ftpserver
 
 import (
+	"crypto/tls"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -148,10 +149,18 @@ func TestCHOWN(t *testing.T) {
 }
 
 func TestMFMT(t *testing.T) {
-	s := NewTestServer(t, true)
+	s := NewTestServerWithDriver(t, &TestServerDriver{
+		Debug: true,
+		TLS:   true,
+	})
 	conf := goftp.Config{
 		User:     authUser,
 		Password: authPass,
+		TLSConfig: &tls.Config{
+			// nolint:gosec
+			InsecureSkipVerify: true,
+		},
+		TLSMode: goftp.TLSExplicit,
 	}
 	c, err := goftp.DialConfig(conf, s.Addr())
 	require.NoError(t, err, "Couldn't connect")
@@ -161,9 +170,7 @@ func TestMFMT(t *testing.T) {
 	// Creating a tiny file
 	ftpUpload(t, c, createTemporaryFile(t, 10), "file")
 
-	var raw goftp.RawConn
-
-	raw, err = c.OpenRawConn()
+	raw, err := c.OpenRawConn()
 	require.NoError(t, err, "Couldn't open raw connection")
 
 	// Good
@@ -206,9 +213,7 @@ func TestSYMLINK(t *testing.T) {
 	// Creating a tiny file
 	ftpUpload(t, c, createTemporaryFile(t, 10), "file")
 
-	var raw goftp.RawConn
-
-	raw, err = c.OpenRawConn()
+	raw, err := c.OpenRawConn()
 	require.NoError(t, err, "Couldn't open raw connection")
 
 	// Creating a bad clunky is authorized
@@ -258,9 +263,7 @@ func TestSTATFile(t *testing.T) {
 	_, err = c.Mkdir("/dir/sub")
 	require.NoError(t, err)
 
-	var raw goftp.RawConn
-
-	raw, err = c.OpenRawConn()
+	raw, err := c.OpenRawConn()
 	require.NoError(t, err, "Couldn't open raw connection")
 
 	rc, _, err := raw.SendCommand("STAT file")
@@ -310,9 +313,7 @@ func TestHASHCommand(t *testing.T) {
 
 	ftpUpload(t, c, tempFile, "file.txt")
 
-	var raw goftp.RawConn
-
-	raw, err = c.OpenRawConn()
+	raw, err := c.OpenRawConn()
 	require.NoError(t, err, "Couldn't open raw connection")
 
 	// ask hash for a directory
@@ -365,9 +366,7 @@ func TestCustomHASHCommands(t *testing.T) {
 
 	ftpUpload(t, c, tempFile, "file.txt")
 
-	var raw goftp.RawConn
-
-	raw, err = c.OpenRawConn()
+	raw, err := c.OpenRawConn()
 	require.NoError(t, err, "Couldn't open raw connection")
 
 	customCommands := make(map[string]string)

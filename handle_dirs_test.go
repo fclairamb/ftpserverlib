@@ -217,9 +217,9 @@ func TestTLSTransfer(t *testing.T) {
 	require.Equal(t, StatusOK, rc)
 	require.Equal(t, "OK", response)
 
-	rc, _, err = raw.SendCommand("EPSV")
+	rc, _, err = raw.SendCommand("PASV")
 	require.NoError(t, err)
-	require.Equal(t, StatusEnteringEPSV, rc)
+	require.Equal(t, StatusEnteringPASV, rc)
 
 	rc, response, err = raw.SendCommand("MLSD /")
 	require.NoError(t, err)
