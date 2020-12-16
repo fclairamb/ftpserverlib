@@ -200,7 +200,7 @@ func TestMFMT(t *testing.T) {
 	}
 
 	// 1 param instead of 2
-	if rc, _, err := raw.SendCommand("MFMT 202012092110"); err != nil || rc != 500 {
+	if rc, _, err := raw.SendCommand("MFMT 202012092110 file"); err != nil || rc != 500 {
 		t.Fatal("Should have failed:", err, rc)
 	}
 
