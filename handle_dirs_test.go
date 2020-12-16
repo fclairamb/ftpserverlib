@@ -3,252 +3,175 @@ package ftpserver
 import (
 	"crypto/tls"
 	"fmt"
-	"runtime"
-	"strings"
+	"net"
+	"path"
 	"testing"
+	"time"
 
-	"gopkg.in/dutchcoders/goftp.v1"
+	"github.com/secsy/goftp"
+	"github.com/stretchr/testify/require"
 )
 
 const DirKnown = "known"
 
-// TestDirAccess relies on LIST of files listing
 func TestDirListing(t *testing.T) {
+	// MLSD is disabled we relies on LIST of files listing
 	s := NewTestServerWithDriver(t, &TestServerDriver{Debug: true, Settings: &Settings{DisableMLSD: true}})
-
-	var connErr error
-
-	var ftp *goftp.FTP
-
-	if ftp, connErr = goftp.Connect(s.Addr()); connErr != nil {
-		t.Fatal("Couldn't connect", connErr)
+	conf := goftp.Config{
+		User:     authUser,
+		Password: authPass,
 	}
 
-	defer func() { panicOnError(ftp.Quit()) }()
+	c, err := goftp.DialConfig(conf, s.Addr())
+	require.NoError(t, err, "Couldn't connect")
 
-	if _, err := ftp.List("/"); err == nil {
-		t.Fatal("We could list files before login")
-	}
+	defer func() { panicOnError(c.Close()) }()
 
-	if err := ftp.Login("test", "test"); err != nil {
-		t.Fatal("Failed to login:", err)
-	}
+	dirName, err := c.Mkdir(DirKnown)
+	require.NoError(t, err, "Couldn't create dir")
+	require.Equal(t, path.Join("/", DirKnown), dirName)
 
-	if err := ftp.Mkd("/" + DirKnown); err != nil {
-		t.Fatal("Couldn't create dir:", err)
-	}
-
-	if lines, err := ftp.List("/"); err != nil {
-		t.Fatal("Couldn't list files:", err)
-	} else {
-		found := false
-		for _, line := range lines {
-			line = line[0 : len(line)-2]
-			if len(line) < 47 {
-				break
-			}
-			fileName := line[47:]
-			if fileName == DirKnown {
-				found = true
-			}
-		}
-		if !found {
-			t.Fatal("Couldn't find the dir")
-		}
-	}
+	contents, err := c.ReadDir("/")
+	require.NoError(t, err)
+	require.Len(t, contents, 1)
+	require.Equal(t, DirKnown, contents[0].Name())
 }
 
 func TestDirListingPathArg(t *testing.T) {
+	// MLSD is disabled we relies on LIST of files listing
 	s := NewTestServerWithDriver(t, &TestServerDriver{Debug: true, Settings: &Settings{DisableMLSD: true}})
-
-	var connErr error
-
-	var ftp *goftp.FTP
-
-	if ftp, connErr = goftp.Connect(s.Addr()); connErr != nil {
-		t.Fatal("Couldn't connect", connErr)
+	conf := goftp.Config{
+		User:     authUser,
+		Password: authPass,
 	}
 
-	defer func() { panicOnError(ftp.Quit()) }()
+	c, err := goftp.DialConfig(conf, s.Addr())
+	require.NoError(t, err, "Couldn't connect")
 
-	if err := ftp.Login("test", "test"); err != nil {
-		t.Fatal("Failed to login:", err)
-	}
+	defer func() { panicOnError(c.Close()) }()
 
 	for _, dir := range []string{"/" + DirKnown, "/" + DirKnown + "/1"} {
-		if err := ftp.Mkd(dir); err != nil {
-			t.Fatal("Couldn't create dir:", err)
-		}
+		_, err = c.Mkdir(dir)
+		require.NoError(t, err, "Couldn't create dir")
 	}
 
-	if lines, err := ftp.List(DirKnown); err != nil {
-		t.Fatal("Couldn't list files:", err)
-	} else {
-		found := false
-		for _, line := range lines {
-			line = line[0 : len(line)-2]
-			if len(line) < 47 {
-				break
-			}
-			fileName := line[47:]
-			if fileName == "1" {
-				found = true
-			}
-		}
-		if !found {
-			t.Fatal("Couldn't find the dir")
-		}
-	}
+	contents, err := c.ReadDir(DirKnown)
+	require.NoError(t, err)
+	require.Len(t, contents, 1)
+	require.Equal(t, "1", contents[0].Name())
 
-	if lines, err := ftp.List(""); err != nil {
-		t.Fatal("Couldn't list files:", err)
-	} else {
-		found := false
-		for _, line := range lines {
-			line = line[0 : len(line)-2]
-			if len(line) < 47 {
-				break
-			}
-			fileName := line[47:]
-			if fileName == DirKnown {
-				found = true
-			}
-		}
-		if !found {
-			t.Fatal("Couldn't find the dir")
-		}
-	}
+	contents, err = c.ReadDir("")
+	require.NoError(t, err)
+	require.Len(t, contents, 1)
+	require.Equal(t, DirKnown, contents[0].Name())
 }
 
-// TestDirAccess relies on LIST of files listing
 func TestDirHandling(t *testing.T) {
 	s := NewTestServer(t, true)
-
-	var connErr error
-
-	var ftp *goftp.FTP
-
-	if ftp, connErr = goftp.Connect(s.Addr()); connErr != nil {
-		t.Fatal("Couldn't connect", connErr)
+	conf := goftp.Config{
+		User:     authUser,
+		Password: authPass,
 	}
 
-	defer func() { panicOnError(ftp.Quit()) }()
+	c, err := goftp.DialConfig(conf, s.Addr())
+	require.NoError(t, err, "Couldn't connect")
 
-	if err := ftp.Login("test", "test"); err != nil {
-		t.Fatal("Failed to login:", err)
-	}
+	defer func() { panicOnError(c.Close()) }()
 
-	if path, err := ftp.Pwd(); err != nil {
-		t.Fatal("Couldn't test PWD", err)
-	} else if path != "/" {
-		t.Fatal("Bad path:", path)
-	}
+	// Getwd will send a PWD command
+	p, err := c.Getwd()
+	require.NoError(t, err)
+	require.Equal(t, "/", p, "Bad path")
 
-	if err := ftp.Cwd("/unknown"); err == nil {
-		t.Fatal("We should have had an error")
-	}
+	raw, err := c.OpenRawConn()
+	require.NoError(t, err, "Couldn't open raw connection")
 
-	if err := ftp.Mkd("/" + DirKnown); err != nil {
-		t.Fatal("Couldn't create dir:", err)
-	}
+	rc, _, err := raw.SendCommand("CWD /unknown")
+	require.NoError(t, err)
+	require.Equal(t, StatusActionNotTaken, rc)
 
-	if entry, err := ftp.List("/"); err != nil {
-		t.Fatal("Couldn't list files")
-	} else {
-		found := false
-		for _, entry := range entry {
-			pathentry := validMLSxEntryPattern.FindStringSubmatch(entry)
-			if len(pathentry) != 2 {
-				t.Errorf("MLSx file listing contains invalid entry: \"%s\"", entry)
-			} else if pathentry[1] == DirKnown {
-				found = true
-			}
-		}
-		if !found {
-			t.Error("Newly created dir was not found during listing of files")
-		}
-	}
+	_, err = c.Mkdir("/" + DirKnown)
+	require.NoError(t, err)
 
-	if err := ftp.Cwd("/" + DirKnown); err != nil {
-		t.Fatal("Couldn't access the known dir:", err)
-	}
+	contents, err := c.ReadDir("/")
+	require.NoError(t, err)
+	require.Len(t, contents, 1)
+	require.Equal(t, DirKnown, contents[0].Name())
 
-	if err := ftp.Rmd("/" + DirKnown); err != nil {
-		t.Fatal("Couldn't ftpDelete the known dir:", err)
-	}
+	rc, _, err = raw.SendCommand("CWD /" + DirKnown)
+	require.NoError(t, err)
+	require.Equal(t, StatusFileOK, rc)
 
-	if err := ftp.Rmd("/" + DirKnown); err == nil {
-		t.Fatal("We shouldn't have been able to ftpDelete known again")
-	}
+	testSubdir := " strange\\ sub dìr"
+	rc, _, err = raw.SendCommand(fmt.Sprintf("MKD %v", testSubdir))
+	require.NoError(t, err)
+	require.Equal(t, StatusPathCreated, rc)
+
+	rc, response, err := raw.SendCommand(fmt.Sprintf("CWD %v", testSubdir))
+	require.NoError(t, err)
+	require.Equal(t, StatusFileOK, rc, response)
+
+	rc, response, err = raw.SendCommand("CDUP")
+	require.NoError(t, err)
+	require.Equal(t, StatusFileOK, rc)
+	require.Equal(t, "CDUP worked on /"+DirKnown, response)
+
+	err = c.Rmdir(path.Join("/", DirKnown, testSubdir))
+	require.NoError(t, err)
+
+	err = c.Rmdir(path.Join("/", DirKnown))
+	require.NoError(t, err)
+
+	err = c.Rmdir("/" + DirKnown)
+	require.Error(t, err, "We shouldn't have been able to ftpDelete known again")
 }
 
 // TestDirListingWithSpace uses the MLSD for files listing
 func TestDirListingWithSpace(t *testing.T) {
 	s := NewTestServer(t, true)
-
-	var connErr error
-
-	var ftp *goftp.FTP
-
-	if ftp, connErr = goftp.Connect(s.Addr()); connErr != nil {
-		t.Fatal("Couldn't connect", connErr)
+	conf := goftp.Config{
+		User:     authUser,
+		Password: authPass,
 	}
 
-	defer func() { panicOnError(ftp.Quit()) }()
+	c, err := goftp.DialConfig(conf, s.Addr())
+	require.NoError(t, err, "Couldn't connect")
 
-	if err := ftp.Login("test", "test"); err != nil {
-		t.Fatal("Failed to login:", err)
-	}
+	defer func() { panicOnError(c.Close()) }()
 
-	if err := ftp.Mkd("/ with spaces "); err != nil {
-		t.Fatal("Couldn't create dir:", err)
-	}
+	dirName := " with spaces "
 
-	if lines, err := ftp.List("/"); err != nil {
-		t.Fatal("Couldn't list files:", err)
-	} else {
-		found := false
-		for _, line := range lines {
-			line = line[0 : len(line)-2]
-			if len(line) < 47 {
-				break
-			}
-			spl := strings.SplitN(line, "; ", 2)
-			fileName := spl[1]
-			expectedfileName := " with spaces "
-			if runtime.GOOS == "windows" {
-				expectedfileName = " with spaces"
-			}
-			if fileName == expectedfileName {
-				found = true
-			}
-		}
-		if !found {
-			t.Fatal("Couldn't find the dir")
-		}
-	}
+	_, err = c.Mkdir(dirName)
+	require.NoError(t, err, "Couldn't create dir")
 
-	if err := ftp.Cwd("/ with spaces "); err != nil {
-		t.Fatal("Couldn't access the known dir:", err)
-	}
+	contents, err := c.ReadDir("/")
+	require.NoError(t, err)
+	require.Len(t, contents, 1)
+	require.Equal(t, dirName, contents[0].Name())
+
+	raw, err := c.OpenRawConn()
+	require.NoError(t, err, "Couldn't open raw connection")
+
+	rc, response, err := raw.SendCommand(fmt.Sprintf("CWD /%s", dirName))
+	require.NoError(t, err)
+	require.Equal(t, StatusFileOK, rc)
+	require.Equal(t, fmt.Sprintf("CD worked on /%s", dirName), response)
 }
 
 func TestCleanPath(t *testing.T) {
 	s := NewTestServer(t, true)
-
-	var connErr error
-
-	var ftp *goftp.FTP
-
-	if ftp, connErr = goftp.Connect(s.Addr()); connErr != nil {
-		t.Fatal("Couldn't connect", connErr)
+	conf := goftp.Config{
+		User:     authUser,
+		Password: authPass,
 	}
 
-	defer func() { panicOnError(ftp.Quit()) }()
+	c, err := goftp.DialConfig(conf, s.Addr())
+	require.NoError(t, err, "Couldn't connect")
 
-	if err := ftp.Login("test", "test"); err != nil {
-		t.Fatal("Failed to login:", err)
-	}
+	defer func() { panicOnError(c.Close()) }()
+
+	raw, err := c.OpenRawConn()
+	require.NoError(t, err, "Couldn't open raw connection")
 
 	// various path purity tests
 
@@ -260,15 +183,14 @@ func TestCleanPath(t *testing.T) {
 		"/./",
 		"/././.",
 	} {
-		if err := ftp.Cwd(dir); err != nil {
-			t.Fatal("Couldn't Cwd to a valid path:", err)
-		}
+		rc, response, err := raw.SendCommand(fmt.Sprintf("CWD %s", dir))
+		require.NoError(t, err)
+		require.Equal(t, StatusFileOK, rc)
+		require.Equal(t, "CD worked on /", response)
 
-		if path, err := ftp.Pwd(); err != nil {
-			t.Fatal("PWD failed:", err)
-		} else if path != "/" {
-			t.Fatal("Faulty path:", path)
-		}
+		p, err := c.Getwd()
+		require.NoError(t, err)
+		require.Equal(t, "/", p)
 	}
 }
 
@@ -279,102 +201,125 @@ func TestTLSTransfer(t *testing.T) {
 	})
 	s.settings.TLSRequired = MandatoryEncryption
 
-	ftp, err := goftp.Connect(s.Addr())
-	if err != nil {
-		t.Fatal("Couldn't connect:", err)
+	conf := goftp.Config{
+		User:     authUser,
+		Password: authPass,
+		TLSConfig: &tls.Config{
+			// nolint:gosec
+			InsecureSkipVerify: true,
+		},
+		TLSMode: goftp.TLSExplicit,
 	}
 
-	defer func() { reportError(ftp.Quit()) }()
+	c, err := goftp.DialConfig(conf, s.Addr())
+	require.NoError(t, err, "Couldn't connect")
 
-	config := &tls.Config{
-		// nolint:gosec
-		InsecureSkipVerify: true,
-	}
-	if err = ftp.AuthTLS(config); err != nil {
-		t.Fatal("Couldn't upgrade connection to TLS:", err)
-	}
+	defer func() { panicOnError(c.Close()) }()
 
-	if err = ftp.Login("test", "test"); err != nil {
-		t.Fatal("Failed to login:", err)
-	}
+	contents, err := c.ReadDir("/")
+	require.NoError(t, err)
+	require.Len(t, contents, 0)
 
-	if _, err := ftp.List("/"); err != nil {
-		t.Fatal("Couldn't list files")
-	}
+	raw, err := c.OpenRawConn()
+	require.NoError(t, err, "Couldn't open raw connection")
 
-	code, _ := ftp.RawCmd("PROT C")
-	if code != StatusOK {
-		t.Fatal("unable to send PROT C")
-	}
+	rc, response, err := raw.SendCommand("PROT C")
+	require.NoError(t, err)
+	require.Equal(t, StatusOK, rc)
+	require.Equal(t, "OK", response)
 
-	if _, err := ftp.List("/"); err == nil {
-		t.Fatal("List files should fail, TLS is required")
-	} else if !strings.Contains(err.Error(), "TLS is required") {
-		t.Fatal("unexpected error:", err)
-	}
+	rc, _, err = raw.SendCommand("PASV")
+	require.NoError(t, err)
+	require.Equal(t, StatusEnteringPASV, rc)
+
+	rc, response, err = raw.SendCommand("MLSD /")
+	require.NoError(t, err)
+	require.Equal(t, StatusServiceNotAvailable, rc)
+	require.Equal(t, "Unable to open transfer: TLS is required", response)
+}
+
+func TestDirListingBeforeLogin(t *testing.T) {
+	s := NewTestServer(t, true)
+	conn, err := net.DialTimeout("tcp", s.Addr(), 5*time.Second)
+	require.NoError(t, err)
+
+	defer func() {
+		err = conn.Close()
+		require.NoError(t, err)
+	}()
+
+	buf := make([]byte, 1024)
+	n, err := conn.Read(buf)
+	require.NoError(t, err)
+
+	response := string(buf[:n])
+	require.Equal(t, "220 TEST Server\r\n", response)
+
+	_, err = conn.Write([]byte("LIST\r\n"))
+	require.NoError(t, err)
+
+	n, err = conn.Read(buf)
+	require.NoError(t, err)
+
+	response = string(buf[:n])
+	require.Equal(t, "530 Please login with USER and PASS\r\n", response)
 }
 
 func TestListArgs(t *testing.T) {
-	s := NewTestServer(t, true)
+	t.Run("with-mlsd", func(t *testing.T) {
+		testListDirArgs(t, NewTestServer(t, true))
+	})
 
-	var connErr error
-	var ftp *goftp.FTP
+	t.Run("without-mlsd", func(t *testing.T) {
+		testListDirArgs(t, NewTestServerWithDriver(t, &TestServerDriver{Debug: true, Settings: &Settings{DisableMLSD: true}}))
+	})
+}
 
-	if ftp, connErr = goftp.Connect(s.Addr()); connErr != nil {
-		t.Fatal("Couldn't connect", connErr)
+func testListDirArgs(t *testing.T, s *FtpServer) {
+	conf := goftp.Config{
+		User:     authUser,
+		Password: authPass,
 	}
+	testDir := "testdir"
 
-	defer func() { panicOnError(ftp.Quit()) }()
+	c, err := goftp.DialConfig(conf, s.Addr())
+	require.NoError(t, err, "Couldn't connect")
 
-	if err := ftp.Login("test", "test"); err != nil {
-		t.Fatal("Failed to login:", err)
-	}
+	defer func() { panicOnError(c.Close()) }()
 
 	for _, arg := range supportedlistArgs {
 		s.settings.DisableLISTArgs = true
 
-		if _, err := ftp.List(arg); err == nil {
-			t.Fatalf("list args are disabled \"list %v\" must fail", arg)
-		}
+		_, err = c.ReadDir(arg)
+		require.Error(t, err, fmt.Sprintf("list args are disabled \"list %v\" must fail", arg))
 
 		s.settings.DisableLISTArgs = false
 
-		if _, err := ftp.List(arg); err != nil {
-			t.Fatal("unexpected error", err)
-		}
+		contents, err := c.ReadDir(arg)
+		require.NoError(t, err)
+		require.Len(t, contents, 0)
 
-		if err := ftp.Mkd(arg); err != nil {
-			t.Fatal("unexpected error", err)
-		}
+		_, err = c.Mkdir(arg)
+		require.NoError(t, err)
 
-		if err := ftp.Mkd(fmt.Sprintf("%v/testdir", arg)); err != nil {
-			t.Fatal("unexpected error", err)
-		}
+		_, err = c.Mkdir(fmt.Sprintf("%v/%v", arg, testDir))
+		require.NoError(t, err)
 
-		contents, err := ftp.List(arg)
-		if err != nil {
-			t.Fatal("unexpected error", err)
-		}
+		contents, err = c.ReadDir(arg)
+		require.NoError(t, err)
+		require.Len(t, contents, 1)
+		require.Equal(t, contents[0].Name(), testDir)
 
-		if len(contents) != 1 {
-			t.Fatal("unexpected dir contents", contents)
-		}
+		contents, err = c.ReadDir(fmt.Sprintf("%v %v", arg, arg))
+		require.NoError(t, err)
+		require.Len(t, contents, 1)
+		require.Equal(t, contents[0].Name(), testDir)
 
-		if !strings.Contains(contents[0], "testdir") {
-			t.Fatal("unexpected dir contents", contents)
-		}
+		// cleanup
+		err = c.Rmdir(fmt.Sprintf("%v/%v", arg, testDir))
+		require.NoError(t, err)
 
-		contents, err = ftp.List(fmt.Sprintf("%v %v", arg, arg))
-		if err != nil {
-			t.Fatal("unexpected error", err)
-		}
-
-		if len(contents) != 1 {
-			t.Fatal("unexpected dir contents", contents)
-		}
-
-		if !strings.Contains(contents[0], "testdir") {
-			t.Fatal("unexpected dir contents", contents)
-		}
+		err = c.Rmdir(arg)
+		require.NoError(t, err)
 	}
 }

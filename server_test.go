@@ -1,20 +1,16 @@
 package ftpserver
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/stretchr/testify/require"
+)
 
 func TestPortCommandFormatOK(t *testing.T) {
 	net, err := parsePORTAddr("127,0,0,1,239,163")
-	if err != nil {
-		t.Fatal("Problem parsing", err)
-	}
-
-	if net.IP.String() != "127.0.0.1" {
-		t.Fatal("Problem parsing IP", net.IP.String())
-	}
-
-	if net.Port != 239<<8+163 {
-		t.Fatal("Problem parsing port", net.Port)
-	}
+	require.NoError(t, err, "Problem parsing")
+	require.Equal(t, "127.0.0.1", net.IP.String(), "Problem parsing IP")
+	require.Equal(t, 239<<8+163, net.Port, "Problem parsing port")
 }
 
 func TestPortCommandFormatInvalid(t *testing.T) {
@@ -24,9 +20,7 @@ func TestPortCommandFormatInvalid(t *testing.T) {
 	}
 	for _, f := range badFormats {
 		_, err := parsePORTAddr(f)
-		if err == nil {
-			t.Fatal("This should have failed", f)
-		}
+		require.Error(t, err, "This should have failed")
 	}
 }
 
@@ -49,9 +43,7 @@ func TestQuoteDoubling(t *testing.T) {
 	for _, tt := range tests {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
-			if got := quoteDoubling(tt.args.s); got != tt.want {
-				t.Errorf("quoteDoubling() = %v, want %v", got, tt.want)
-			}
+			require.Equal(t, tt.want, quoteDoubling(tt.args.s))
 		})
 	}
 }

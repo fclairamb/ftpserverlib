@@ -1,6 +1,7 @@
 package ftpserver
 
 import (
+	"crypto/tls"
 	"fmt"
 	"strings"
 	"testing"
@@ -23,9 +24,7 @@ func TestSiteCommand(t *testing.T) {
 
 	defer func() { panicOnError(c.Close()) }()
 
-	var raw goftp.RawConn
-
-	raw, err = c.OpenRawConn()
+	raw, err := c.OpenRawConn()
 	require.NoError(t, err, "Couldn't open raw connection")
 
 	rc, response, err := raw.SendCommand("SITE HELP")
@@ -103,9 +102,7 @@ func TestCLNT(t *testing.T) {
 
 	defer func() { panicOnError(c.Close()) }()
 
-	var raw goftp.RawConn
-
-	raw, err = c.OpenRawConn()
+	raw, err := c.OpenRawConn()
 	require.NoError(t, err, "Couldn't open raw connection")
 
 	rc, _, err := raw.SendCommand("CLNT NcFTP 3.2.6 macosx10.15")
@@ -125,9 +122,7 @@ func TestOPTSUTF8(t *testing.T) {
 
 	defer func() { panicOnError(c.Close()) }()
 
-	var raw goftp.RawConn
-
-	raw, err = c.OpenRawConn()
+	raw, err := c.OpenRawConn()
 	require.NoError(t, err, "Couldn't open raw connection")
 
 	for _, cmd := range []string{"OPTS UTF8", "OPTS UTF8 ON"} {
@@ -158,9 +153,7 @@ func TestOPTSHASH(t *testing.T) {
 
 	defer func() { panicOnError(c.Close()) }()
 
-	var raw goftp.RawConn
-
-	raw, err = c.OpenRawConn()
+	raw, err := c.OpenRawConn()
 	require.NoError(t, err, "Couldn't open raw connection")
 
 	rc, message, err := raw.SendCommand("OPTS HASH")
@@ -193,23 +186,16 @@ func TestOPTSHASH(t *testing.T) {
 
 func TestAVBL(t *testing.T) {
 	s := NewTestServer(t, true)
-
 	conf := goftp.Config{
 		User:     authUser,
 		Password: authPass,
 	}
-
-	var err error
-	var c *goftp.Client
-
-	c, err = goftp.DialConfig(conf, s.Addr())
+	c, err := goftp.DialConfig(conf, s.Addr())
 	require.NoError(t, err, "Couldn't connect")
 
 	defer func() { panicOnError(c.Close()) }()
 
-	var raw goftp.RawConn
-
-	raw, err = c.OpenRawConn()
+	raw, err := c.OpenRawConn()
 	require.NoError(t, err, "Couldn't open raw connection")
 
 	rc, response, err := raw.SendCommand("AVBL")
@@ -237,4 +223,59 @@ func TestAVBL(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, StatusActionNotTaken, rc)
 	require.Equal(t, fmt.Sprintf("Couldn't get space for path %v: %v", noavblDir, errAvblNotPermitted.Error()), response)
+}
+
+func TestQuit(t *testing.T) {
+	s := NewTestServerWithDriver(t, &TestServerDriver{
+		Debug: true,
+		TLS:   true,
+	})
+	conf := goftp.Config{
+		User:     authUser,
+		Password: authPass,
+		TLSConfig: &tls.Config{
+			// nolint:gosec
+			InsecureSkipVerify: true,
+		},
+		TLSMode: goftp.TLSExplicit,
+	}
+	c, err := goftp.DialConfig(conf, s.Addr())
+	require.NoError(t, err, "Couldn't connect")
+
+	defer func() { panicOnError(c.Close()) }()
+
+	raw, err := c.OpenRawConn()
+	require.NoError(t, err, "Couldn't open raw connection")
+
+	rc, _, err := raw.SendCommand("QUIT")
+	require.NoError(t, err)
+	require.Equal(t, StatusClosingControlConn, rc)
+}
+
+func TestTYPE(t *testing.T) {
+	s := NewTestServer(t, true)
+	conf := goftp.Config{
+		User:     authUser,
+		Password: authPass,
+	}
+
+	c, err := goftp.DialConfig(conf, s.Addr())
+	require.NoError(t, err, "Couldn't connect")
+
+	defer func() { panicOnError(c.Close()) }()
+
+	raw, err := c.OpenRawConn()
+	require.NoError(t, err, "Couldn't open raw connection")
+
+	rc, _, err := raw.SendCommand("TYPE I")
+	require.NoError(t, err)
+	require.Equal(t, StatusOK, rc)
+
+	rc, _, err = raw.SendCommand("TYPE A")
+	require.NoError(t, err)
+	require.Equal(t, StatusOK, rc)
+
+	rc, _, err = raw.SendCommand("TYPE wrong")
+	require.NoError(t, err)
+	require.Equal(t, StatusSyntaxErrorNotRecognised, rc)
 }
