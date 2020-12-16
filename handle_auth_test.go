@@ -2,7 +2,6 @@ package ftpserver
 
 import (
 	"crypto/tls"
-	"fmt"
 	"net"
 	"testing"
 	"time"
@@ -14,12 +13,6 @@ import (
 func panicOnError(err error) {
 	if err != nil {
 		panic(err)
-	}
-}
-
-func reportError(err error) {
-	if err != nil {
-		fmt.Println("Error reporting:", err)
 	}
 }
 

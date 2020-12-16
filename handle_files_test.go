@@ -85,7 +85,6 @@ func TestALLO(t *testing.T) {
 		User:     authUser,
 		Password: authPass,
 	}
-
 	c, err := goftp.DialConfig(conf, s.Addr())
 	require.NoError(t, err, "Couldn't connect")
 
@@ -111,7 +110,6 @@ func TestCHOWN(t *testing.T) {
 		User:     authUser,
 		Password: authPass,
 	}
-
 	c, err := goftp.DialConfig(conf, s.Addr())
 	require.NoError(t, err, "Couldn't connect")
 
@@ -155,7 +153,6 @@ func TestMFMT(t *testing.T) {
 		User:     authUser,
 		Password: authPass,
 	}
-
 	c, err := goftp.DialConfig(conf, s.Addr())
 	require.NoError(t, err, "Couldn't connect")
 
@@ -201,7 +198,6 @@ func TestSYMLINK(t *testing.T) {
 		User:     authUser,
 		Password: authPass,
 	}
-
 	c, err := goftp.DialConfig(conf, s.Addr())
 	require.NoError(t, err, "Couldn't connect")
 
