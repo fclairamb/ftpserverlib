@@ -91,6 +91,12 @@ type ClientDriverExtensionRemoveDir interface {
 	RemoveDir(name string) error
 }
 
+// ClientDriverExtensionHasher is an extension to implement if you want to handle file digests
+// yourself. You have to set EnableHASH to true for this extension to be called
+type ClientDriverExtensionHasher interface {
+	ComputeHash(name string, algo HASHAlgo, startOffset, endOffset int64) (string, error)
+}
+
 // ClientContext is implemented on the server side to provide some access to few data around the client
 type ClientContext interface {
 	// Path provides the path of the current connection

@@ -2,7 +2,14 @@
 package ftpserver
 
 import (
+	"crypto/md5"  //nolint:gosec
+	"crypto/sha1" //nolint:gosec
+	"crypto/sha256"
+	"crypto/sha512"
+	"encoding/hex"
 	"fmt"
+	"hash"
+	"hash/crc32"
 	"io"
 	"net"
 	"os"
@@ -465,8 +472,13 @@ func (c *clientHandler) handleGenericHash(algo HASHAlgo, isCustomMode bool) erro
 	// to support partial hash also for the HASH command we should implement RANG too,
 	// but this apply also to uploads/downloads and so complicat the things, we'll add
 	// this support in future improvements
+	var result string
+	if hasher, ok := c.driver.(ClientDriverExtensionHasher); ok {
+		result, err = hasher.ComputeHash(c.absPath(args[0]), algo, start, end)
+	} else {
+		result, err = c.computeHashForFile(c.absPath(args[0]), algo, start, end)
+	}
 
-	result, err := c.computeHashForFile(c.absPath(args[0]), algo, start, end)
 	if err != nil {
 		c.writeMessage(StatusActionNotTaken, fmt.Sprintf("%v: %v", args[0], err))
 		return nil
@@ -492,4 +504,51 @@ func (c *clientHandler) handleGenericHash(algo HASHAlgo, isCustomMode bool) erro
 	c.writeMessage(StatusFileStatus, response)
 
 	return nil
+}
+
+func (c *clientHandler) computeHashForFile(filePath string, algo HASHAlgo, start, end int64) (string, error) {
+	var h hash.Hash
+	var file FileTransfer
+	var err error
+
+	switch algo {
+	case HASHAlgoCRC32:
+		h = crc32.NewIEEE()
+	case HASHAlgoMD5:
+		h = md5.New() //nolint:gosec
+	case HASHAlgoSHA1:
+		h = sha1.New() //nolint:gosec
+	case HASHAlgoSHA256:
+		h = sha256.New()
+	case HASHAlgoSHA512:
+		h = sha512.New()
+	default:
+		return "", errUnknowHash
+	}
+
+	if fileTransfer, ok := c.driver.(ClientDriverExtentionFileTransfer); ok {
+		file, err = fileTransfer.GetHandle(filePath, os.O_RDONLY, start)
+	} else {
+		file, err = c.driver.OpenFile(filePath, os.O_RDONLY, os.ModePerm)
+	}
+
+	if err != nil {
+		return "", err
+	}
+
+	if start > 0 {
+		_, err = file.Seek(start, io.SeekStart)
+		if err != nil {
+			return "", err
+		}
+	}
+
+	_, err = io.CopyN(h, file, end-start)
+	defer file.Close() //nolint:errcheck // we ignore close error here
+
+	if err != nil && err != io.EOF {
+		return "", err
+	}
+
+	return hex.EncodeToString(h.Sum(nil)), nil
 }
