@@ -100,8 +100,8 @@ func (c *clientHandler) transferFile(write bool, append bool) {
 	}
 
 	err = c.doFileTransfer(tr, file, write)
-	if errClose := file.Close(); errClose != nil && err == nil {
-		// FIXME: should we ignore close error if write == false?
+	// we ignore close error for reads
+	if errClose := file.Close(); errClose != nil && err == nil && write {
 		err = errClose
 	}
 
