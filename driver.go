@@ -186,4 +186,6 @@ type Settings struct {
 	DisableSite              bool             // Disable SITE command
 	DisableActiveMode        bool             // Disable Active FTP
 	EnableHASH               bool             // Enable support for calculating hash value of files
+	DisableSTAT              bool             // Disable Server STATUS, STAT on files and directories will still work
+	DisableSYST              bool             // Disable SYST
 }

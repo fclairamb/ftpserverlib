@@ -64,6 +64,11 @@ func TestLoginSuccess(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, StatusSystemType, rc)
 	require.Equal(t, "UNIX Type: L8", response)
+
+	s.settings.DisableSYST = true
+	rc, response, err = raw.SendCommand("SYST")
+	require.NoError(t, err)
+	require.Equal(t, StatusCommandNotImplemented, rc, response)
 }
 
 func TestLoginFailure(t *testing.T) {

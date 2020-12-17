@@ -88,6 +88,12 @@ func TestStat(t *testing.T) {
 	count := strings.Count(str, "\n")
 	require.GreaterOrEqual(t, count, 4)
 	require.NotEqual(t, ' ', str[0])
+
+	s.settings.DisableSTAT = true
+
+	rc, str, err = raw.SendCommand("STAT")
+	require.NoError(t, err)
+	require.Equal(t, StatusCommandNotImplemented, rc, str)
 }
 
 func TestCLNT(t *testing.T) {
