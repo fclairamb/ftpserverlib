@@ -384,13 +384,10 @@ func (c *clientHandler) TransferOpen() (net.Conn, error) {
 }
 
 func (c *clientHandler) TransferClose(err error) {
-	if c.transfer != nil {
-		if err == nil {
-			// only send the OK status if there is no error
-			c.writeMessage(StatusClosingDataConn, "Closing transfer connection")
-		}
+	var errClose error
 
-		if err := c.transfer.Close(); err != nil {
+	if c.transfer != nil {
+		if errClose = c.transfer.Close(); errClose != nil {
 			c.logger.Warn(
 				"Problem closing transfer connection",
 				"err", err,
@@ -402,6 +399,15 @@ func (c *clientHandler) TransferClose(err error) {
 		if c.debug {
 			c.logger.Debug("Transfer connection closed")
 		}
+	}
+
+	switch {
+	case err == nil && errClose == nil:
+		c.writeMessage(StatusClosingDataConn, "Closing transfer connection")
+	case errClose != nil:
+		c.writeMessage(StatusActionNotTaken, fmt.Sprintf("Issue during transfer close: %v", errClose))
+	case err != nil:
+		c.writeMessage(StatusActionNotTaken, fmt.Sprintf("Issue during transfer: %v", err))
 	}
 }
 

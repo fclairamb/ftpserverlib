@@ -83,55 +83,50 @@ func (c *clientHandler) transferFile(write bool, append bool) {
 		c.ctxRest = 0
 	}
 
-	// Start the transfer
-	if err == nil {
-		err = c.doTransfer(file, write)
-	}
-
-	// *ALWAYS* close the file but only save the error if there wasn't one before
-	if errClose := file.Close(); errClose != nil && err == nil {
-		err = errClose
-	}
-
 	if err != nil {
-		// if the transfer could not be open we already sent an error
-		if _, isOpenTransferErr := err.(*openTransferError); !isOpenTransferErr {
-			c.writeMessage(StatusActionNotTaken, "Could not transfer file: "+err.Error())
-			return
+		return
+	}
+
+	var tr net.Conn
+	tr, err = c.TransferOpen()
+
+	if err == nil {
+		err = c.doFileTransfer(tr, file, write)
+
+		// We always close the file
+		if errClose := file.Close(); errClose != nil && err == nil {
+			err = errClose
 		}
 	}
+
+	c.TransferClose(err)
 }
 
-func (c *clientHandler) doTransfer(file io.ReadWriter, write bool) error {
-	var tr net.Conn
+func (c *clientHandler) doFileTransfer(tr net.Conn, file io.ReadWriter, write bool) error {
 	var err error
 
-	if tr, err = c.TransferOpen(); err == nil {
-		// Copy the data
-		var in io.Reader
-		var out io.Writer
+	// Copy the data
+	var in io.Reader
+	var out io.Writer
 
-		if write { // ... from the connection to the file
-			in = tr
-			out = file
-		} else { // ... from the file to the connection
-			in = file
-			out = tr
+	if write { // ... from the connection to the file
+		in = tr
+		out = file
+	} else { // ... from the file to the connection
+		in = file
+		out = tr
+	}
+	// for reads io.EOF isn't an error, for writes it must be considered an error
+	if written, errCopy := io.Copy(out, in); errCopy != nil && (errCopy != io.EOF || write) {
+		err = errCopy
+	} else {
+		c.logger.Debug(
+			"Stream copy finished",
+			"writtenBytes", written,
+		)
+		if written == 0 {
+			_, err = out.Write([]byte{})
 		}
-		// for reads io.EOF isn't an error, for writes it must be considered an error
-		if written, errCopy := io.Copy(out, in); errCopy != nil && (errCopy != io.EOF || write) {
-			err = errCopy
-		} else {
-			c.logger.Debug(
-				"Stream copy finished",
-				"writtenBytes", written,
-			)
-			if written == 0 {
-				_, err = out.Write([]byte(""))
-			}
-		}
-
-		c.TransferClose(err)
 	}
 
 	if err != nil {

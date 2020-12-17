@@ -78,14 +78,12 @@ type TestServerDriver struct {
 	Debug bool // To display connection logs information
 	TLS   bool
 
-	Settings     *Settings // Settings
-	FileOverride afero.File
-	fs           afero.Fs
+	Settings *Settings // Settings
+	fs       afero.Fs
 }
 
 // TestClientDriver defines a minimal serverftp client driver
 type TestClientDriver struct {
-	FileOverride afero.File
 	afero.Fs
 }
 
@@ -116,10 +114,6 @@ var errBadUserNameOrPassword = errors.New("bad username or password")
 func (driver *TestServerDriver) AuthUser(_ ClientContext, user, pass string) (ClientDriver, error) {
 	if user == authUser && pass == authPass {
 		clientdriver := NewTestClientDriver(driver)
-
-		if driver.FileOverride != nil {
-			clientdriver.FileOverride = driver.FileOverride
-		}
 
 		return clientdriver, nil
 	}
@@ -156,11 +150,13 @@ func (driver *TestServerDriver) GetTLSConfig() (*tls.Config, error) {
 
 // OpenFile opens a file in 3 possible modes: read, write, appending write (use appropriate flags)
 func (driver *TestClientDriver) OpenFile(path string, flag int, perm os.FileMode) (afero.File, error) {
-	if driver.FileOverride != nil {
-		return driver.FileOverride, nil
+	file, err := driver.Fs.OpenFile(path, flag, perm)
+
+	if err == nil {
+		file = &testFile{File: file}
 	}
 
-	return driver.Fs.OpenFile(path, flag, perm)
+	return file, err
 }
 
 var errTooMuchSpaceRequested = errors.New("you're requesting too much space")

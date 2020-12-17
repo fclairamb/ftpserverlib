@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"encoding/hex"
 	"errors"
+	"github.com/spf13/afero"
 	"io"
 	"io/ioutil"
 	"math/rand"
@@ -361,7 +362,7 @@ func TestBogusTransferStart(t *testing.T) {
 	}
 }
 
-func TestFailedFileClose(t *testing.T) {
+func TestFailingFileTransfer(t *testing.T) {
 	driver := &TestServerDriver{
 		Debug: true,
 	}
@@ -374,32 +375,47 @@ func TestFailedFileClose(t *testing.T) {
 	}
 
 	var err error
-
 	var c *goftp.Client
 
-	if c, err = goftp.DialConfig(conf, s.Addr()); err != nil {
-		t.Fatal("Couldn't connect", err)
-	}
-
-	defer func() { panicOnError(c.Close()) }()
-
 	file := createTemporaryFile(t, 1*1024)
-	driver.FileOverride = &failingCloser{File: *file}
-	err = c.Store("file.bin", file)
 
-	if err == nil {
-		t.Fatal("this upload should not succeed", err)
-	}
+	c, err = goftp.DialConfig(conf, s.Addr())
+	require.NoError(t, err)
+	defer func() { require.NoError(t, c.Close()) }()
 
-	if !strings.Contains(err.Error(), errFailingCloser.Error()) {
-		t.Errorf("got %s as the error message, want it to contain %s", err, errFailingCloser)
-	}
+	t.Run("on write", func(t *testing.T) {
+		err = c.Store("fail-to-write.bin", file)
+		require.True(t, strings.Contains(err.Error(), errFailWrite.Error()), err)
+	})
+
+	t.Run("on close", func(t *testing.T) {
+		err = c.Store("fail-to-close.bin", file)
+		require.True(t, strings.Contains(err.Error(), errFailClose.Error()), err)
+	})
+
+	t.Run("check for sync", func(t *testing.T) {
+		require.NoError(t, c.Store("ok", file))
+	})
 }
 
-type failingCloser struct {
-	os.File
+type testFile struct {
+	afero.File
 }
 
-var errFailingCloser = errors.New("the hard disk crashed")
+var errFailClose = errors.New("couldn't close")
 
-func (f *failingCloser) Close() error { return errFailingCloser }
+var errFailWrite = errors.New("couldn't write")
+
+func (f *testFile) Write(b []byte) (int, error) {
+	if strings.Contains(f.File.Name(), "fail-to-write") {
+		return 0, errFailWrite
+	}
+	return f.File.Write(b)
+}
+
+func (f *testFile) Close() error {
+	if strings.Contains(f.File.Name(), "fail-to-close") {
+		return errFailClose
+	}
+	return f.File.Close()
+}
