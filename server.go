@@ -64,6 +64,7 @@ var commandsMap = map[string]*CommandDescription{
 	"XSHA1":   {Fn: (*clientHandler).handleSHA1},
 	"XSHA256": {Fn: (*clientHandler).handleSHA256},
 	"XSHA512": {Fn: (*clientHandler).handleSHA512},
+	"COMB":    {Fn: (*clientHandler).handleCOMB},
 
 	// Directory handling
 	"CWD":  {Fn: (*clientHandler).handleCWD},

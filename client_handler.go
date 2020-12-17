@@ -41,6 +41,19 @@ func getHashMapping() map[string]HASHAlgo {
 	return mapping
 }
 
+func getHashName(algo HASHAlgo) string {
+	hashName := ""
+	hashMapping := getHashMapping()
+
+	for k, v := range hashMapping {
+		if v == algo {
+			hashName = k
+		}
+	}
+
+	return hashName
+}
+
 // nolint: maligned
 type clientHandler struct {
 	id               uint32          // ID of the client

@@ -1,8 +1,11 @@
 package ftpserver
 
 import (
+	"crypto/sha256"
 	"crypto/tls"
+	"encoding/hex"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"os"
 	"regexp"
@@ -178,6 +181,11 @@ func TestCHOWN(t *testing.T) {
 	rc, _, err = raw.SendCommand("SITE CHOWN test file2")
 	require.NoError(t, err)
 	require.Equal(t, StatusActionNotTaken, rc, "Should NOT have been accepted")
+
+	// Asking for a chown with a missing parameter
+	rc, _, err = raw.SendCommand("SITE CHOWN 1000")
+	require.NoError(t, err)
+	require.Equal(t, StatusSyntaxErrorParameters, rc, "Should NOT have been accepted")
 }
 
 func TestMFMT(t *testing.T) {
@@ -414,15 +422,7 @@ func TestHASHCommand(t *testing.T) {
 }
 
 func TestCustomHASHCommands(t *testing.T) {
-	s := NewTestServerWithDriver(
-		t,
-		&TestServerDriver{
-			Debug: true,
-			Settings: &Settings{
-				EnableHASH: true,
-			},
-		},
-	)
+	s := NewTestServer(t, true)
 	conf := goftp.Config{
 		User:     authUser,
 		Password: authPass,
@@ -443,6 +443,12 @@ func TestCustomHASHCommands(t *testing.T) {
 	raw, err := c.OpenRawConn()
 	require.NoError(t, err, "Couldn't open raw connection")
 
+	rc, message, err := raw.SendCommand("XSHA256 file.txt")
+	require.NoError(t, err)
+	require.Equal(t, StatusCommandNotImplemented, rc, message)
+
+	s.settings.EnableHASH = true
+
 	customCommands := make(map[string]string)
 	customCommands["XCRC"] = "21b0f382"
 	customCommands["MD5"] = "6905e38270e1797e68f69026bfbef131"
@@ -451,9 +457,6 @@ func TestCustomHASHCommands(t *testing.T) {
 	customCommands["XSHA1"] = "0f11c4103a2573b14edd4733984729f2380d99ed"
 	customCommands["XSHA256"] = "ceee704dd96e2b8c2ceca59c4c697bc01123fb9e66a1a3ac34dbdd2d6da9659b"
 	customCommands["XSHA512"] = "4f95c20e4d030cbc43b1e139a0fe11c5e0e5e520cf3265bae852ae212b1c7cdb02c2fea5ba038cbf3202af8cdf313579fbe344d47919c288c16d6dd671e9db63" //nolint:lll
-
-	var rc int
-	var message string
 
 	for cmd, expected := range customCommands {
 		rc, message, err = raw.SendCommand(fmt.Sprintf("%v file.txt", cmd))
@@ -477,4 +480,208 @@ func TestCustomHASHCommands(t *testing.T) {
 	rc, _, err = raw.SendCommand("XSHA256 file.txt 7 a")
 	require.NoError(t, err)
 	require.Equal(t, StatusSyntaxErrorParameters, rc)
+}
+
+func TestCOMB(t *testing.T) {
+	s := NewTestServer(t, true)
+	conf := goftp.Config{
+		User:     authUser,
+		Password: authPass,
+	}
+
+	c, err := goftp.DialConfig(conf, s.Addr())
+	require.NoError(t, err, "Couldn't connect")
+
+	defer func() { panicOnError(c.Close()) }()
+
+	raw, err := c.OpenRawConn()
+	require.NoError(t, err, "Couldn't open raw connection")
+
+	rc, message, err := raw.SendCommand("COMB file.bin 1 2")
+	require.NoError(t, err)
+	require.Equal(t, StatusCommandNotImplemented, rc, message)
+
+	s.settings.EnableCOMB = true
+
+	var parts []*os.File
+
+	partSize := 1024
+	hasher := sha256.New()
+
+	parts = append(parts, createTemporaryFile(t, partSize), createTemporaryFile(t, partSize),
+		createTemporaryFile(t, partSize), createTemporaryFile(t, partSize))
+
+	for idx, part := range parts {
+		ftpUpload(t, c, part, fmt.Sprintf("%d", idx))
+		_, err = part.Seek(0, io.SeekStart)
+		require.NoError(t, err)
+		_, err = io.Copy(hasher, part)
+		require.NoError(t, err)
+	}
+
+	rc, message, err = raw.SendCommand("COMB file.bin 0 1 2 3")
+	require.NoError(t, err)
+	require.Equal(t, StatusFileOK, rc, message)
+	require.Equal(t, "COMB succeeded!", message)
+
+	info, err := c.Stat("file.bin")
+	require.NoError(t, err)
+	require.Equal(t, int64(partSize*4), info.Size())
+
+	hashParts := hex.EncodeToString(hasher.Sum(nil))
+	hashCombined := ftpDownloadAndHash(t, c, "file.bin")
+	require.Equal(t, hashParts, hashCombined)
+
+	contents, err := c.ReadDir("/")
+	require.NoError(t, err)
+	require.Len(t, contents, 1)
+}
+
+func TestCOMBAppend(t *testing.T) {
+	s := NewTestServerWithDriver(
+		t,
+		&TestServerDriver{
+			Debug: true,
+			Settings: &Settings{
+				EnableCOMB: true,
+			},
+		},
+	)
+	conf := goftp.Config{
+		User:     authUser,
+		Password: authPass,
+	}
+
+	c, err := goftp.DialConfig(conf, s.Addr())
+	require.NoError(t, err, "Couldn't connect")
+
+	defer func() { panicOnError(c.Close()) }()
+
+	partSize := 1024
+	hasher := sha256.New()
+
+	initialFile := createTemporaryFile(t, partSize)
+	ftpUpload(t, c, initialFile, "file.bin")
+
+	_, err = initialFile.Seek(0, io.SeekStart)
+	require.NoError(t, err)
+	_, err = io.Copy(hasher, initialFile)
+	require.NoError(t, err)
+
+	var parts []*os.File
+
+	parts = append(parts, createTemporaryFile(t, partSize), createTemporaryFile(t, partSize))
+
+	for idx, part := range parts {
+		ftpUpload(t, c, part, fmt.Sprintf(" %d ", idx))
+		_, err = part.Seek(0, io.SeekStart)
+		require.NoError(t, err)
+		_, err = io.Copy(hasher, part)
+		require.NoError(t, err)
+	}
+
+	raw, err := c.OpenRawConn()
+	require.NoError(t, err, "Couldn't open raw connection")
+
+	rc, message, err := raw.SendCommand("COMB file.bin \" 0 \" \" 1 \"")
+	require.NoError(t, err)
+	require.Equal(t, StatusFileOK, rc, message)
+	require.Equal(t, "COMB succeeded!", message)
+
+	info, err := c.Stat("file.bin")
+	require.NoError(t, err)
+	require.Equal(t, int64(partSize*3), info.Size())
+
+	hashParts := hex.EncodeToString(hasher.Sum(nil))
+	hashCombined := ftpDownloadAndHash(t, c, "file.bin")
+	require.Equal(t, hashParts, hashCombined)
+
+	contents, err := c.ReadDir("/")
+	require.NoError(t, err)
+	require.Len(t, contents, 1)
+}
+
+func TestCOMBErrors(t *testing.T) {
+	s := NewTestServer(t, true)
+	conf := goftp.Config{
+		User:     authUser,
+		Password: authPass,
+	}
+
+	s.settings.EnableCOMB = true
+
+	c, err := goftp.DialConfig(conf, s.Addr())
+	require.NoError(t, err, "Couldn't connect")
+
+	defer func() { panicOnError(c.Close()) }()
+
+	raw, err := c.OpenRawConn()
+	require.NoError(t, err, "Couldn't open raw connection")
+
+	rc, message, err := raw.SendCommand("COMB")
+	require.NoError(t, err)
+	require.Equal(t, StatusSyntaxErrorParameters, rc, message)
+
+	rc, message, err = raw.SendCommand("COMB file.bin")
+	require.NoError(t, err)
+	require.Equal(t, StatusSyntaxErrorParameters, rc, message)
+
+	rc, message, err = raw.SendCommand("COMB file.bin missing")
+	require.NoError(t, err)
+	require.Equal(t, StatusActionNotTaken, rc, message)
+
+	rc, message, err = raw.SendCommand("COMB /missing/file.bin file.bin")
+	require.NoError(t, err)
+	require.Equal(t, StatusActionNotTaken, rc, message)
+
+	rc, message, err = raw.SendCommand("COMB file.bin \"\"")
+	require.NoError(t, err)
+	require.Equal(t, StatusActionNotTaken, rc, message)
+}
+
+type quotedParams struct {
+	params    string
+	parsed    []string
+	wantError bool
+}
+
+func TestUnquoteCOMBParams(t *testing.T) {
+	testQuotedParams := []quotedParams{
+		{
+			params:    "final5.log 64.log 65.log",
+			parsed:    []string{"final5.log", "64.log", "65.log"},
+			wantError: false,
+		},
+		{
+			params:    "\"final3.log\" \"60à.log\"",
+			parsed:    []string{"final3.log", "60à.log"},
+			wantError: false,
+		},
+		{
+			params:    "\"final5.log\" \"64.log\" \"65.log\"",
+			parsed:    []string{"final5.log", "64.log", "65.log"},
+			wantError: false,
+		},
+		{
+			params:    "final7.log \"6 6.log\" 67.log",
+			parsed:    []string{"final7.log", "6 6.log", "67.log"},
+			wantError: false,
+		},
+		{
+			params:    "",
+			parsed:    nil,
+			wantError: true,
+		},
+	}
+
+	for _, p := range testQuotedParams {
+		parsed, err := unquoteSpaceSeparatedParams(p.params)
+
+		if p.wantError {
+			require.Error(t, err)
+		} else {
+			require.NoError(t, err)
+			require.Equal(t, p.parsed, parsed)
+		}
+	}
 }
