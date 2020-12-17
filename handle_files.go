@@ -159,9 +159,9 @@ func (c *clientHandler) handleCHMOD(params string) {
 
 // https://www.raidenftpd.com/en/raiden-ftpd-doc/help-sitecmd.html (wildcard isn't supported)
 func (c *clientHandler) handleCHOWN(params string) {
-	spl := strings.SplitN(params, " ", 2)
+	spl := strings.SplitN(params, " ", 3)
 
-	if len(spl) < 2 {
+	if len(spl) != 2 {
 		c.writeMessage(StatusSyntaxErrorParameters, "bad command")
 		return
 	}
