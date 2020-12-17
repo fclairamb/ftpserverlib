@@ -345,3 +345,52 @@ func TestFailingFileTransfer(t *testing.T) {
 		require.NoError(t, c.Store("ok", file))
 	})
 }
+
+func TestTransfersFromOffset(t *testing.T) {
+	driver := &TestServerDriver{
+		Debug: true,
+	}
+	s := NewTestServerWithDriver(t, driver)
+	conf := goftp.Config{
+		User:     authUser,
+		Password: authPass,
+	}
+	file := createTemporaryFile(t, 1*1024)
+	c, err := goftp.DialConfig(conf, s.Addr())
+	require.NoError(t, err)
+
+	defer func() { require.NoError(t, c.Close()) }()
+
+	_, err = file.Seek(0, io.SeekStart)
+	require.NoError(t, err)
+
+	err = c.Store("file", file)
+	require.NoError(t, err)
+
+	_, err = file.Seek(0, io.SeekEnd)
+	require.NoError(t, err)
+
+	data := []byte("some more data")
+	_, err = file.Write(data)
+	require.NoError(t, err)
+
+	_, err = file.Seek(1024, io.SeekStart)
+	require.NoError(t, err)
+
+	_, err = c.TransferFromOffset("file", nil, file, 1024)
+	require.NoError(t, err)
+
+	info, err := c.Stat("file")
+	require.NoError(t, err)
+	require.Equal(t, int64(1024+len(data)), info.Size())
+
+	localHash := hashFile(t, file)
+	remoteHash := ftpDownloadAndHash(t, c, "file")
+	require.Equal(t, localHash, remoteHash)
+
+	// finally test a partial RETR
+	buf := bytes.NewBuffer(nil)
+	_, err = c.TransferFromOffset("file", buf, nil, 1024)
+	require.NoError(t, err)
+	require.Equal(t, string(data), buf.String())
+}
