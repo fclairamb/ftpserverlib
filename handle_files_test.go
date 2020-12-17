@@ -250,15 +250,19 @@ func TestSYMLINK(t *testing.T) {
 
 	// Bad syntaxes
 	rc, _, err := raw.SendCommand("SITE SYMLINK")
+	require.NoError(t, err)
 	require.Equal(t, StatusSyntaxErrorNotRecognised, rc, "Should have been refused")
 
 	rc, _, err = raw.SendCommand("SITE SYMLINK ")
+	require.NoError(t, err)
 	require.Equal(t, StatusSyntaxErrorParameters, rc, "Should have been refused")
 
 	rc, _, err = raw.SendCommand("SITE SYMLINK file1")
+	require.NoError(t, err)
 	require.Equal(t, StatusSyntaxErrorParameters, rc, "Should have been refused")
 
 	rc, _, err = raw.SendCommand("SITE SYMLINK file1 file2 file3")
+	require.NoError(t, err)
 	require.Equal(t, StatusSyntaxErrorParameters, rc, "Should have been refused")
 
 	// Creating a bad symlink is authorized
