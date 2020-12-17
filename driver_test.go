@@ -96,6 +96,8 @@ var errFailClose = errors.New("couldn't close")
 
 var errFailWrite = errors.New("couldn't write")
 
+var errFailSeek = errors.New("couldn't seek")
+
 func (f *testFile) Write(b []byte) (int, error) {
 	if strings.Contains(f.File.Name(), "fail-to-write") {
 		return 0, errFailWrite
@@ -110,6 +112,14 @@ func (f *testFile) Close() error {
 	}
 
 	return f.File.Close()
+}
+
+func (f *testFile) Seek(offset int64, whence int) (int64, error) {
+	if strings.Contains(f.File.Name(), "fail-to-seek") {
+		return 0, errFailSeek
+	}
+
+	return f.File.Seek(offset, whence)
 }
 
 // NewTestClientDriver creates a client driver

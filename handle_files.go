@@ -68,7 +68,7 @@ func (c *clientHandler) transferFile(write bool, append bool) {
 
 		// If this fail, can stop right here and reset the seek position
 		if err != nil {
-			c.writeMessage(550, "Could not access file: "+err.Error())
+			c.writeMessage(StatusActionNotTaken, "Could not access file: "+err.Error())
 			c.ctxRest = 0
 			return
 		}
@@ -200,9 +200,9 @@ func (c *clientHandler) handleCHOWN(params string) {
 // https://learn.akamai.com/en-us/webhelp/netstorage/netstorage-user-guide/
 // GUID-AB301948-C6FF-4957-9291-FE3F02457FD0.html
 func (c *clientHandler) handleSYMLINK(params string) {
-	spl := strings.SplitN(params, " ", 2)
+	spl := strings.SplitN(params, " ", 3)
 
-	if len(spl) < 2 {
+	if len(spl) != 2 {
 		c.writeMessage(StatusSyntaxErrorParameters, "bad command")
 		return
 	}

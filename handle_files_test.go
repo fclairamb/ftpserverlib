@@ -248,8 +248,21 @@ func TestSYMLINK(t *testing.T) {
 	raw, err := c.OpenRawConn()
 	require.NoError(t, err, "Couldn't open raw connection")
 
-	// Creating a bad clunky is authorized
-	rc, _, err := raw.SendCommand("SITE SYMLINK file3 file4")
+	// Bad syntaxes
+	rc, _, err := raw.SendCommand("SITE SYMLINK")
+	require.Equal(t, StatusSyntaxErrorNotRecognised, rc, "Should have been refused")
+
+	rc, _, err = raw.SendCommand("SITE SYMLINK ")
+	require.Equal(t, StatusSyntaxErrorParameters, rc, "Should have been refused")
+
+	rc, _, err = raw.SendCommand("SITE SYMLINK file1")
+	require.Equal(t, StatusSyntaxErrorParameters, rc, "Should have been refused")
+
+	rc, _, err = raw.SendCommand("SITE SYMLINK file1 file2 file3")
+	require.Equal(t, StatusSyntaxErrorParameters, rc, "Should have been refused")
+
+	// Creating a bad symlink is authorized
+	rc, _, err = raw.SendCommand("SITE SYMLINK file3 file4")
 	require.NoError(t, err)
 	require.Equal(t, StatusOK, rc, "Should have been accepted")
 
