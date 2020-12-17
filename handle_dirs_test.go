@@ -235,7 +235,7 @@ func TestTLSTransfer(t *testing.T) {
 	rc, response, err = raw.SendCommand("MLSD /")
 	require.NoError(t, err)
 	require.Equal(t, StatusServiceNotAvailable, rc)
-	require.Equal(t, "Unable to open transfer: TLS is required", response)
+	require.Equal(t, "unable to open transfer: TLS is required", response)
 }
 
 func TestDirListingBeforeLogin(t *testing.T) {

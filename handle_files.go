@@ -38,77 +38,83 @@ func (c *clientHandler) handleRETR() error {
 func (c *clientHandler) transferFile(write bool, append bool) {
 	var file FileTransfer
 	var err error
+	var fileFlag int
+	var filePerm os.FileMode = 0777
 
 	path := c.absPath(c.param)
 
 	// We try to open the file
-	{
-		var fileFlag int
-		var filePerm os.FileMode = 0777
-		if write {
-			fileFlag = os.O_WRONLY
-			if append {
-				fileFlag |= os.O_APPEND
-			} else {
-				fileFlag |= os.O_CREATE
-				// if this isn't a resume we add the truncate flag
-				// to be sure to overwrite an existing file
-				if c.ctxRest == 0 {
-					fileFlag |= os.O_TRUNC
-				}
+	if write {
+		fileFlag = os.O_WRONLY
+		if append {
+			fileFlag |= os.O_APPEND
+		} else {
+			fileFlag |= os.O_CREATE
+			// if this isn't a resume we add the truncate flag
+			// to be sure to overwrite an existing file
+			if c.ctxRest == 0 {
+				fileFlag |= os.O_TRUNC
 			}
-		} else {
-			fileFlag = os.O_RDONLY
 		}
-		if fileTransfer, ok := c.driver.(ClientDriverExtentionFileTransfer); ok {
-			file, err = fileTransfer.GetHandle(path, fileFlag, c.ctxRest)
-		} else {
-			file, err = c.driver.OpenFile(path, fileFlag, filePerm)
-		}
+	} else {
+		fileFlag = os.O_RDONLY
+	}
 
-		// If this fail, can stop right here and reset the seek position
-		if err != nil {
-			c.writeMessage(StatusActionNotTaken, "Could not access file: "+err.Error())
-			c.ctxRest = 0
-			return
-		}
+	if fileTransfer, ok := c.driver.(ClientDriverExtentionFileTransfer); ok {
+		file, err = fileTransfer.GetHandle(path, fileFlag, c.ctxRest)
+	} else {
+		file, err = c.driver.OpenFile(path, fileFlag, filePerm)
+	}
+
+	// If this fail, can stop right here and reset the seek position
+	if err != nil {
+		c.writeMessage(StatusActionNotTaken, "Could not access file: "+err.Error())
+		c.ctxRest = 0
+
+		return
 	}
 
 	// Try to seek on it
 	if c.ctxRest != 0 {
-		if _, errSeek := file.Seek(c.ctxRest, 0); errSeek != nil {
-			err = errSeek
-		}
+		_, err = file.Seek(c.ctxRest, 0)
 		// Whatever happens we should reset the seek position
 		c.ctxRest = 0
+
+		if err != nil {
+			// if we are unable to seek we can stop right here and close the file
+			c.writeMessage(StatusActionNotTaken, "Could not seek file: "+err.Error())
+			// we can ignore the close error here
+			file.Close() //nolint:errcheck,gosec
+
+			return
+		}
 	}
 
+	tr, err := c.TransferOpen()
 	if err != nil {
+		// an error is already returned to the FTP client
+		// we can stop right here and close the file ignoring close error if any
+		file.Close() //nolint:errcheck,gosec
+
 		return
 	}
 
-	var tr net.Conn
-	tr, err = c.TransferOpen()
-
-	if err == nil {
-		err = c.doFileTransfer(tr, file, write)
-
-		// We always close the file
-		if errClose := file.Close(); errClose != nil && err == nil {
-			err = errClose
-		}
+	err = c.doFileTransfer(tr, file, write)
+	if errClose := file.Close(); errClose != nil && err == nil {
+		// FIXME: should we ignore close error if write == false?
+		err = errClose
 	}
 
+	// closing the transfer we also send the response message to the FTP client
 	c.TransferClose(err)
 }
 
 func (c *clientHandler) doFileTransfer(tr net.Conn, file io.ReadWriter, write bool) error {
 	var err error
-
-	// Copy the data
 	var in io.Reader
 	var out io.Writer
 
+	// Copy the data
 	if write { // ... from the connection to the file
 		in = tr
 		out = file
