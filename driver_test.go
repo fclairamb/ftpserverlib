@@ -100,6 +100,7 @@ func (f *testFile) Write(b []byte) (int, error) {
 	if strings.Contains(f.File.Name(), "fail-to-write") {
 		return 0, errFailWrite
 	}
+
 	return f.File.Write(b)
 }
 
@@ -107,6 +108,7 @@ func (f *testFile) Close() error {
 	if strings.Contains(f.File.Name(), "fail-to-close") {
 		return errFailClose
 	}
+
 	return f.File.Close()
 }
 

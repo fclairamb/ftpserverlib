@@ -311,6 +311,7 @@ func TestFailingFileTransfer(t *testing.T) {
 
 	c, err = goftp.DialConfig(conf, s.Addr())
 	require.NoError(t, err)
+
 	defer func() { require.NoError(t, c.Close()) }()
 
 	t.Run("on write", func(t *testing.T) {
