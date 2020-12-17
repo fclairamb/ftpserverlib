@@ -1,6 +1,7 @@
 package ftpserver
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"crypto/tls"
 	"encoding/hex"
@@ -296,32 +297,48 @@ func TestFailingFileTransfer(t *testing.T) {
 	driver := &TestServerDriver{
 		Debug: true,
 	}
-
 	s := NewTestServerWithDriver(t, driver)
-
 	conf := goftp.Config{
 		User:     authUser,
 		Password: authPass,
 	}
 
-	var err error
-	var c *goftp.Client
-
 	file := createTemporaryFile(t, 1*1024)
 
-	c, err = goftp.DialConfig(conf, s.Addr())
+	c, err := goftp.DialConfig(conf, s.Addr())
 	require.NoError(t, err)
 
 	defer func() { require.NoError(t, c.Close()) }()
 
 	t.Run("on write", func(t *testing.T) {
 		err = c.Store("fail-to-write.bin", file)
+		require.Error(t, err)
 		require.True(t, strings.Contains(err.Error(), errFailWrite.Error()), err)
 	})
 
 	t.Run("on close", func(t *testing.T) {
 		err = c.Store("fail-to-close.bin", file)
+		require.Error(t, err)
 		require.True(t, strings.Contains(err.Error(), errFailClose.Error()), err)
+	})
+
+	t.Run("on seek", func(t *testing.T) {
+		appendFile := createTemporaryFile(t, 1*1024)
+		err = c.Store("fail-to-seek.bin", appendFile)
+		require.NoError(t, err)
+		err = appendFile.Close()
+		require.NoError(t, err)
+		appendFile, err = os.OpenFile(appendFile.Name(), os.O_APPEND|os.O_WRONLY, os.ModePerm)
+		require.NoError(t, err)
+		data := []byte("some more data")
+		_, err = io.Copy(appendFile, bytes.NewReader(data))
+		require.NoError(t, err)
+		info, err := appendFile.Stat()
+		require.NoError(t, err)
+		require.Equal(t, int64(1024+len(data)), info.Size())
+		_, err = c.TransferFromOffset("fail-to-seek.bin", nil, appendFile, 1024)
+		require.Error(t, err)
+		require.True(t, strings.Contains(err.Error(), errFailSeek.Error()), err)
 	})
 
 	t.Run("check for sync", func(t *testing.T) {
