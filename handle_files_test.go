@@ -1,6 +1,7 @@
 package ftpserver
 
 import (
+	"crypto/tls"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -85,7 +86,6 @@ func TestALLO(t *testing.T) {
 		User:     authUser,
 		Password: authPass,
 	}
-
 	c, err := goftp.DialConfig(conf, s.Addr())
 	require.NoError(t, err, "Couldn't connect")
 
@@ -105,13 +105,44 @@ func TestALLO(t *testing.T) {
 	require.Equal(t, StatusOK, rc, "Should have been accepted")
 }
 
+func TestCHMOD(t *testing.T) {
+	s := NewTestServerWithDriver(t, &TestServerDriver{
+		Debug: true,
+		TLS:   true,
+	})
+	conf := goftp.Config{
+		User:     authUser,
+		Password: authPass,
+		TLSConfig: &tls.Config{
+			// nolint:gosec
+			InsecureSkipVerify: true,
+		},
+		TLSMode: goftp.TLSExplicit,
+	}
+	c, err := goftp.DialConfig(conf, s.Addr())
+	require.NoError(t, err, "Couldn't connect")
+
+	// Creating a tiny file
+	ftpUpload(t, c, createTemporaryFile(t, 10), "file")
+
+	raw, err := c.OpenRawConn()
+	require.NoError(t, err, "Couldn't open raw connection")
+
+	rc, _, err := raw.SendCommand("SITE CHMOD a file")
+	require.NoError(t, err)
+	require.Equal(t, StatusActionNotTaken, rc, "Should have been refused")
+
+	rc, _, err = raw.SendCommand("SITE CHMOD 600 file")
+	require.NoError(t, err)
+	require.Equal(t, StatusOK, rc, "Should have been accepted")
+}
+
 func TestCHOWN(t *testing.T) {
 	s := NewTestServer(t, true)
 	conf := goftp.Config{
 		User:     authUser,
 		Password: authPass,
 	}
-
 	c, err := goftp.DialConfig(conf, s.Addr())
 	require.NoError(t, err, "Couldn't connect")
 
@@ -150,12 +181,19 @@ func TestCHOWN(t *testing.T) {
 }
 
 func TestMFMT(t *testing.T) {
-	s := NewTestServer(t, true)
+	s := NewTestServerWithDriver(t, &TestServerDriver{
+		Debug: true,
+		TLS:   true,
+	})
 	conf := goftp.Config{
 		User:     authUser,
 		Password: authPass,
+		TLSConfig: &tls.Config{
+			// nolint:gosec
+			InsecureSkipVerify: true,
+		},
+		TLSMode: goftp.TLSExplicit,
 	}
-
 	c, err := goftp.DialConfig(conf, s.Addr())
 	require.NoError(t, err, "Couldn't connect")
 
@@ -164,9 +202,7 @@ func TestMFMT(t *testing.T) {
 	// Creating a tiny file
 	ftpUpload(t, c, createTemporaryFile(t, 10), "file")
 
-	var raw goftp.RawConn
-
-	raw, err = c.OpenRawConn()
+	raw, err := c.OpenRawConn()
 	require.NoError(t, err, "Couldn't open raw connection")
 
 	// Good
@@ -201,7 +237,6 @@ func TestSYMLINK(t *testing.T) {
 		User:     authUser,
 		Password: authPass,
 	}
-
 	c, err := goftp.DialConfig(conf, s.Addr())
 	require.NoError(t, err, "Couldn't connect")
 
@@ -210,9 +245,7 @@ func TestSYMLINK(t *testing.T) {
 	// Creating a tiny file
 	ftpUpload(t, c, createTemporaryFile(t, 10), "file")
 
-	var raw goftp.RawConn
-
-	raw, err = c.OpenRawConn()
+	raw, err := c.OpenRawConn()
 	require.NoError(t, err, "Couldn't open raw connection")
 
 	// Creating a bad clunky is authorized
@@ -246,7 +279,6 @@ func TestSTATFile(t *testing.T) {
 		User:     authUser,
 		Password: authPass,
 	}
-
 	c, err := goftp.DialConfig(conf, s.Addr())
 	require.NoError(t, err, "Couldn't connect")
 
@@ -262,9 +294,7 @@ func TestSTATFile(t *testing.T) {
 	_, err = c.Mkdir("/dir/sub")
 	require.NoError(t, err)
 
-	var raw goftp.RawConn
-
-	raw, err = c.OpenRawConn()
+	raw, err := c.OpenRawConn()
 	require.NoError(t, err, "Couldn't open raw connection")
 
 	rc, _, err := raw.SendCommand("STAT file")
@@ -279,6 +309,32 @@ func TestSTATFile(t *testing.T) {
 	rc, _, err = raw.SendCommand("STAT missing")
 	require.NoError(t, err)
 	require.Equal(t, StatusFileActionNotTaken, rc)
+}
+
+func TestMDTM(t *testing.T) {
+	s := NewTestServer(t, true)
+	conf := goftp.Config{
+		User:     authUser,
+		Password: authPass,
+	}
+	c, err := goftp.DialConfig(conf, s.Addr())
+	require.NoError(t, err, "Couldn't connect")
+
+	defer func() { panicOnError(c.Close()) }()
+
+	// Creating a tiny file
+	ftpUpload(t, c, createTemporaryFile(t, 10), "file")
+
+	raw, err := c.OpenRawConn()
+	require.NoError(t, err, "Couldn't open raw connection")
+
+	rc, _, err := raw.SendCommand("MDTM file")
+	require.NoError(t, err)
+	require.Equal(t, StatusFileStatus, rc)
+
+	rc, _, err = raw.SendCommand("MDTM missing")
+	require.NoError(t, err)
+	require.Equal(t, StatusActionNotTaken, rc)
 }
 
 func TestHASHCommand(t *testing.T) {
@@ -314,9 +370,7 @@ func TestHASHCommand(t *testing.T) {
 
 	ftpUpload(t, c, tempFile, "file.txt")
 
-	var raw goftp.RawConn
-
-	raw, err = c.OpenRawConn()
+	raw, err := c.OpenRawConn()
 	require.NoError(t, err, "Couldn't open raw connection")
 
 	// ask hash for a directory
@@ -369,9 +423,7 @@ func TestCustomHASHCommands(t *testing.T) {
 
 	ftpUpload(t, c, tempFile, "file.txt")
 
-	var raw goftp.RawConn
-
-	raw, err = c.OpenRawConn()
+	raw, err := c.OpenRawConn()
 	require.NoError(t, err, "Couldn't open raw connection")
 
 	customCommands := make(map[string]string)

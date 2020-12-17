@@ -111,10 +111,6 @@ func (c *clientHandler) checkLISTArgs() {
 }
 
 func (c *clientHandler) handleLIST() error {
-	if !c.server.settings.DisableLISTArgs {
-		c.checkLISTArgs()
-	}
-
 	if files, err := c.getFileList(); err == nil || err == io.EOF {
 		if tr, errTr := c.TransferOpen(); errTr == nil {
 			err = c.dirTransferLIST(tr, files)
@@ -258,6 +254,10 @@ func (c *clientHandler) writeMLSxOutput(w io.Writer, file os.FileInfo) error {
 }
 
 func (c *clientHandler) getFileList() ([]os.FileInfo, error) {
+	if !c.server.settings.DisableLISTArgs {
+		c.checkLISTArgs()
+	}
+
 	directoryPath := c.absPath(c.param)
 
 	if fileList, ok := c.driver.(ClientDriverExtensionFileList); ok {

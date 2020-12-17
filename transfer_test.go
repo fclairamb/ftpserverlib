@@ -5,7 +5,6 @@ import (
 	"crypto/tls"
 	"encoding/hex"
 	"errors"
-	"github.com/spf13/afero"
 	"io"
 	"io/ioutil"
 	"math/rand"
@@ -22,43 +21,34 @@ func createTemporaryFile(t *testing.T, targetSize int) *os.File {
 
 	var fileErr error
 
-	if file, fileErr = ioutil.TempFile("", "ftpserver"); fileErr != nil {
-		t.Fatal("Temporary creation error:", fileErr)
-		return nil
-	}
+	file, fileErr = ioutil.TempFile("", "ftpserver")
+	require.NoError(t, fileErr, "Temporary file creation error")
 
 	// nolint: gosec
 	src := rand.New(rand.NewSource(0))
-	if _, err := io.CopyN(file, src, int64(targetSize)); err != nil {
-		t.Fatal("Couldn't copy:", err)
-		return nil
-	}
+	_, err := io.CopyN(file, src, int64(targetSize))
+	require.NoError(t, err, "Couldn't copy")
 
 	t.Cleanup(func() {
-		if err := os.Remove(file.Name()); err != nil {
-			t.Fatalf("Problem deleting file \"%s\": %v", file.Name(), err)
-		}
+		err := os.Remove(file.Name())
+		require.NoError(t, err, fmt.Sprintf("Problem deleting file %#v", file.Name()))
 	})
 
 	return file
 }
 
 func hashFile(t *testing.T, file *os.File) string {
-	if _, err := file.Seek(0, 0); err != nil {
-		t.Fatal("Couldn't seek:", err)
-	}
+	_, err := file.Seek(0, 0)
+	require.NoError(t, err, "Couldn't seek")
 
 	hashser := sha256.New()
-
-	if _, err := io.Copy(hashser, file); err != nil {
-		t.Fatal("Couldn't hashUpload:", err)
-	}
+	_, err = io.Copy(hashser, file)
+	require.NoError(t, err, "Couldn't hashUpload")
 
 	hash := hex.EncodeToString(hashser.Sum(nil))
 
-	if _, err := file.Seek(0, 0); err != nil {
-		t.Fatal("Couldn't seek:", err)
-	}
+	_, err = file.Seek(0, 0)
+	require.NoError(t, err, "Couldn't seek")
 
 	return hash
 }
@@ -92,21 +82,18 @@ func ftpUpload(t *testing.T, ftp *goftp.Client, file io.ReadSeeker, filename str
 
 func ftpDownloadAndHash(t *testing.T, ftp *goftp.Client, filename string) string {
 	hasher := sha256.New()
-	if err := ftp.Retrieve(filename, hasher); err != nil {
-		t.Fatal("Couldn't fetch file:", err)
-	}
+	err := ftp.Retrieve(filename, hasher)
+	require.NoError(t, err, "Couldn't fetch file")
 
 	return hex.EncodeToString(hasher.Sum(nil))
 }
 
 func ftpDelete(t *testing.T, ftp *goftp.Client, filename string) {
-	if err := ftp.Delete(filename); err != nil {
-		t.Fatal("Couldn't delete file "+filename+":", err)
-	}
+	err := ftp.Delete(filename)
+	require.NoError(t, err, "Couldn't delete file "+filename)
 
-	if err := ftp.Delete(filename); err == nil {
-		t.Fatal("Should have had a problem deleting " + filename)
-	}
+	err = ftp.Delete(filename)
+	require.Error(t, err, "Should have had a problem deleting "+filename)
 }
 
 func TestTransferIPv6(t *testing.T) {
@@ -189,12 +176,8 @@ func testTransferOnConnection(t *testing.T, server *FtpServer, active, enableTLS
 		}
 	}
 
-	var err error
-	var c *goftp.Client
-
-	if c, err = goftp.DialConfig(conf, server.Addr()); err != nil {
-		t.Fatal("Couldn't connect", err)
-	}
+	c, err := goftp.DialConfig(conf, server.Addr())
+	require.NoError(t, err, "Couldn't connect")
 
 	defer func() { panicOnError(c.Close()) }()
 
@@ -211,9 +194,7 @@ func testTransferOnConnection(t *testing.T, server *FtpServer, active, enableTLS
 	}
 
 	// We make sure the hashes of the two files match
-	if hashUpload != hashDownload {
-		t.Fatal("The two files don't have the same hash:", hashUpload, "!=", hashDownload)
-	}
+	require.Equal(t, hashUpload, hashDownload, "The two files don't have the same hash")
 }
 
 func TestActiveModeDisabled(t *testing.T) {
@@ -230,135 +211,84 @@ func TestActiveModeDisabled(t *testing.T) {
 		Password:        authPass,
 		ActiveTransfers: true,
 	}
-
-	var err error
-	var c *goftp.Client
-
-	if c, err = goftp.DialConfig(conf, server.Addr()); err != nil {
-		t.Fatal("Couldn't connect", err)
-	}
+	c, err := goftp.DialConfig(conf, server.Addr())
+	require.NoError(t, err, "Couldn't connect")
 
 	defer func() { panicOnError(c.Close()) }()
 
 	file := createTemporaryFile(t, 10*1024)
 	err = c.Store("file.bin", file)
-
-	if err == nil {
-		t.Fatal("active mode is disabled, upload must fail")
-	}
-
-	if !strings.Contains(err.Error(), "421-PORT command is disabled") {
-		t.Fatal("unexpected error", err)
-	}
+	require.Error(t, err, "active mode is disabled, upload must fail")
+	require.True(t, strings.Contains(err.Error(), "421-PORT command is disabled"))
 }
 
 // TestFailedTransfer validates the handling of failed transfer caused by file access issues
 func TestFailedTransfer(t *testing.T) {
 	s := NewTestServer(t, true)
-
 	conf := goftp.Config{
 		User:     authUser,
 		Password: authPass,
 	}
-
-	var err error
-
-	var c *goftp.Client
-
-	if c, err = goftp.DialConfig(conf, s.Addr()); err != nil {
-		t.Fatal("Couldn't connect", err)
-	}
+	c, err := goftp.DialConfig(conf, s.Addr())
+	require.NoError(t, err, "Couldn't connect")
 
 	defer func() { panicOnError(c.Close()) }()
 
 	// We create a 1KB file and upload it
 	file := createTemporaryFile(t, 1*1024)
-	if err = c.Store("/non/existing/path/file.bin", file); err == nil {
-		t.Fatal("This upload should have failed")
-	}
+	err = c.Store("/non/existing/path/file.bin", file)
+	require.Error(t, err, "This upload should have failed")
 
-	if err = c.Store("file.bin", file); err != nil {
-		t.Fatal("This upload should have succeeded", err)
-	}
+	err = c.Store("file.bin", file)
+	require.NoError(t, err, "This upload should have succeeded")
 }
 
 func TestBogusTransferStart(t *testing.T) {
 	s := NewTestServer(t, true)
-
-	c, err := goftp.DialConfig(goftp.Config{User: "test", Password: "test"}, s.Addr())
-	if err != nil {
-		t.Fatal(err)
+	conf := goftp.Config{
+		User:     authUser,
+		Password: authPass,
 	}
+	c, err := goftp.DialConfig(conf, s.Addr())
+	require.NoError(t, err, "Couldn't connect")
 
 	rc, err := c.OpenRawConn()
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	{ // Completely bogus port declaration
 		status, resp, err := rc.SendCommand("PORT something")
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		if status != StatusSyntaxErrorNotRecognised {
-			t.Fatal("Bad status:", status, resp)
-		}
+		require.NoError(t, err)
+		require.Equal(t, StatusSyntaxErrorNotRecognised, status, resp)
 	}
 
 	{ // Completely bogus port declaration
 		status, resp, err := rc.SendCommand("EPRT something")
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		if status != StatusSyntaxErrorNotRecognised {
-			t.Fatal("Bad status:", status, resp)
-		}
+		require.NoError(t, err)
+		require.Equal(t, StatusSyntaxErrorNotRecognised, status, resp)
 	}
 
 	{ // Bad port number: 0
 		status, resp, err := rc.SendCommand("EPRT |2|::1|0|")
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		if status != StatusSyntaxErrorNotRecognised {
-			t.Fatal("Bad status:", status, resp)
-		}
+		require.NoError(t, err)
+		require.Equal(t, StatusSyntaxErrorNotRecognised, status, resp)
 	}
 
 	{ // Bad IP
 		status, resp, err := rc.SendCommand("EPRT |1|253.254.255.256|2000|")
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		if status != StatusSyntaxErrorNotRecognised {
-			t.Fatal("Bad status:", status, resp)
-		}
+		require.NoError(t, err)
+		require.Equal(t, StatusSyntaxErrorNotRecognised, status, resp)
 	}
 
 	{ // Bad protocol type: 3
 		status, resp, err := rc.SendCommand("EPRT |3|::1|2000|")
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		if status != StatusSyntaxErrorNotRecognised {
-			t.Fatal("Bad status:", status, resp)
-		}
+		require.NoError(t, err)
+		require.Equal(t, StatusSyntaxErrorNotRecognised, status, resp)
 	}
 
 	{ // We end-up on a positive note
 		status, resp, err := rc.SendCommand("EPRT |1|::1|2000|")
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		if status != StatusOK {
-			t.Fatal("Bad status:", status, resp)
-		}
+		require.NoError(t, err)
+		require.Equal(t, StatusOK, status, resp)
 	}
 }
 
@@ -419,3 +349,4 @@ func (f *testFile) Close() error {
 	}
 	return f.File.Close()
 }
+
