@@ -6,6 +6,7 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
+	"strings"
 	"testing"
 
 	gklog "github.com/go-kit/kit/log"
@@ -85,6 +86,28 @@ type TestServerDriver struct {
 // TestClientDriver defines a minimal serverftp client driver
 type TestClientDriver struct {
 	afero.Fs
+}
+
+type testFile struct {
+	afero.File
+}
+
+var errFailClose = errors.New("couldn't close")
+
+var errFailWrite = errors.New("couldn't write")
+
+func (f *testFile) Write(b []byte) (int, error) {
+	if strings.Contains(f.File.Name(), "fail-to-write") {
+		return 0, errFailWrite
+	}
+	return f.File.Write(b)
+}
+
+func (f *testFile) Close() error {
+	if strings.Contains(f.File.Name(), "fail-to-close") {
+		return errFailClose
+	}
+	return f.File.Close()
 }
 
 // NewTestClientDriver creates a client driver

@@ -4,7 +4,7 @@ import (
 	"crypto/sha256"
 	"crypto/tls"
 	"encoding/hex"
-	"errors"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"math/rand"
@@ -327,26 +327,3 @@ func TestFailingFileTransfer(t *testing.T) {
 		require.NoError(t, c.Store("ok", file))
 	})
 }
-
-type testFile struct {
-	afero.File
-}
-
-var errFailClose = errors.New("couldn't close")
-
-var errFailWrite = errors.New("couldn't write")
-
-func (f *testFile) Write(b []byte) (int, error) {
-	if strings.Contains(f.File.Name(), "fail-to-write") {
-		return 0, errFailWrite
-	}
-	return f.File.Write(b)
-}
-
-func (f *testFile) Close() error {
-	if strings.Contains(f.File.Name(), "fail-to-close") {
-		return errFailClose
-	}
-	return f.File.Close()
-}
-
