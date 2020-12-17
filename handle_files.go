@@ -38,100 +38,101 @@ func (c *clientHandler) handleRETR() error {
 func (c *clientHandler) transferFile(write bool, append bool) {
 	var file FileTransfer
 	var err error
+	var fileFlag int
+	var filePerm os.FileMode = 0777
 
 	path := c.absPath(c.param)
 
 	// We try to open the file
-	{
-		var fileFlag int
-		var filePerm os.FileMode = 0777
-		if write {
-			fileFlag = os.O_WRONLY
-			if append {
-				fileFlag |= os.O_APPEND
-			} else {
-				fileFlag |= os.O_CREATE
-				// if this isn't a resume we add the truncate flag
-				// to be sure to overwrite an existing file
-				if c.ctxRest == 0 {
-					fileFlag |= os.O_TRUNC
-				}
+	if write {
+		fileFlag = os.O_WRONLY
+		if append {
+			fileFlag |= os.O_APPEND
+		} else {
+			fileFlag |= os.O_CREATE
+			// if this isn't a resume we add the truncate flag
+			// to be sure to overwrite an existing file
+			if c.ctxRest == 0 {
+				fileFlag |= os.O_TRUNC
 			}
-		} else {
-			fileFlag = os.O_RDONLY
 		}
-		if fileTransfer, ok := c.driver.(ClientDriverExtentionFileTransfer); ok {
-			file, err = fileTransfer.GetHandle(path, fileFlag, c.ctxRest)
-		} else {
-			file, err = c.driver.OpenFile(path, fileFlag, filePerm)
-		}
+	} else {
+		fileFlag = os.O_RDONLY
+	}
 
-		// If this fail, can stop right here and reset the seek position
-		if err != nil {
-			c.writeMessage(550, "Could not access file: "+err.Error())
-			c.ctxRest = 0
-			return
-		}
+	if fileTransfer, ok := c.driver.(ClientDriverExtentionFileTransfer); ok {
+		file, err = fileTransfer.GetHandle(path, fileFlag, c.ctxRest)
+	} else {
+		file, err = c.driver.OpenFile(path, fileFlag, filePerm)
+	}
+
+	// If this fail, can stop right here and reset the seek position
+	if err != nil {
+		c.writeMessage(StatusActionNotTaken, "Could not access file: "+err.Error())
+		c.ctxRest = 0
+
+		return
 	}
 
 	// Try to seek on it
 	if c.ctxRest != 0 {
-		if _, errSeek := file.Seek(c.ctxRest, 0); errSeek != nil {
-			err = errSeek
-		}
+		_, err = file.Seek(c.ctxRest, 0)
 		// Whatever happens we should reset the seek position
 		c.ctxRest = 0
-	}
 
-	// Start the transfer
-	if err == nil {
-		err = c.doTransfer(file, write)
-	}
+		if err != nil {
+			// if we are unable to seek we can stop right here and close the file
+			c.writeMessage(StatusActionNotTaken, "Could not seek file: "+err.Error())
+			// we can ignore the close error here
+			file.Close() //nolint:errcheck,gosec
 
-	// *ALWAYS* close the file but only save the error if there wasn't one before
-	if errClose := file.Close(); errClose != nil && err == nil {
-		err = errClose
-	}
-
-	if err != nil {
-		// if the transfer could not be open we already sent an error
-		if _, isOpenTransferErr := err.(*openTransferError); !isOpenTransferErr {
-			c.writeMessage(StatusActionNotTaken, "Could not transfer file: "+err.Error())
 			return
 		}
 	}
+
+	tr, err := c.TransferOpen()
+	if err != nil {
+		// an error is already returned to the FTP client
+		// we can stop right here and close the file ignoring close error if any
+		file.Close() //nolint:errcheck,gosec
+
+		return
+	}
+
+	err = c.doFileTransfer(tr, file, write)
+	// we ignore close error for reads
+	if errClose := file.Close(); errClose != nil && err == nil && write {
+		err = errClose
+	}
+
+	// closing the transfer we also send the response message to the FTP client
+	c.TransferClose(err)
 }
 
-func (c *clientHandler) doTransfer(file io.ReadWriter, write bool) error {
-	var tr net.Conn
+func (c *clientHandler) doFileTransfer(tr net.Conn, file io.ReadWriter, write bool) error {
 	var err error
+	var in io.Reader
+	var out io.Writer
 
-	if tr, err = c.TransferOpen(); err == nil {
-		// Copy the data
-		var in io.Reader
-		var out io.Writer
-
-		if write { // ... from the connection to the file
-			in = tr
-			out = file
-		} else { // ... from the file to the connection
-			in = file
-			out = tr
+	// Copy the data
+	if write { // ... from the connection to the file
+		in = tr
+		out = file
+	} else { // ... from the file to the connection
+		in = file
+		out = tr
+	}
+	// for reads io.EOF isn't an error, for writes it must be considered an error
+	if written, errCopy := io.Copy(out, in); errCopy != nil && (errCopy != io.EOF || write) {
+		err = errCopy
+	} else {
+		c.logger.Debug(
+			"Stream copy finished",
+			"writtenBytes", written,
+		)
+		if written == 0 {
+			_, err = out.Write([]byte{})
 		}
-		// for reads io.EOF isn't an error, for writes it must be considered an error
-		if written, errCopy := io.Copy(out, in); errCopy != nil && (errCopy != io.EOF || write) {
-			err = errCopy
-		} else {
-			c.logger.Debug(
-				"Stream copy finished",
-				"writtenBytes", written,
-			)
-			if written == 0 {
-				_, err = out.Write([]byte(""))
-			}
-		}
-
-		c.TransferClose(err)
 	}
 
 	if err != nil {
@@ -164,9 +165,9 @@ func (c *clientHandler) handleCHMOD(params string) {
 
 // https://www.raidenftpd.com/en/raiden-ftpd-doc/help-sitecmd.html (wildcard isn't supported)
 func (c *clientHandler) handleCHOWN(params string) {
-	spl := strings.SplitN(params, " ", 2)
+	spl := strings.SplitN(params, " ", 3)
 
-	if len(spl) < 2 {
+	if len(spl) != 2 {
 		c.writeMessage(StatusSyntaxErrorParameters, "bad command")
 		return
 	}
@@ -205,9 +206,9 @@ func (c *clientHandler) handleCHOWN(params string) {
 // https://learn.akamai.com/en-us/webhelp/netstorage/netstorage-user-guide/
 // GUID-AB301948-C6FF-4957-9291-FE3F02457FD0.html
 func (c *clientHandler) handleSYMLINK(params string) {
-	spl := strings.SplitN(params, " ", 2)
+	spl := strings.SplitN(params, " ", 3)
 
-	if len(spl) < 2 {
+	if len(spl) != 2 {
 		c.writeMessage(StatusSyntaxErrorParameters, "bad command")
 		return
 	}

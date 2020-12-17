@@ -50,6 +50,28 @@ func TestLastCommand(t *testing.T) {
 	assert.Empty(t, cc.GetLastCommand())
 }
 
+func TestTransferOpenError(t *testing.T) {
+	s := NewTestServer(t, true)
+	conf := goftp.Config{
+		User:     authUser,
+		Password: authPass,
+	}
+
+	c, err := goftp.DialConfig(conf, s.Addr())
+	require.NoError(t, err, "Couldn't connect")
+
+	defer func() { panicOnError(c.Close()) }()
+
+	raw, err := c.OpenRawConn()
+	require.NoError(t, err, "Couldn't open raw connection")
+
+	// we send STOR without opening a transfer connection
+	rc, response, err := raw.SendCommand("STOR file")
+	require.NoError(t, err)
+	require.Equal(t, StatusActionNotTaken, rc)
+	require.Equal(t, "unable to open transfer: no transfer connection", response)
+}
+
 func TestTLSMethods(t *testing.T) {
 	t.Run("without-tls", func(t *testing.T) {
 		cc := clientHandler{

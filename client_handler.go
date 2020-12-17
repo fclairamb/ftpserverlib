@@ -3,6 +3,7 @@ package ftpserver
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -24,6 +25,11 @@ const (
 	HASHAlgoSHA512
 )
 
+var (
+	errNoTrasferConnection = errors.New("unable to open transfer: no transfer connection")
+	errTLSRequired         = errors.New("unable to open transfer: TLS is required")
+)
+
 func getHashMapping() map[string]HASHAlgo {
 	mapping := make(map[string]HASHAlgo)
 	mapping["CRC32"] = HASHAlgoCRC32
@@ -33,14 +39,6 @@ func getHashMapping() map[string]HASHAlgo {
 	mapping["SHA-512"] = HASHAlgoSHA512
 
 	return mapping
-}
-
-type openTransferError struct {
-	err string
-}
-
-func (e *openTransferError) Error() string {
-	return fmt.Sprintf("Unable to open transfer: %s", e.err)
 }
 
 // nolint: maligned
@@ -341,22 +339,17 @@ func (c *clientHandler) writeMessage(code int, message string) {
 	}
 }
 
-// ErrNoPassiveConnectionDeclared is defined when a transfer is openeed without any passive connection declared
-// var ErrNoPassiveConnectionDeclared = errors.New("no passive connection declared")
-
 func (c *clientHandler) TransferOpen() (net.Conn, error) {
 	if c.transfer == nil {
-		err := &openTransferError{err: "No passive connection declared"}
-		c.writeMessage(StatusActionNotTaken, err.Error())
+		c.writeMessage(StatusActionNotTaken, errNoTrasferConnection.Error())
 
-		return nil, err
+		return nil, errNoTrasferConnection
 	}
 
 	if c.server.settings.TLSRequired == MandatoryEncryption && !c.transferTLS {
-		err := &openTransferError{err: "TLS is required"}
-		c.writeMessage(StatusServiceNotAvailable, err.Error())
+		c.writeMessage(StatusServiceNotAvailable, errTLSRequired.Error())
 
-		return nil, err
+		return nil, errTLSRequired
 	}
 
 	conn, err := c.transfer.Open()
@@ -365,10 +358,9 @@ func (c *clientHandler) TransferOpen() (net.Conn, error) {
 			"Unable to open transfer",
 			"error", err)
 
-		err = &openTransferError{err: err.Error()}
 		c.writeMessage(StatusCannotOpenDataConnection, err.Error())
 
-		return conn, err
+		return nil, err
 	}
 
 	c.writeMessage(StatusFileStatusOK, "Using transfer connection")
@@ -384,13 +376,10 @@ func (c *clientHandler) TransferOpen() (net.Conn, error) {
 }
 
 func (c *clientHandler) TransferClose(err error) {
-	if c.transfer != nil {
-		if err == nil {
-			// only send the OK status if there is no error
-			c.writeMessage(StatusClosingDataConn, "Closing transfer connection")
-		}
+	var errClose error
 
-		if err := c.transfer.Close(); err != nil {
+	if c.transfer != nil {
+		if errClose = c.transfer.Close(); errClose != nil {
 			c.logger.Warn(
 				"Problem closing transfer connection",
 				"err", err,
@@ -402,6 +391,15 @@ func (c *clientHandler) TransferClose(err error) {
 		if c.debug {
 			c.logger.Debug("Transfer connection closed")
 		}
+	}
+
+	switch {
+	case err == nil && errClose == nil:
+		c.writeMessage(StatusClosingDataConn, "Closing transfer connection")
+	case errClose != nil:
+		c.writeMessage(StatusActionNotTaken, fmt.Sprintf("Issue during transfer close: %v", errClose))
+	case err != nil:
+		c.writeMessage(StatusActionNotTaken, fmt.Sprintf("Issue during transfer: %v", err))
 	}
 }
 

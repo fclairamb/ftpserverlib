@@ -6,6 +6,7 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
+	"strings"
 	"testing"
 
 	gklog "github.com/go-kit/kit/log"
@@ -78,15 +79,47 @@ type TestServerDriver struct {
 	Debug bool // To display connection logs information
 	TLS   bool
 
-	Settings     *Settings // Settings
-	FileOverride afero.File
-	fs           afero.Fs
+	Settings *Settings // Settings
+	fs       afero.Fs
 }
 
 // TestClientDriver defines a minimal serverftp client driver
 type TestClientDriver struct {
-	FileOverride afero.File
 	afero.Fs
+}
+
+type testFile struct {
+	afero.File
+}
+
+var errFailClose = errors.New("couldn't close")
+
+var errFailWrite = errors.New("couldn't write")
+
+var errFailSeek = errors.New("couldn't seek")
+
+func (f *testFile) Write(b []byte) (int, error) {
+	if strings.Contains(f.File.Name(), "fail-to-write") {
+		return 0, errFailWrite
+	}
+
+	return f.File.Write(b)
+}
+
+func (f *testFile) Close() error {
+	if strings.Contains(f.File.Name(), "fail-to-close") {
+		return errFailClose
+	}
+
+	return f.File.Close()
+}
+
+func (f *testFile) Seek(offset int64, whence int) (int64, error) {
+	if strings.Contains(f.File.Name(), "fail-to-seek") {
+		return 0, errFailSeek
+	}
+
+	return f.File.Seek(offset, whence)
 }
 
 // NewTestClientDriver creates a client driver
@@ -116,10 +149,6 @@ var errBadUserNameOrPassword = errors.New("bad username or password")
 func (driver *TestServerDriver) AuthUser(_ ClientContext, user, pass string) (ClientDriver, error) {
 	if user == authUser && pass == authPass {
 		clientdriver := NewTestClientDriver(driver)
-
-		if driver.FileOverride != nil {
-			clientdriver.FileOverride = driver.FileOverride
-		}
 
 		return clientdriver, nil
 	}
@@ -156,11 +185,13 @@ func (driver *TestServerDriver) GetTLSConfig() (*tls.Config, error) {
 
 // OpenFile opens a file in 3 possible modes: read, write, appending write (use appropriate flags)
 func (driver *TestClientDriver) OpenFile(path string, flag int, perm os.FileMode) (afero.File, error) {
-	if driver.FileOverride != nil {
-		return driver.FileOverride, nil
+	file, err := driver.Fs.OpenFile(path, flag, perm)
+
+	if err == nil {
+		file = &testFile{File: file}
 	}
 
-	return driver.Fs.OpenFile(path, flag, perm)
+	return file, err
 }
 
 var errTooMuchSpaceRequested = errors.New("you're requesting too much space")

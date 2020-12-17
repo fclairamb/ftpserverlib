@@ -1,10 +1,10 @@
 package ftpserver
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"crypto/tls"
 	"encoding/hex"
-	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -293,7 +293,7 @@ func TestBogusTransferStart(t *testing.T) {
 	}
 }
 
-func TestFailedFileClose(t *testing.T) {
+func TestFailingFileTransfer(t *testing.T) {
 	driver := &TestServerDriver{
 		Debug: true,
 	}
@@ -302,22 +302,95 @@ func TestFailedFileClose(t *testing.T) {
 		User:     authUser,
 		Password: authPass,
 	}
-	c, err := goftp.DialConfig(conf, s.Addr())
-	require.NoError(t, err, "Couldn't connect")
-
-	defer func() { panicOnError(c.Close()) }()
 
 	file := createTemporaryFile(t, 1*1024)
-	driver.FileOverride = &failingCloser{File: *file}
-	err = c.Store("file.bin", file)
-	require.Error(t, err, "this upload should not succeed")
-	require.True(t, strings.Contains(err.Error(), errFailingCloser.Error()))
+
+	c, err := goftp.DialConfig(conf, s.Addr())
+	require.NoError(t, err)
+
+	defer func() { require.NoError(t, c.Close()) }()
+
+	t.Run("on write", func(t *testing.T) {
+		err = c.Store("fail-to-write.bin", file)
+		require.Error(t, err)
+		require.True(t, strings.Contains(err.Error(), errFailWrite.Error()), err)
+	})
+
+	t.Run("on close", func(t *testing.T) {
+		err = c.Store("fail-to-close.bin", file)
+		require.Error(t, err)
+		require.True(t, strings.Contains(err.Error(), errFailClose.Error()), err)
+	})
+
+	t.Run("on seek", func(t *testing.T) {
+		appendFile := createTemporaryFile(t, 1*1024)
+		err = c.Store("fail-to-seek.bin", appendFile)
+		require.NoError(t, err)
+		err = appendFile.Close()
+		require.NoError(t, err)
+		appendFile, err = os.OpenFile(appendFile.Name(), os.O_APPEND|os.O_WRONLY, os.ModePerm)
+		require.NoError(t, err)
+		data := []byte("some more data")
+		_, err = io.Copy(appendFile, bytes.NewReader(data))
+		require.NoError(t, err)
+		info, err := appendFile.Stat()
+		require.NoError(t, err)
+		require.Equal(t, int64(1024+len(data)), info.Size())
+		_, err = c.TransferFromOffset("fail-to-seek.bin", nil, appendFile, 1024)
+		require.Error(t, err)
+		require.True(t, strings.Contains(err.Error(), errFailSeek.Error()), err)
+	})
+
+	t.Run("check for sync", func(t *testing.T) {
+		require.NoError(t, c.Store("ok", file))
+	})
 }
 
-type failingCloser struct {
-	os.File
+func TestTransfersFromOffset(t *testing.T) {
+	driver := &TestServerDriver{
+		Debug: true,
+	}
+	s := NewTestServerWithDriver(t, driver)
+	conf := goftp.Config{
+		User:     authUser,
+		Password: authPass,
+	}
+	file := createTemporaryFile(t, 1*1024)
+	c, err := goftp.DialConfig(conf, s.Addr())
+	require.NoError(t, err)
+
+	defer func() { require.NoError(t, c.Close()) }()
+
+	_, err = file.Seek(0, io.SeekStart)
+	require.NoError(t, err)
+
+	err = c.Store("file", file)
+	require.NoError(t, err)
+
+	_, err = file.Seek(0, io.SeekEnd)
+	require.NoError(t, err)
+
+	data := []byte("some more data")
+	_, err = file.Write(data)
+	require.NoError(t, err)
+
+	_, err = file.Seek(1024, io.SeekStart)
+	require.NoError(t, err)
+
+	_, err = c.TransferFromOffset("file", nil, file, 1024)
+	require.NoError(t, err)
+
+	info, err := c.Stat("file")
+	require.NoError(t, err)
+	require.Equal(t, int64(1024+len(data)), info.Size())
+
+	localHash := hashFile(t, file)
+	remoteHash := ftpDownloadAndHash(t, c, "file")
+	require.Equal(t, localHash, remoteHash)
+
+	// finally test a partial RETR
+	buf := bytes.NewBuffer(nil)
+	_, err = c.TransferFromOffset("file", buf, nil, 1024)
+	require.NoError(t, err)
+	require.Equal(t, string(data), buf.String())
 }
-
-var errFailingCloser = errors.New("the hard disk crashed")
-
-func (f *failingCloser) Close() error { return errFailingCloser }
