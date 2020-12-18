@@ -49,6 +49,16 @@ func (c *clientHandler) handleMKD() error {
 	return nil
 }
 
+func (c *clientHandler) handleMKDIR(params string) {
+	p := c.absPath(params)
+
+	if err := c.driver.MkdirAll(p, 0755); err == nil {
+		c.writeMessage(StatusFileOK, fmt.Sprintf("Created dir %s", p))
+	} else {
+		c.writeMessage(StatusActionNotTaken, fmt.Sprintf("Couldn't create dir %s: %v", p, err))
+	}
+}
+
 func (c *clientHandler) handleRMD() error {
 	var err error
 
@@ -67,6 +77,16 @@ func (c *clientHandler) handleRMD() error {
 	}
 
 	return nil
+}
+
+func (c *clientHandler) handleRMDIR(params string) {
+	p := c.absPath(params)
+
+	if err := c.driver.RemoveAll(p); err == nil {
+		c.writeMessage(StatusFileOK, fmt.Sprintf("Removed dir %s", p))
+	} else {
+		c.writeMessage(StatusActionNotTaken, fmt.Sprintf("Couldn't remove dir %s: %v", p, err))
+	}
 }
 
 func (c *clientHandler) handleCDUP() error {

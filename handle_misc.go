@@ -66,21 +66,28 @@ func (c *clientHandler) handleSITE() error {
 	}
 
 	spl := strings.SplitN(c.param, " ", 2)
-	if len(spl) > 1 {
-		switch strings.ToUpper(spl[0]) {
-		case "CHMOD":
-			c.handleCHMOD(spl[1])
-			return nil
-		case "CHOWN":
-			c.handleCHOWN(spl[1])
-			return nil
-		case "SYMLINK":
-			c.handleSYMLINK(spl[1])
-			return nil
-		}
+	if len(spl) < 2 {
+		c.writeMessage(StatusSyntaxErrorNotRecognised, "Argument required !")
+		return nil
 	}
 
-	c.writeMessage(StatusSyntaxErrorNotRecognised, "Not understood SITE subcommand")
+	cmd := strings.ToUpper(spl[0])
+	params := spl[1]
+
+	switch cmd {
+	case "CHMOD":
+		c.handleCHMOD(params)
+	case "CHOWN":
+		c.handleCHOWN(params)
+	case "SYMLINK":
+		c.handleSYMLINK(params)
+	case "MKDIR":
+		c.handleMKDIR(params)
+	case "RMDIR":
+		c.handleRMDIR(params)
+	default:
+		c.writeMessage(StatusSyntaxErrorNotRecognised, fmt.Sprintf("Unknown SITE subcommand: %s", params))
+	}
 
 	return nil
 }
