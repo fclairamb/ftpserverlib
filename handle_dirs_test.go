@@ -126,6 +126,71 @@ func TestDirHandling(t *testing.T) {
 	require.Error(t, err, "We shouldn't have been able to ftpDelete known again")
 }
 
+func TestMkdirRmDir(t *testing.T) {
+	s := NewTestServer(t, true)
+	conf := goftp.Config{
+		User:     authUser,
+		Password: authPass,
+	}
+
+	c, err := goftp.DialConfig(conf, s.Addr())
+	require.NoError(t, err, "Couldn't connect")
+
+	defer func() { panicOnError(c.Close()) }()
+
+	raw, err := c.OpenRawConn()
+	require.NoError(t, err, "Couldn't open raw connection")
+
+	t.Run("standard", func(t *testing.T) {
+		rc, _, err := raw.SendCommand("SITE MKDIR /dir1/dir2/dir3")
+		require.NoError(t, err)
+		require.Equal(t, StatusFileOK, rc)
+
+		for _, d := range []string{"/dir1", "/dir1/dir2", "/dir1/dir2/dir3"} {
+			stat, errStat := c.Stat(d)
+			require.NoError(t, errStat)
+			require.True(t, stat.IsDir())
+		}
+
+		rc, _, err = raw.SendCommand("SITE RMDIR /dir1")
+		require.NoError(t, err)
+		require.Equal(t, StatusFileOK, rc)
+
+		for _, d := range []string{"/dir1", "/dir1/dir2", "/dir1/dir2/dir3"} {
+			stat, errStat := c.Stat(d)
+			require.Error(t, errStat)
+			require.Nil(t, stat)
+		}
+	})
+
+	t.Run("syntax error", func(t *testing.T) {
+		rc, _, err := raw.SendCommand("SITE MKDIR")
+		require.NoError(t, err)
+		require.Equal(t, StatusSyntaxErrorNotRecognised, rc)
+
+		rc, _, err = raw.SendCommand("SITE RMDIR")
+		require.NoError(t, err)
+		require.Equal(t, StatusSyntaxErrorNotRecognised, rc)
+	})
+
+	t.Run("spaces", func(t *testing.T) {
+		rc, _, err := raw.SendCommand("SITE MKDIR /dir1 /dir2")
+		require.NoError(t, err)
+		require.Equal(t, StatusFileOK, rc)
+
+		{
+			dir := "/dir1 /dir2"
+			stat, errStat := c.Stat(dir)
+			require.NoError(t, errStat)
+			require.True(t, stat.IsDir())
+		}
+
+		rc, _, err = raw.SendCommand("SITE RMDIR /dir1 /dir2")
+		require.NoError(t, err)
+		require.Equal(t, StatusFileOK, rc)
+	})
+}
+
 // TestDirListingWithSpace uses the MLSD for files listing
 func TestDirListingWithSpace(t *testing.T) {
 	s := NewTestServer(t, true)

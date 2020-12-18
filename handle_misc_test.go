@@ -27,10 +27,10 @@ func TestSiteCommand(t *testing.T) {
 	raw, err := c.OpenRawConn()
 	require.NoError(t, err, "Couldn't open raw connection")
 
-	rc, response, err := raw.SendCommand("SITE HELP")
+	rc, response, err := raw.SendCommand("SITE help")
 	require.NoError(t, err)
 	require.Equal(t, StatusSyntaxErrorNotRecognised, rc, "Are we supporting it now ?")
-	require.Equal(t, "Not understood SITE subcommand", response, "Are we supporting it now ?")
+	require.Equal(t, "Unknown SITE subcommand: HELP", response, "Are we supporting it now ?")
 }
 
 // florent(2018-01-14): #58: IDLE timeout: Testing timeout

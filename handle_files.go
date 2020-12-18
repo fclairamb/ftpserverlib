@@ -22,16 +22,19 @@ import (
 
 func (c *clientHandler) handleSTOR() error {
 	c.transferFile(true, false)
+
 	return nil
 }
 
 func (c *clientHandler) handleAPPE() error {
 	c.transferFile(true, true)
+
 	return nil
 }
 
 func (c *clientHandler) handleRETR() error {
 	c.transferFile(false, false)
+
 	return nil
 }
 
@@ -145,12 +148,14 @@ func (c *clientHandler) handleCOMB() error {
 	if !c.server.settings.EnableCOMB {
 		// if disabled the client should not arrive here as COMB support is not declared in the FEAT response
 		c.writeMessage(StatusCommandNotImplemented, "COMB support is disabled")
+
 		return nil
 	}
 
 	relativePaths, err := unquoteSpaceSeparatedParams(c.param)
 	if err != nil || len(relativePaths) < 2 {
 		c.writeMessage(StatusSyntaxErrorParameters, fmt.Sprintf("invalid COMB parameters: %v", c.param))
+
 		return nil
 	}
 
@@ -165,6 +170,7 @@ func (c *clientHandler) handleCOMB() error {
 	_, err = c.driver.Stat(targetPath)
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
 		c.writeMessage(StatusActionNotTaken, fmt.Sprintf("Could not access file %#v: %v", targetPath, err))
+
 		return nil
 	}
 
@@ -184,6 +190,7 @@ func (c *clientHandler) combineFiles(targetPath string, fileFlag int, sourcePath
 	file, err := c.getFileHandle(targetPath, fileFlag, 0)
 	if err != nil {
 		c.writeMessage(StatusActionNotTaken, fmt.Sprintf("Could not access file %#v: %v", targetPath, err))
+
 		return
 	}
 
@@ -221,6 +228,7 @@ func (c *clientHandler) combineFiles(targetPath string, fileFlag int, sourcePath
 	err = file.Close()
 	if err != nil {
 		c.writeMessage(StatusActionNotTaken, fmt.Sprintf("Could close combined file %#v: %v", targetPath, err))
+
 		return
 	}
 
@@ -240,6 +248,7 @@ func (c *clientHandler) handleCHMOD(params string) {
 
 	if err != nil {
 		c.writeMessage(StatusActionNotTaken, err.Error())
+
 		return
 	}
 
@@ -252,6 +261,7 @@ func (c *clientHandler) handleCHOWN(params string) {
 
 	if len(spl) != 2 {
 		c.writeMessage(StatusSyntaxErrorParameters, "bad command")
+
 		return
 	}
 
@@ -293,6 +303,7 @@ func (c *clientHandler) handleSYMLINK(params string) {
 
 	if len(spl) != 2 {
 		c.writeMessage(StatusSyntaxErrorParameters, "bad command")
+
 		return
 	}
 
@@ -378,7 +389,8 @@ func (c *clientHandler) handleSTATFile() error {
 				directory, errOpenFile := c.driver.Open(c.absPath(c.param))
 
 				if errOpenFile != nil {
-					c.writeMessage(500, fmt.Sprintf("Could not list: %v", errOpenFile))
+					c.writeMessage(StatusSyntaxErrorNotRecognised, fmt.Sprintf("Could not list: %v", errOpenFile))
+
 					return nil
 				}
 				files, errList = directory.Readdir(-1)
@@ -405,6 +417,7 @@ func (c *clientHandler) handleSTATFile() error {
 func (c *clientHandler) handleMLST() error {
 	if c.server.settings.DisableMLST {
 		c.writeMessage(StatusSyntaxErrorNotRecognised, "MLST has been disabled")
+
 		return nil
 	}
 
@@ -470,6 +483,7 @@ func (c *clientHandler) handleMFMT() error {
 	if len(params) != 2 {
 		c.writeMessage(StatusSyntaxErrorNotRecognised, fmt.Sprintf(
 			"Couldn't set mtime, not enough params, given: %s", c.param))
+
 		return nil
 	}
 
@@ -477,6 +491,7 @@ func (c *clientHandler) handleMFMT() error {
 	if err != nil {
 		c.writeMessage(StatusSyntaxErrorParameters, fmt.Sprintf(
 			"Couldn't parse mtime, given: %s, err: %v", params[0], err))
+
 		return nil
 	}
 
@@ -485,6 +500,7 @@ func (c *clientHandler) handleMFMT() error {
 	if err := c.driver.Chtimes(path, mtime, mtime); err != nil {
 		c.writeMessage(StatusActionNotTaken, fmt.Sprintf(
 			"Couldn't set mtime %q for %q, err: %v", mtime.Format(time.RFC3339), path, err))
+
 		return nil
 	}
 
@@ -521,6 +537,7 @@ func (c *clientHandler) handleGenericHash(algo HASHAlgo, isCustomMode bool) erro
 	if !c.server.settings.EnableHASH {
 		// if disabled the client should not arrive here as HASH support is not declared in the FEAT response
 		c.writeMessage(StatusCommandNotImplemented, "File hash support is disabled")
+
 		return nil
 	}
 
@@ -529,11 +546,13 @@ func (c *clientHandler) handleGenericHash(algo HASHAlgo, isCustomMode bool) erro
 
 	if err != nil {
 		c.writeMessage(StatusActionNotTaken, fmt.Sprintf("%v: %v", c.param, err))
+
 		return nil
 	}
 
 	if !info.Mode().IsRegular() {
 		c.writeMessage(StatusActionNotTakenNoFile, fmt.Sprintf("%v is not a regular file", c.param))
+
 		return nil
 	}
 
@@ -550,6 +569,7 @@ func (c *clientHandler) handleGenericHash(algo HASHAlgo, isCustomMode bool) erro
 			start, err = strconv.ParseInt(args[1], 10, 64)
 			if err != nil {
 				c.writeMessage(StatusSyntaxErrorParameters, fmt.Sprintf("invalid start offset %v: %v", args[1], err))
+
 				return nil
 			}
 		}
@@ -558,6 +578,7 @@ func (c *clientHandler) handleGenericHash(algo HASHAlgo, isCustomMode bool) erro
 			end, err = strconv.ParseInt(args[2], 10, 64)
 			if err != nil {
 				c.writeMessage(StatusSyntaxErrorParameters, fmt.Sprintf("invalid end offset %v2: %v", args[2], err))
+
 				return nil
 			}
 		}
@@ -572,6 +593,7 @@ func (c *clientHandler) handleGenericHash(algo HASHAlgo, isCustomMode bool) erro
 
 	if err != nil {
 		c.writeMessage(StatusActionNotTaken, fmt.Sprintf("%v: %v", args[0], err))
+
 		return nil
 	}
 
@@ -580,6 +602,7 @@ func (c *clientHandler) handleGenericHash(algo HASHAlgo, isCustomMode bool) erro
 
 	if isCustomMode {
 		c.writeMessage(StatusFileOK, fmt.Sprintf("%v\r\n%v", firstLine, result))
+
 		return nil
 	}
 

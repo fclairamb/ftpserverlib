@@ -74,6 +74,7 @@ func (c *clientHandler) findListenerWithinPortRange(portRange *PortRange) (*net.
 
 		if errResolve != nil {
 			c.logger.Error("Problem resolving local port", "err", errResolve, "port", port)
+
 			return nil, fmt.Errorf("could not resolve port %d: %w", port, errResolve)
 		}
 
@@ -110,6 +111,7 @@ func (c *clientHandler) handlePASV() error {
 
 	if err != nil {
 		c.logger.Error("Could not listen for passive connection", "err", err)
+
 		return nil
 	}
 
@@ -121,6 +123,7 @@ func (c *clientHandler) handlePASV() error {
 			listener = tls.NewListener(tcpListener, tlsConfig)
 		} else {
 			c.writeMessage(StatusServiceNotAvailable, fmt.Sprintf("Cannot get a TLS config: %v", err))
+
 			return nil
 		}
 	} else {
@@ -176,6 +179,7 @@ func (p *passiveTransferHandler) ConnectionWait(wait time.Duration) (net.Conn, e
 
 func (p *passiveTransferHandler) Open() (net.Conn, error) {
 	timeout := time.Duration(time.Second.Nanoseconds() * int64(p.settings.ConnectionTimeout))
+
 	return p.ConnectionWait(timeout)
 }
 

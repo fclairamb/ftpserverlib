@@ -7,6 +7,7 @@ import "fmt"
 func (c *clientHandler) handleUSER() error {
 	if c.server.settings.TLSRequired == MandatoryEncryption && !c.controlTLS {
 		c.writeMessage(StatusServiceNotAvailable, "TLS is required")
+
 		return nil
 	}
 

@@ -119,15 +119,6 @@ linters-settings:
       range-loops: true # Report preallocation suggestions on range loops, true by default
       for-loops: false # Report preallocation suggestions on for loops, false by default
     gocritic:
-      # Which checks should be enabled; can't be combined with 'disabled-checks';
-      # See https://go-critic.github.io/overview#checks-overview
-      # To check which checks are enabled run `GL_DEBUG=gocritic golangci-lint run`
-      # By default list of stable checks is used.
-      enabled-checks:
-  
-      # Which checks should be disabled; can't be combined with 'enabled-checks'; default is empty
-      disabled-checks:
-  
       # Enable multiple checks by tags, run `GL_DEBUG=gocritic golangci-lint run` to see all tags and checks.
       # Empty list by default. See https://github.com/go-critic/go-critic#usage -> section "Tags".
       enabled-tags:
@@ -169,6 +160,7 @@ linters-settings:
       force-case-trailing-whitespace: 0
   
 linters:
+    disable-all: true
     enable:
         - bodyclose
         - deadcode
@@ -176,8 +168,13 @@ linters:
         - dogsled
         - dupl
         - errcheck
+        - exhaustive
+        # - exhaustivestruct
+        - exportloopref
         - funlen
+        # - gci
         - gochecknoinits
+        # - gochecknoglobals
         - gocognit
         - goconst
         - gocritic
@@ -199,6 +196,8 @@ linters:
         - megacheck
         - misspell
         - nakedret
+        # - nestif
+        - nlreturn
         - prealloc
         - nolintlint
         - rowserrcheck
@@ -212,11 +211,8 @@ linters:
         - unused
         - varcheck
         - whitespace
+        # - wrapcheck
         - wsl
-    disable-all: false
-    presets:
-        - bugs
-        - unused
     fast: false
   
 issues:

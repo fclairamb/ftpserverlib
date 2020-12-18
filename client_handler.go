@@ -211,6 +211,7 @@ func (c *clientHandler) HandleCommands() {
 		c.writeMessage(StatusServiceReady, msg)
 	} else {
 		c.writeMessage(StatusSyntaxErrorNotRecognised, msg)
+
 		return
 	}
 
@@ -235,6 +236,7 @@ func (c *clientHandler) HandleCommands() {
 
 		if err != nil {
 			c.handleCommandsStreamError(err)
+
 			return
 		}
 
@@ -293,11 +295,13 @@ func (c *clientHandler) handleCommand(line string) {
 	cmdDesc := commandsMap[c.command]
 	if cmdDesc == nil {
 		c.writeMessage(StatusSyntaxErrorNotRecognised, "Unknown command")
+
 		return
 	}
 
 	if c.driver == nil && !cmdDesc.Open {
 		c.writeMessage(StatusNotLoggedIn, "Please login with USER and PASS")
+
 		return
 	}
 

@@ -49,6 +49,22 @@ func (c *clientHandler) handleMKD() error {
 	return nil
 }
 
+func (c *clientHandler) handleMKDIR(params string) {
+	if params == "" {
+		c.writeMessage(StatusSyntaxErrorNotRecognised, "Missing path")
+
+		return
+	}
+
+	p := c.absPath(params)
+
+	if err := c.driver.MkdirAll(p, 0755); err == nil {
+		c.writeMessage(StatusFileOK, fmt.Sprintf("Created dir %s", p))
+	} else {
+		c.writeMessage(StatusActionNotTaken, fmt.Sprintf("Couldn't create dir %s: %v", p, err))
+	}
+}
+
 func (c *clientHandler) handleRMD() error {
 	var err error
 
@@ -69,6 +85,22 @@ func (c *clientHandler) handleRMD() error {
 	return nil
 }
 
+func (c *clientHandler) handleRMDIR(params string) {
+	if params == "" {
+		c.writeMessage(StatusSyntaxErrorNotRecognised, "Missing path")
+
+		return
+	}
+
+	p := c.absPath(params)
+
+	if err := c.driver.RemoveAll(p); err == nil {
+		c.writeMessage(StatusFileOK, fmt.Sprintf("Removed dir %s", p))
+	} else {
+		c.writeMessage(StatusActionNotTaken, fmt.Sprintf("Couldn't remove dir %s: %v", p, err))
+	}
+}
+
 func (c *clientHandler) handleCDUP() error {
 	parent, _ := path.Split(c.Path())
 	if parent != "/" && strings.HasSuffix(parent, "/") {
@@ -87,6 +119,7 @@ func (c *clientHandler) handleCDUP() error {
 
 func (c *clientHandler) handlePWD() error {
 	c.writeMessage(StatusPathCreated, "\""+c.Path()+"\" is the current directory")
+
 	return nil
 }
 
@@ -134,7 +167,7 @@ func (c *clientHandler) handleNLST() error {
 			return err
 		}
 	} else {
-		c.writeMessage(500, fmt.Sprintf("Could not list: %v", err))
+		c.writeMessage(StatusSyntaxErrorNotRecognised, fmt.Sprintf("Could not list: %v", err))
 	}
 
 	return nil
@@ -143,6 +176,7 @@ func (c *clientHandler) handleNLST() error {
 func (c *clientHandler) dirTransferNLST(w io.Writer, files []os.FileInfo) error {
 	if len(files) == 0 {
 		_, err := w.Write([]byte(""))
+
 		return err
 	}
 
@@ -158,6 +192,7 @@ func (c *clientHandler) dirTransferNLST(w io.Writer, files []os.FileInfo) error 
 func (c *clientHandler) handleMLSD() error {
 	if c.server.settings.DisableMLSD {
 		c.writeMessage(StatusSyntaxErrorNotRecognised, "MLSD has been disabled")
+
 		return nil
 	}
 
@@ -206,6 +241,7 @@ func (c *clientHandler) fileStat(file os.FileInfo) string {
 func (c *clientHandler) dirTransferLIST(w io.Writer, files []os.FileInfo) error {
 	if len(files) == 0 {
 		_, err := w.Write([]byte(""))
+
 		return err
 	}
 
@@ -222,6 +258,7 @@ func (c *clientHandler) dirTransferLIST(w io.Writer, files []os.FileInfo) error 
 func (c *clientHandler) dirTransferMLSD(w io.Writer, files []os.FileInfo) error {
 	if len(files) == 0 {
 		_, err := w.Write([]byte(""))
+
 		return err
 	}
 
