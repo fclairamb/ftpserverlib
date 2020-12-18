@@ -40,7 +40,13 @@ func (c *clientHandler) handlePBSZ() error {
 }
 
 func (c *clientHandler) handleSYST() error {
+	if c.server.settings.DisableSYST {
+		c.writeMessage(StatusCommandNotImplemented, "SYST is disabled")
+		return nil
+	}
+
 	c.writeMessage(StatusSystemType, "UNIX Type: L8")
+
 	return nil
 }
 
@@ -80,6 +86,14 @@ func (c *clientHandler) handleSITE() error {
 }
 
 func (c *clientHandler) handleSTATServer() error {
+	if c.server.settings.DisableSTAT {
+		c.writeMessage(StatusCommandNotImplemented, "STAT is disabled")
+		return nil
+	}
+
+	// drakkan(2020-12-17): we don't handle STAT properly,
+	// we should return the status for all the transfers and we should allow
+	// stat while a transfer is in progress, see RFC 959
 	defer c.multilineAnswer(StatusSystemStatus, "Server status")()
 
 	duration := time.Now().UTC().Sub(c.connectedAt)
