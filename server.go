@@ -146,6 +146,7 @@ func (server *FtpServer) Listen() error {
 
 		if err != nil {
 			server.Logger.Error("Cannot listen", "err", err)
+
 			return err
 		}
 		if server.settings.TLSRequired == ImplicitEncryption {
@@ -155,6 +156,7 @@ func (server *FtpServer) Listen() error {
 			tlsConfig, err = server.driver.GetTLSConfig()
 			if err != nil {
 				server.Logger.Error("Cannot get tls config", "err", err)
+
 				return err
 			}
 			server.listener = tls.NewListener(server.listener, tlsConfig)
@@ -176,6 +178,7 @@ func (server *FtpServer) Serve() error {
 				// This means we just closed the connection and it's OK
 				if errOp.Err.Error() == "use of closed network connection" {
 					server.listener = nil
+
 					return nil
 				}
 			}

@@ -36,12 +36,14 @@ func (c *clientHandler) handlePROT() error {
 
 func (c *clientHandler) handlePBSZ() error {
 	c.writeMessage(StatusOK, "Whatever")
+
 	return nil
 }
 
 func (c *clientHandler) handleSYST() error {
 	if c.server.settings.DisableSYST {
 		c.writeMessage(StatusCommandNotImplemented, "SYST is disabled")
+
 		return nil
 	}
 
@@ -62,12 +64,14 @@ func (c *clientHandler) handleSTAT() error {
 func (c *clientHandler) handleSITE() error {
 	if c.server.settings.DisableSite {
 		c.writeMessage(StatusSyntaxErrorNotRecognised, "SITE support is disabled")
+
 		return nil
 	}
 
 	spl := strings.SplitN(c.param, " ", 2)
 	cmd := strings.ToUpper(spl[0])
 	var params string
+
 	if len(spl) > 1 {
 		params = spl[1]
 	} else {
@@ -95,6 +99,7 @@ func (c *clientHandler) handleSITE() error {
 func (c *clientHandler) handleSTATServer() error {
 	if c.server.settings.DisableSTAT {
 		c.writeMessage(StatusCommandNotImplemented, "STAT is disabled")
+
 		return nil
 	}
 
@@ -127,6 +132,7 @@ func (c *clientHandler) handleOPTS() error {
 	args := strings.SplitN(c.param, " ", 2)
 	if strings.EqualFold(args[0], "UTF8") {
 		c.writeMessage(StatusOK, "I'm in UTF8 only anyway")
+
 		return nil
 	}
 
@@ -165,6 +171,7 @@ func (c *clientHandler) handleOPTS() error {
 
 func (c *clientHandler) handleNOOP() error {
 	c.writeMessage(StatusOK, "OK")
+
 	return nil
 }
 
@@ -267,17 +274,20 @@ func (c *clientHandler) handleAVBL() error {
 		info, err := c.driver.Stat(path)
 		if err != nil {
 			c.writeMessage(StatusActionNotTaken, fmt.Sprintf("Couldn't access %s: %v", path, err))
+
 			return nil
 		}
 
 		if !info.IsDir() {
 			c.writeMessage(StatusActionNotTaken, fmt.Sprintf("%s: is not a directory", path))
+
 			return nil
 		}
 
 		available, err := avbl.GetAvailableSpace(path)
 		if err != nil {
 			c.writeMessage(StatusActionNotTaken, fmt.Sprintf("Couldn't get space for path %s: %v", path, err))
+
 			return nil
 		}
 

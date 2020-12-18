@@ -15,6 +15,7 @@ import (
 func (c *clientHandler) handlePORT() error {
 	if c.server.settings.DisableActiveMode {
 		c.writeMessage(StatusServiceNotAvailable, "PORT command is disabled")
+
 		return nil
 	}
 
@@ -29,6 +30,7 @@ func (c *clientHandler) handlePORT() error {
 
 	if err != nil {
 		c.writeMessage(StatusSyntaxErrorNotRecognised, fmt.Sprintf("Problem parsing %s: %v", c.command, err))
+
 		return nil
 	}
 
@@ -38,6 +40,7 @@ func (c *clientHandler) handlePORT() error {
 		tlsConfig, err = c.server.driver.GetTLSConfig()
 		if err != nil {
 			c.writeMessage(StatusServiceNotAvailable, fmt.Sprintf("Cannot get a TLS config for active connection: %v", err))
+
 			return nil
 		}
 	}
