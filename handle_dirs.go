@@ -52,6 +52,7 @@ func (c *clientHandler) handleMKD() error {
 func (c *clientHandler) handleMKDIR(params string) {
 	if params == "" {
 		c.writeMessage(StatusSyntaxErrorNotRecognised, "Missing path")
+
 		return
 	}
 
@@ -87,6 +88,7 @@ func (c *clientHandler) handleRMD() error {
 func (c *clientHandler) handleRMDIR(params string) {
 	if params == "" {
 		c.writeMessage(StatusSyntaxErrorNotRecognised, "Missing path")
+
 		return
 	}
 
