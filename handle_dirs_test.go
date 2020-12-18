@@ -137,6 +137,7 @@ func TestMkdirRmDir(t *testing.T) {
 	require.NoError(t, err, "Couldn't connect")
 
 	defer func() { panicOnError(c.Close()) }()
+
 	raw, err := c.OpenRawConn()
 	require.NoError(t, err, "Couldn't open raw connection")
 
@@ -179,8 +180,8 @@ func TestMkdirRmDir(t *testing.T) {
 
 		{
 			dir := "/dir1 /dir2"
-			stat, err := c.Stat(dir)
-			require.NoError(t, err)
+			stat, errStat := c.Stat(dir)
+			require.NoError(t, errStat)
 			require.True(t, stat.IsDir())
 		}
 
