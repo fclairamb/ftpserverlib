@@ -203,6 +203,10 @@ func (c *clientHandler) handleFEAT() error {
 		features = append(features, nonStandardHashImpl...)
 	}
 
+	if c.server.settings.EnableCOMB {
+		features = append(features, "COMB")
+	}
+
 	if _, ok := c.driver.(ClientDriverExtensionAvailableSpace); ok {
 		features = append(features, "AVBL")
 	}

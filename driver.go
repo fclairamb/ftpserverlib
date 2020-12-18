@@ -186,4 +186,5 @@ type Settings struct {
 	DisableSite              bool             // Disable SITE command
 	DisableActiveMode        bool             // Disable Active FTP
 	EnableHASH               bool             // Enable support for calculating hash value of files
+	EnableCOMB               bool             // Enable COMB support
 }
