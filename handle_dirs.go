@@ -50,6 +50,11 @@ func (c *clientHandler) handleMKD() error {
 }
 
 func (c *clientHandler) handleMKDIR(params string) {
+	if params == "" {
+		c.writeMessage(StatusSyntaxErrorNotRecognised, "Missing path")
+		return
+	}
+
 	p := c.absPath(params)
 
 	if err := c.driver.MkdirAll(p, 0755); err == nil {
@@ -80,6 +85,11 @@ func (c *clientHandler) handleRMD() error {
 }
 
 func (c *clientHandler) handleRMDIR(params string) {
+	if params == "" {
+		c.writeMessage(StatusSyntaxErrorNotRecognised, "Missing path")
+		return
+	}
+
 	p := c.absPath(params)
 
 	if err := c.driver.RemoveAll(p); err == nil {

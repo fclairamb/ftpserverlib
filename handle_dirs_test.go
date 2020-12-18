@@ -158,8 +158,8 @@ func TestMkdirRmDir(t *testing.T) {
 
 		for _, d := range []string{"/dir1", "/dir1/dir2", "/dir1/dir2/dir3"} {
 			stat, errStat := c.Stat(d)
-			require.NoError(t, errStat)
-			require.True(t, stat.IsDir())
+			require.Error(t, errStat)
+			require.Nil(t, stat)
 		}
 	})
 
