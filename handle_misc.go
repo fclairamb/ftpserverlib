@@ -66,13 +66,13 @@ func (c *clientHandler) handleSITE() error {
 	}
 
 	spl := strings.SplitN(c.param, " ", 2)
-	if len(spl) < 2 {
-		c.writeMessage(StatusSyntaxErrorNotRecognised, "Argument required !")
-		return nil
-	}
-
 	cmd := strings.ToUpper(spl[0])
-	params := spl[1]
+	var params string
+	if len(spl) > 1 {
+		params = spl[1]
+	} else {
+		params = ""
+	}
 
 	switch cmd {
 	case "CHMOD":
@@ -86,7 +86,7 @@ func (c *clientHandler) handleSITE() error {
 	case "RMDIR":
 		c.handleRMDIR(params)
 	default:
-		c.writeMessage(StatusSyntaxErrorNotRecognised, fmt.Sprintf("Unknown SITE subcommand: %s", params))
+		c.writeMessage(StatusSyntaxErrorNotRecognised, fmt.Sprintf("Unknown SITE subcommand: %s", cmd))
 	}
 
 	return nil
