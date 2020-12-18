@@ -6,7 +6,9 @@ import (
 	"crypto/sha1" //nolint:gosec
 	"crypto/sha256"
 	"crypto/sha512"
+	"encoding/csv"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"hash"
 	"hash/crc32"
@@ -39,7 +41,6 @@ func (c *clientHandler) transferFile(write bool, append bool) {
 	var file FileTransfer
 	var err error
 	var fileFlag int
-	var filePerm os.FileMode = 0777
 
 	path := c.absPath(c.param)
 
@@ -60,11 +61,7 @@ func (c *clientHandler) transferFile(write bool, append bool) {
 		fileFlag = os.O_RDONLY
 	}
 
-	if fileTransfer, ok := c.driver.(ClientDriverExtentionFileTransfer); ok {
-		file, err = fileTransfer.GetHandle(path, fileFlag, c.ctxRest)
-	} else {
-		file, err = c.driver.OpenFile(path, fileFlag, filePerm)
-	}
+	file, err = c.getFileHandle(path, fileFlag, c.ctxRest)
 
 	// If this fail, can stop right here and reset the seek position
 	if err != nil {
@@ -84,7 +81,7 @@ func (c *clientHandler) transferFile(write bool, append bool) {
 			// if we are unable to seek we can stop right here and close the file
 			c.writeMessage(StatusActionNotTaken, "Could not seek file: "+err.Error())
 			// we can ignore the close error here
-			file.Close() //nolint:errcheck,gosec
+			c.closeUnchecked(file)
 
 			return
 		}
@@ -94,7 +91,7 @@ func (c *clientHandler) transferFile(write bool, append bool) {
 	if err != nil {
 		// an error is already returned to the FTP client
 		// we can stop right here and close the file ignoring close error if any
-		file.Close() //nolint:errcheck,gosec
+		c.closeUnchecked(file)
 
 		return
 	}
@@ -142,6 +139,92 @@ func (c *clientHandler) doFileTransfer(tr net.Conn, file io.ReadWriter, write bo
 	}
 
 	return err
+}
+
+func (c *clientHandler) handleCOMB() error {
+	if !c.server.settings.EnableCOMB {
+		// if disabled the client should not arrive here as COMB support is not declared in the FEAT response
+		c.writeMessage(StatusCommandNotImplemented, "COMB support is disabled")
+		return nil
+	}
+
+	relativePaths, err := unquoteSpaceSeparatedParams(c.param)
+	if err != nil || len(relativePaths) < 2 {
+		c.writeMessage(StatusSyntaxErrorParameters, fmt.Sprintf("invalid COMB parameters: %v", c.param))
+		return nil
+	}
+
+	targetPath := c.absPath(relativePaths[0])
+
+	sourcePaths := make([]string, 0, len(relativePaths)-1)
+	for _, src := range relativePaths[1:] {
+		sourcePaths = append(sourcePaths, c.absPath(src))
+	}
+	// if targetPath exists we have append to it
+	// partial files will be deleted if COMB succeeded
+	_, err = c.driver.Stat(targetPath)
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		c.writeMessage(StatusActionNotTaken, fmt.Sprintf("Could not access file %#v: %v", targetPath, err))
+		return nil
+	}
+
+	fileFlag := os.O_WRONLY
+	if errors.Is(err, os.ErrNotExist) {
+		fileFlag |= os.O_CREATE
+	} else {
+		fileFlag |= os.O_APPEND
+	}
+
+	c.combineFiles(targetPath, fileFlag, sourcePaths)
+
+	return nil
+}
+
+func (c *clientHandler) combineFiles(targetPath string, fileFlag int, sourcePaths []string) {
+	file, err := c.getFileHandle(targetPath, fileFlag, 0)
+	if err != nil {
+		c.writeMessage(StatusActionNotTaken, fmt.Sprintf("Could not access file %#v: %v", targetPath, err))
+		return
+	}
+
+	for _, partial := range sourcePaths {
+		var src FileTransfer
+
+		src, err = c.getFileHandle(partial, os.O_RDONLY, 0)
+		if err != nil {
+			c.closeUnchecked(file)
+			c.writeMessage(StatusActionNotTaken, fmt.Sprintf("Could not access file %#v: %v", partial, err))
+
+			return
+		}
+
+		_, err = io.Copy(file, src)
+		if err != nil {
+			c.closeUnchecked(src)
+			c.closeUnchecked(file)
+			c.writeMessage(StatusActionNotTaken, fmt.Sprintf("Could combine file %#v: %v", partial, err))
+
+			return
+		}
+
+		c.closeUnchecked(src)
+
+		err = c.driver.Remove(partial)
+		if err != nil {
+			c.closeUnchecked(file)
+			c.writeMessage(StatusActionNotTaken, fmt.Sprintf("Could delete file %#v after combine: %v", partial, err))
+
+			return
+		}
+	}
+
+	err = file.Close()
+	if err != nil {
+		c.writeMessage(StatusActionNotTaken, fmt.Sprintf("Could close combined file %#v: %v", targetPath, err))
+		return
+	}
+
+	c.writeMessage(StatusFileOK, "COMB succeeded!")
 }
 
 func (c *clientHandler) handleCHMOD(params string) {
@@ -435,6 +518,12 @@ func (c *clientHandler) handleSHA512() error {
 }
 
 func (c *clientHandler) handleGenericHash(algo HASHAlgo, isCustomMode bool) error {
+	if !c.server.settings.EnableHASH {
+		// if disabled the client should not arrive here as HASH support is not declared in the FEAT response
+		c.writeMessage(StatusCommandNotImplemented, "File hash support is disabled")
+		return nil
+	}
+
 	args := strings.SplitN(c.param, " ", 3)
 	info, err := c.driver.Stat(args[0])
 
@@ -451,6 +540,9 @@ func (c *clientHandler) handleGenericHash(algo HASHAlgo, isCustomMode bool) erro
 	start := int64(0)
 	end := info.Size()
 
+	// to support partial hash also for the HASH command we should implement RANG too,
+	// but this apply also to uploads/downloads and so complicat the things, we'll add
+	// this support in future improvements
 	if isCustomMode {
 		// for custom command the range can be specified in this way:
 		// XSHA1 <file> <start> <end>
@@ -470,9 +562,7 @@ func (c *clientHandler) handleGenericHash(algo HASHAlgo, isCustomMode bool) erro
 			}
 		}
 	}
-	// to support partial hash also for the HASH command we should implement RANG too,
-	// but this apply also to uploads/downloads and so complicat the things, we'll add
-	// this support in future improvements
+
 	var result string
 	if hasher, ok := c.driver.(ClientDriverExtensionHasher); ok {
 		result, err = hasher.ComputeHash(c.absPath(args[0]), algo, start, end)
@@ -485,15 +575,7 @@ func (c *clientHandler) handleGenericHash(algo HASHAlgo, isCustomMode bool) erro
 		return nil
 	}
 
-	hashMapping := getHashMapping()
-	hashName := ""
-
-	for k, v := range hashMapping {
-		if v == algo {
-			hashName = k
-		}
-	}
-
+	hashName := getHashName(algo)
 	firstLine := fmt.Sprintf("Computing %v digest", hashName)
 
 	if isCustomMode {
@@ -527,11 +609,7 @@ func (c *clientHandler) computeHashForFile(filePath string, algo HASHAlgo, start
 		return "", errUnknowHash
 	}
 
-	if fileTransfer, ok := c.driver.(ClientDriverExtentionFileTransfer); ok {
-		file, err = fileTransfer.GetHandle(filePath, os.O_RDONLY, start)
-	} else {
-		file, err = c.driver.OpenFile(filePath, os.O_RDONLY, os.ModePerm)
-	}
+	file, err = c.getFileHandle(filePath, os.O_RDONLY, start)
 
 	if err != nil {
 		return "", err
@@ -545,11 +623,43 @@ func (c *clientHandler) computeHashForFile(filePath string, algo HASHAlgo, start
 	}
 
 	_, err = io.CopyN(h, file, end-start)
-	defer file.Close() //nolint:errcheck // we ignore close error here
+	defer c.closeUnchecked(file) // we ignore close error here
 
 	if err != nil && err != io.EOF {
 		return "", err
 	}
 
 	return hex.EncodeToString(h.Sum(nil)), nil
+}
+
+func (c *clientHandler) getFileHandle(name string, flags int, offset int64) (FileTransfer, error) {
+	if fileTransfer, ok := c.driver.(ClientDriverExtentionFileTransfer); ok {
+		return fileTransfer.GetHandle(name, flags, offset)
+	}
+
+	return c.driver.OpenFile(name, flags, os.ModePerm)
+}
+
+func (c *clientHandler) closeUnchecked(file io.Closer) {
+	if err := file.Close(); err != nil {
+		c.logger.Warn(
+			"Problem closing a file",
+			"err", err,
+		)
+	}
+}
+
+// This method split params by spaces, expect when the space is inside quotes.
+// It was introduced to support COMB command. Supported COMB examples:
+//
+// - Append a single part onto an existing (or new) file: e.g., COMB "final.log" "132.log".
+// - Target and source files do not require enclosing quotes UNLESS the filename includes spaces:
+//   - COMB final5.log 64.log 65.log
+//   - COMB "final5.log" "64.log" "65.log"
+//   - COMB final7.log "6 6.log" 67.log
+func unquoteSpaceSeparatedParams(params string) ([]string, error) {
+	reader := csv.NewReader(strings.NewReader(params))
+	reader.Comma = ' ' // space
+
+	return reader.Read()
 }
