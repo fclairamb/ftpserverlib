@@ -11,7 +11,6 @@ import (
 	"math/rand"
 	"os"
 	"strings"
-	"sync"
 	"testing"
 
 	"github.com/secsy/goftp"
@@ -532,20 +531,8 @@ func aborTransfer(t *testing.T, c *goftp.Client) {
 	_, err = file.Seek(0, io.SeekStart)
 	require.NoError(t, err)
 
-	dcGetter, err := raw.PrepareDataConn()
+	_, err = raw.PrepareDataConn()
 	require.NoError(t, err)
-
-	var wg sync.WaitGroup
-
-	wg.Add(1)
-
-	go func() {
-		wg.Done()
-
-		_, err = dcGetter()
-		require.NoError(t, err)
-	}()
-	wg.Wait()
 
 	rc, response, err := raw.SendCommand("RETR delay-io.bin")
 	require.NoError(t, err)
