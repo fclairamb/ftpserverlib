@@ -8,6 +8,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	gklog "github.com/go-kit/kit/log"
 	"github.com/spf13/afero"
@@ -98,9 +99,23 @@ var errFailWrite = errors.New("couldn't write")
 
 var errFailSeek = errors.New("couldn't seek")
 
+func (f *testFile) Read(b []byte) (int, error) {
+	// simulating a slow reading allows us to test ABOR
+	if strings.Contains(f.File.Name(), "delay-io") {
+		time.Sleep(1 * time.Second)
+	}
+
+	return f.File.Read(b)
+}
+
 func (f *testFile) Write(b []byte) (int, error) {
 	if strings.Contains(f.File.Name(), "fail-to-write") {
 		return 0, errFailWrite
+	}
+
+	// simulating a slow writing allows us to test ABOR
+	if strings.Contains(f.File.Name(), "delay-io") {
+		time.Sleep(1 * time.Second)
 	}
 
 	return f.File.Write(b)
@@ -117,6 +132,14 @@ func (f *testFile) Close() error {
 func (f *testFile) Seek(offset int64, whence int) (int64, error) {
 	if strings.Contains(f.File.Name(), "fail-to-seek") {
 		return 0, errFailSeek
+	}
+
+	// by delaying the seek and sending a REST before the actual transfer
+	// we can delay the opening of the transfer and then test an ABOR before
+	// opening a transfer. I'm not sure if this can really happen but it is
+	// better to be prepared for buggy clients too
+	if strings.Contains(f.File.Name(), "delay-io") {
+		time.Sleep(1 * time.Second)
 	}
 
 	return f.File.Seek(offset, whence)

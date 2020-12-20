@@ -362,6 +362,30 @@ func TestMDTM(t *testing.T) {
 	require.Equal(t, StatusActionNotTaken, rc)
 }
 
+func TestRename(t *testing.T) {
+	s := NewTestServer(t, true)
+	conf := goftp.Config{
+		User:     authUser,
+		Password: authPass,
+	}
+	c, err := goftp.DialConfig(conf, s.Addr())
+	require.NoError(t, err, "Couldn't connect")
+
+	defer func() { panicOnError(c.Close()) }()
+
+	ftpUpload(t, c, createTemporaryFile(t, 10), "file")
+
+	err = c.Rename("file", "file1")
+	require.NoError(t, err)
+
+	raw, err := c.OpenRawConn()
+	require.NoError(t, err, "Couldn't open raw connection")
+
+	rc, _, err := raw.SendCommand("RNTO file2")
+	require.NoError(t, err)
+	require.Equal(t, StatusBadCommandSequence, rc)
+}
+
 func TestHASHCommand(t *testing.T) {
 	s := NewTestServerWithDriver(
 		t,

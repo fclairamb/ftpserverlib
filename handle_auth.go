@@ -4,23 +4,23 @@ package ftpserver
 import "fmt"
 
 // Handle the "USER" command
-func (c *clientHandler) handleUSER() error {
+func (c *clientHandler) handleUSER(param string) error {
 	if c.server.settings.TLSRequired == MandatoryEncryption && !c.controlTLS {
 		c.writeMessage(StatusServiceNotAvailable, "TLS is required")
 
 		return nil
 	}
 
-	c.user = c.param
+	c.user = param
 	c.writeMessage(StatusUserOK, "OK")
 
 	return nil
 }
 
 // Handle the "PASS" command
-func (c *clientHandler) handlePASS() error {
+func (c *clientHandler) handlePASS(param string) error {
 	var err error
-	c.driver, err = c.server.driver.AuthUser(c, c.user, c.param)
+	c.driver, err = c.server.driver.AuthUser(c, c.user, param)
 
 	switch {
 	case err == nil:

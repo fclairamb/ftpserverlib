@@ -12,7 +12,7 @@ import (
 	"time"
 )
 
-func (c *clientHandler) handlePORT() error {
+func (c *clientHandler) handlePORT(param string) error {
 	if c.server.settings.DisableActiveMode {
 		c.writeMessage(StatusServiceNotAvailable, "PORT command is disabled")
 
@@ -23,9 +23,9 @@ func (c *clientHandler) handlePORT() error {
 	var raddr *net.TCPAddr
 
 	if c.command == "EPRT" {
-		raddr, err = parseEPRTAddr(c.param)
+		raddr, err = parseEPRTAddr(param)
 	} else { // PORT
-		raddr, err = parsePORTAddr(c.param)
+		raddr, err = parsePORTAddr(param)
 	}
 
 	if err != nil {
@@ -45,12 +45,17 @@ func (c *clientHandler) handlePORT() error {
 		}
 	}
 
-	c.writeMessage(StatusOK, c.command+" command successful")
+	c.Lock()
+
 	c.transfer = &activeTransferHandler{
 		raddr:     raddr,
 		settings:  c.server.settings,
 		tlsConfig: tlsConfig,
 	}
+
+	c.Unlock()
+
+	c.writeMessage(StatusOK, c.command+" command successful")
 
 	return nil
 }
@@ -61,6 +66,15 @@ type activeTransferHandler struct {
 	conn      net.Conn     // Connection used to connect to him
 	settings  *Settings    // Settings
 	tlsConfig *tls.Config  // not nil if the active connection requires TLS
+	info      string       // transfer info
+}
+
+func (a *activeTransferHandler) GetInfo() string {
+	return a.info
+}
+
+func (a *activeTransferHandler) SetInfo(info string) {
+	a.info = info
 }
 
 func (a *activeTransferHandler) Open() (net.Conn, error) {

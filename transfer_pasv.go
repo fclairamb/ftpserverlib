@@ -20,6 +20,11 @@ type transferHandler interface {
 
 	// Close the connection (and any associated resource)
 	Close() error
+
+	// Set info about the transfer to return in STAT response
+	SetInfo(string)
+	// Info about the transfer to return in STAT response
+	GetInfo() string
 }
 
 // Passive connection
@@ -29,6 +34,7 @@ type passiveTransferHandler struct {
 	Port        int              // TCP Port we are listening on
 	connection  net.Conn         // TCP Connection established
 	settings    *Settings        // Settings
+	info        string           // transfer info
 	logger      log.Logger       // Logger
 }
 
@@ -94,7 +100,7 @@ func (c *clientHandler) findListenerWithinPortRange(portRange *PortRange) (*net.
 	return nil, ErrNoAvailableListeningPort
 }
 
-func (c *clientHandler) handlePASV() error {
+func (c *clientHandler) handlePASV(param string) error {
 	addr, _ := net.ResolveTCPAddr("tcp", ":0")
 
 	var tcpListener *net.TCPListener
@@ -111,6 +117,7 @@ func (c *clientHandler) handlePASV() error {
 
 	if err != nil {
 		c.logger.Error("Could not listen for passive connection", "err", err)
+		c.writeMessage(StatusServiceNotAvailable, fmt.Sprintf("Could not listen for passive connection: %v", err))
 
 		return nil
 	}
@@ -145,7 +152,9 @@ func (c *clientHandler) handlePASV() error {
 		quads, err2 := c.getCurrentIP()
 
 		if err2 != nil {
-			return err2
+			c.writeMessage(StatusServiceNotAvailable, fmt.Sprintf("Could not listen for passive connection: %v", err2))
+
+			return nil
 		}
 
 		c.writeMessage(
@@ -155,7 +164,9 @@ func (c *clientHandler) handlePASV() error {
 		c.writeMessage(StatusEnteringEPSV, fmt.Sprintf("Entering Extended Passive Mode (|||%d|)", p.Port))
 	}
 
+	c.Lock()
 	c.transfer = p
+	c.Unlock()
 
 	return nil
 }
@@ -175,6 +186,14 @@ func (p *passiveTransferHandler) ConnectionWait(wait time.Duration) (net.Conn, e
 	}
 
 	return p.connection, nil
+}
+
+func (p *passiveTransferHandler) GetInfo() string {
+	return p.info
+}
+
+func (p *passiveTransferHandler) SetInfo(info string) {
+	p.info = info
 }
 
 func (p *passiveTransferHandler) Open() (net.Conn, error) {

@@ -156,7 +156,7 @@ func isStringInSlice(s string, list []string) bool {
 	return false
 }
 
-func TestUnkowCommand(t *testing.T) {
+func TestUnknownCommand(t *testing.T) {
 	s := NewTestServer(t, true)
 	conf := goftp.Config{
 		User:     authUser,
@@ -171,8 +171,9 @@ func TestUnkowCommand(t *testing.T) {
 	raw, err := c.OpenRawConn()
 	require.NoError(t, err, "Couldn't open raw connection")
 
-	rc, response, err := raw.SendCommand("UNSUPPORTED")
+	cmd := "UNSUPPORTED"
+	rc, response, err := raw.SendCommand(cmd)
 	require.NoError(t, err)
 	require.Equal(t, StatusSyntaxErrorNotRecognised, rc)
-	require.Equal(t, "Unknown command", response)
+	require.Equal(t, fmt.Sprintf("Unknown command %#v", cmd), response)
 }

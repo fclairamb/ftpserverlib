@@ -8,6 +8,7 @@ import (
 	"io"
 	"net"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/fclairamb/ftpserverlib/log"
@@ -56,26 +57,29 @@ func getHashName(algo HASHAlgo) string {
 
 // nolint: maligned
 type clientHandler struct {
-	id               uint32          // ID of the client
-	server           *FtpServer      // Server on which the connection was accepted
-	driver           ClientDriver    // Client handling driver
-	conn             net.Conn        // TCP connection
-	writer           *bufio.Writer   // Writer on the TCP connection
-	reader           *bufio.Reader   // Reader on the TCP connection
-	user             string          // Authenticated user
-	path             string          // Current path
-	clnt             string          // Identified client
-	command          string          // Command received on the connection
-	param            string          // Param of the FTP command
-	connectedAt      time.Time       // Date of connection
-	ctxRnfr          string          // Rename from
-	ctxRest          int64           // Restart point
-	debug            bool            // Show debugging info on the server side
-	transfer         transferHandler // Transfer connection (only passive is implemented at this stage)
-	transferTLS      bool            // Use TLS for transfer connection
-	controlTLS       bool            // Use TLS for control connection
-	selectedHashAlgo HASHAlgo        // algorithm used when we receive the HASH command
-	logger           log.Logger      // Client handler logging
+	id                uint32          // ID of the client
+	server            *FtpServer      // Server on which the connection was accepted
+	driver            ClientDriver    // Client handling driver
+	conn              net.Conn        // TCP connection
+	writer            *bufio.Writer   // Writer on the TCP connection
+	reader            *bufio.Reader   // Reader on the TCP connection
+	user              string          // Authenticated user
+	path              string          // Current path
+	clnt              string          // Identified client
+	command           string          // Command received on the connection
+	connectedAt       time.Time       // Date of connection
+	ctxRnfr           string          // Rename from
+	ctxRest           int64           // Restart point
+	debug             bool            // Show debugging info on the server side
+	transferTLS       bool            // Use TLS for transfer connection
+	controlTLS        bool            // Use TLS for control connection
+	selectedHashAlgo  HASHAlgo        // algorithm used when we receive the HASH command
+	logger            log.Logger      // Client handler logging
+	transferWg        sync.WaitGroup  // wait group for command that open a transfer connection
+	sync.Mutex                        // this mutex will protect the transfer parameters
+	transfer          transferHandler // Transfer connection (passive or active)s
+	isTransferOpen    bool            // indicate if the transfer connection is opened
+	isTransferAborted bool            // indicate if the transfer was aborted
 }
 
 // newClientHandler initializes a client handler when someone connects
@@ -158,6 +162,17 @@ func (c *clientHandler) GetLastCommand() string {
 	return c.command
 }
 
+func (c *clientHandler) SetCommand(cmd string) {
+	if c.command == "ABOR" {
+		// before setting the current command we wait for the active transfer connection, if any, to end
+		// if the transfer connection is not opened for a previous error and we received an abor then
+		// isTransferAborted will remain to true, so we reset it here
+		c.isTransferAborted = false
+	}
+
+	c.command = cmd
+}
+
 // HasTLSForTransfers returns true if the transfer connection is over TLS
 func (c *clientHandler) HasTLSForTransfers() bool {
 	if c.server.settings.TLSRequired == ImplicitEncryption {
@@ -167,16 +182,33 @@ func (c *clientHandler) HasTLSForTransfers() bool {
 	return c.transferTLS
 }
 
-// Close closes the active transfer, if any, and the control connection
-func (c *clientHandler) Close(code int, message string) error {
+func (c *clientHandler) closeTransfer() error {
+	var err error
 	if c.transfer != nil {
-		if err := c.transfer.Close(); err != nil {
-			c.logger.Warn(
-				"Problem closing a transfer on external close request",
-				"err", err,
-			)
+		err = c.transfer.Close()
+		c.isTransferOpen = false
+		c.transfer = nil
+
+		if c.debug {
+			c.logger.Debug("Transfer connection closed")
 		}
 	}
+
+	return err
+}
+
+// Close closes the active transfer, if any, and the control connection
+func (c *clientHandler) Close(code int, message string) error {
+	c.Lock()
+
+	if err := c.closeTransfer(); err != nil {
+		c.logger.Warn(
+			"Problem closing a transfer on external close request",
+			"err", err,
+		)
+	}
+
+	c.Unlock()
 
 	if code > 0 {
 		c.writeMessage(code, message)
@@ -193,14 +225,35 @@ func (c *clientHandler) end() {
 	c.server.driver.ClientDisconnected(c)
 	c.server.clientDeparture(c)
 
-	if c.transfer != nil {
-		if err := c.transfer.Close(); err != nil {
-			c.logger.Warn(
-				"Problem closing a transfer",
-				"err", err,
-			)
+	c.Lock()
+	defer c.Unlock()
+
+	if err := c.closeTransfer(); err != nil {
+		c.logger.Warn(
+			"Problem closing a transfer",
+			"err", err,
+		)
+	}
+}
+
+func (c *clientHandler) canOpenTransfer(command string) bool {
+	for _, cmd := range transferCommands {
+		if cmd == command {
+			return true
 		}
 	}
+
+	return false
+}
+
+func (c *clientHandler) isSpecialAttentionCommand(command string) bool {
+	for _, cmd := range specialAttentionCommands {
+		if cmd == command {
+			return true
+		}
+	}
+
+	return false
 }
 
 // HandleCommands reads the stream of commands
@@ -289,14 +342,35 @@ func (c *clientHandler) handleCommandsStreamError(err error) {
 // handleCommand takes care of executing the received line
 func (c *clientHandler) handleCommand(line string) {
 	command, param := parseLine(line)
-	c.command = strings.ToUpper(command)
-	c.param = param
+	command = strings.ToUpper(command)
 
-	cmdDesc := commandsMap[c.command]
+	cmdDesc := commandsMap[command]
 	if cmdDesc == nil {
-		c.writeMessage(StatusSyntaxErrorNotRecognised, "Unknown command")
+		// Search among commands having a "special semantic". They
+		// should be sent by following the RFC-959 procedure of sending
+		// Telnet IP/Synch sequence (chr 242 and 255) as OOB data but
+		// since many ftp clients don't do it correctly we check the
+		// command suffix.
+		for _, cmd := range specialAttentionCommands {
+			if strings.HasSuffix(command, cmd) {
+				cmdDesc = commandsMap[cmd]
+				command = cmd
 
-		return
+				if cmd == "ABOR" {
+					// this way ABOR know about the command to abort
+					param = c.GetLastCommand()
+				}
+
+				break
+			}
+		}
+
+		if cmdDesc == nil {
+			c.SetCommand(command)
+			c.writeMessage(StatusSyntaxErrorNotRecognised, fmt.Sprintf("Unknown command %#v", command))
+
+			return
+		}
 	}
 
 	if c.driver == nil && !cmdDesc.Open {
@@ -305,6 +379,34 @@ func (c *clientHandler) handleCommand(line string) {
 		return
 	}
 
+	if c.canOpenTransfer(command) {
+		// these commands will be started in a separate goroutine so
+		// they can be aborted. A FTP client is not allowed to open a new transfer
+		// connection if another one is already open. We enforce this by serializing
+		// commands that can open a transfer connection using a wait group.
+		// The wg is also required to properly handle QUIT: we have to wait for the
+		// active transfer, if any, to end before quitting
+		c.transferWg.Wait()
+		c.SetCommand(command)
+		c.transferWg.Add(1)
+
+		go func(cmd, param string) {
+			defer c.transferWg.Done()
+
+			c.executeCommandFn(cmdDesc, cmd, param)
+		}(c.command, param)
+	} else {
+		// only special attention commands can be processed while a transfer is in progress
+		// we enforce this requirement to simplify our code
+		if !c.isSpecialAttentionCommand(command) {
+			c.transferWg.Wait()
+		}
+		c.SetCommand(command)
+		c.executeCommandFn(cmdDesc, c.command, param)
+	}
+}
+
+func (c *clientHandler) executeCommandFn(cmdDesc *CommandDescription, command, param string) {
 	// Let's prepare to recover in case there's a command error
 	defer func() {
 		if r := recover(); r != nil {
@@ -312,13 +414,13 @@ func (c *clientHandler) handleCommand(line string) {
 			c.logger.Warn(
 				"Internal command handling error",
 				"err", r,
-				"command", c.command,
-				"param", c.param,
+				"command", command,
+				"param", param,
 			)
 		}
 	}()
 
-	if err := cmdDesc.Fn(c); err != nil {
+	if err := cmdDesc.Fn(c, param); err != nil {
 		c.writeMessage(StatusSyntaxErrorNotRecognised, fmt.Sprintf("Error: %s", err))
 	}
 }
@@ -356,8 +458,29 @@ func (c *clientHandler) writeMessage(code int, message string) {
 	}
 }
 
-func (c *clientHandler) TransferOpen() (net.Conn, error) {
+func (c *clientHandler) GetTranferInfo() string {
+	c.Lock()
+	defer c.Unlock()
+
 	if c.transfer == nil {
+		return ""
+	}
+
+	return c.transfer.GetInfo()
+}
+
+func (c *clientHandler) TransferOpen(info string) (net.Conn, error) {
+	c.Lock()
+	defer c.Unlock()
+
+	if c.transfer == nil {
+		// a transfer could be aborted before it is opened, in this case no response should be returned
+		if c.isTransferAborted {
+			c.isTransferAborted = false
+
+			return nil, errNoTrasferConnection
+		}
+
 		c.writeMessage(StatusActionNotTaken, errNoTrasferConnection.Error())
 
 		return nil, errNoTrasferConnection
@@ -380,6 +503,9 @@ func (c *clientHandler) TransferOpen() (net.Conn, error) {
 		return nil, err
 	}
 
+	c.isTransferOpen = true
+	c.transfer.SetInfo(info)
+
 	c.writeMessage(StatusFileStatusOK, "Using transfer connection")
 
 	if c.debug {
@@ -393,21 +519,22 @@ func (c *clientHandler) TransferOpen() (net.Conn, error) {
 }
 
 func (c *clientHandler) TransferClose(err error) {
-	var errClose error
+	c.Lock()
+	defer c.Unlock()
 
-	if c.transfer != nil {
-		if errClose = c.transfer.Close(); errClose != nil {
-			c.logger.Warn(
-				"Problem closing transfer connection",
-				"err", err,
-			)
-		}
+	errClose := c.closeTransfer()
+	if errClose != nil {
+		c.logger.Warn(
+			"Problem closing transfer connection",
+			"err", err,
+		)
+	}
 
-		c.transfer = nil
+	// if the transfer was aborted we don't have to send a response
+	if c.isTransferAborted {
+		c.isTransferAborted = false
 
-		if c.debug {
-			c.logger.Debug("Transfer connection closed")
-		}
+		return
 	}
 
 	switch {

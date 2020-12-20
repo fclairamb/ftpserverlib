@@ -161,6 +161,9 @@ func TestMkdirRmDir(t *testing.T) {
 			require.Error(t, errStat)
 			require.Nil(t, stat)
 		}
+
+		_, err = c.Mkdir("/missing/path")
+		require.Error(t, err)
 	})
 
 	t.Run("syntax error", func(t *testing.T) {
@@ -221,6 +224,24 @@ func TestDirListingWithSpace(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, StatusFileOK, rc)
 	require.Equal(t, fmt.Sprintf("CD worked on /%s", dirName), response)
+
+	_, err = raw.PrepareDataConn()
+	require.NoError(t, err)
+
+	rc, response, err = raw.SendCommand("NLST /")
+	require.NoError(t, err)
+	require.Equal(t, StatusFileStatusOK, rc, response)
+
+	rc, _, err = raw.ReadResponse()
+	require.NoError(t, err)
+	require.Equal(t, StatusClosingDataConn, rc)
+
+	_, err = raw.PrepareDataConn()
+	require.NoError(t, err)
+
+	rc, response, err = raw.SendCommand("NLST /missingpath")
+	require.NoError(t, err)
+	require.Equal(t, StatusFileActionNotTaken, rc, response)
 }
 
 func TestCleanPath(t *testing.T) {

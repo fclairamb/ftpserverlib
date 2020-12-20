@@ -17,8 +17,8 @@ var (
 
 // CommandDescription defines which function should be used and if it should be open to anyone or only logged in users
 type CommandDescription struct {
-	Open bool                       // Open to clients without auth
-	Fn   func(*clientHandler) error // Function to handle it
+	Open bool                               // Open to clients without auth
+	Fn   func(*clientHandler, string) error // Function to handle it
 }
 
 // This is shared between FtpServer instances as there's no point in making the FTP commands behave differently
@@ -41,6 +41,7 @@ var commandsMap = map[string]*CommandDescription{
 	"OPTS": {Fn: (*clientHandler).handleOPTS, Open: true},
 	"QUIT": {Fn: (*clientHandler).handleQUIT, Open: true},
 	"AVBL": {Fn: (*clientHandler).handleAVBL},
+	"ABOR": {Fn: (*clientHandler).handleABOR},
 
 	// File access
 	"SIZE":    {Fn: (*clientHandler).handleSIZE},
@@ -88,6 +89,12 @@ var commandsMap = map[string]*CommandDescription{
 	"PORT": {Fn: (*clientHandler).handlePORT},
 	"EPRT": {Fn: (*clientHandler).handlePORT},
 }
+
+var (
+	// transfer command defines the commands that can open a transfer connection
+	transferCommands         = []string{"NLST", "LIST", "MLSD", "STOR", "APPE", "RETR"}
+	specialAttentionCommands = []string{"ABOR", "STAT", "QUIT"}
+)
 
 // FtpServer is where everything is stored
 // We want to keep it as simple as possible
