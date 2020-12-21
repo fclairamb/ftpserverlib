@@ -14,6 +14,7 @@ import (
 	"testing"
 
 	"github.com/secsy/goftp"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -39,6 +40,8 @@ func createTemporaryFile(t *testing.T, targetSize int) *os.File {
 	require.NoError(t, err, "Couldn't copy")
 
 	t.Cleanup(func() {
+		err = file.Close()
+		assert.NoError(t, err, fmt.Sprintf("Problem closing file %#v", file.Name()))
 		err := os.Remove(file.Name())
 		require.NoError(t, err, fmt.Sprintf("Problem deleting file %#v", file.Name()))
 	})
@@ -264,6 +267,8 @@ func TestBogusTransferStart(t *testing.T) {
 	rc, err := c.OpenRawConn()
 	require.NoError(t, err)
 
+	defer func() { require.NoError(t, rc.Close()) }()
+
 	{ // Completely bogus port declaration
 		status, resp, err := rc.SendCommand("PORT something")
 		require.NoError(t, err)
@@ -331,22 +336,33 @@ func TestFailingFileTransfer(t *testing.T) {
 	})
 
 	t.Run("on seek", func(t *testing.T) {
-		appendFile := createTemporaryFile(t, 1*1024)
+		initialData := []byte("initial data")
+		appendFile, err := ioutil.TempFile("", "ftpserver")
+		require.NoError(t, err)
+
+		_, err = appendFile.Write(initialData)
+		require.NoError(t, err)
+
 		err = c.Store("fail-to-seek.bin", appendFile)
 		require.NoError(t, err)
+
 		err = appendFile.Close()
 		require.NoError(t, err)
+
 		appendFile, err = os.OpenFile(appendFile.Name(), os.O_APPEND|os.O_WRONLY, os.ModePerm)
 		require.NoError(t, err)
+
 		data := []byte("some more data")
 		_, err = io.Copy(appendFile, bytes.NewReader(data))
 		require.NoError(t, err)
 		info, err := appendFile.Stat()
 		require.NoError(t, err)
-		require.Equal(t, int64(1024+len(data)), info.Size())
-		_, err = c.TransferFromOffset("fail-to-seek.bin", nil, appendFile, 1024)
+		require.Equal(t, int64(len(initialData)+len(data)), info.Size())
+		_, err = c.TransferFromOffset("fail-to-seek.bin", nil, appendFile, int64(len(initialData)))
 		require.Error(t, err)
 		require.True(t, strings.Contains(err.Error(), errFailSeek.Error()), err)
+		err = appendFile.Close()
+		require.NoError(t, err)
 	})
 
 	t.Run("check for sync", func(t *testing.T) {
@@ -416,6 +432,8 @@ func TestBasicABOR(t *testing.T) {
 
 	raw, err := c.OpenRawConn()
 	require.NoError(t, err)
+
+	defer func() { require.NoError(t, raw.Close()) }()
 
 	rc, _, err := raw.SendCommand("EPSV")
 	require.NoError(t, err)
@@ -528,6 +546,8 @@ func aborTransfer(t *testing.T, c *goftp.Client) {
 	raw, err := c.OpenRawConn()
 	require.NoError(t, err)
 
+	defer func() { require.NoError(t, raw.Close()) }()
+
 	_, err = file.Seek(0, io.SeekStart)
 	require.NoError(t, err)
 
@@ -570,6 +590,8 @@ func aborBeforeOpenTransfer(t *testing.T, c *goftp.Client) {
 
 	raw, err := c.OpenRawConn()
 	require.NoError(t, err)
+
+	defer func() { require.NoError(t, raw.Close()) }()
 
 	_, err = file.Seek(1, io.SeekStart)
 	require.NoError(t, err)

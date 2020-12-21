@@ -65,6 +65,8 @@ func TestTransferOpenError(t *testing.T) {
 	raw, err := c.OpenRawConn()
 	require.NoError(t, err, "Couldn't open raw connection")
 
+	defer func() { require.NoError(t, raw.Close()) }()
+
 	// we send STOR without opening a transfer connection
 	rc, response, err := raw.SendCommand("STOR file")
 	require.NoError(t, err)
@@ -170,6 +172,8 @@ func TestUnknownCommand(t *testing.T) {
 
 	raw, err := c.OpenRawConn()
 	require.NoError(t, err, "Couldn't open raw connection")
+
+	defer func() { require.NoError(t, raw.Close()) }()
 
 	cmd := "UNSUPPORTED"
 	rc, response, err := raw.SendCommand(cmd)

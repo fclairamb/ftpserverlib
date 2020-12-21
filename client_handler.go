@@ -164,9 +164,12 @@ func (c *clientHandler) GetLastCommand() string {
 
 func (c *clientHandler) SetCommand(cmd string) {
 	if c.command == "ABOR" {
-		// before setting the current command we wait for the active transfer connection, if any, to end
-		// if the transfer connection is not opened for a previous error and we received an abor then
-		// isTransferAborted will remain to true, so we reset it here
+		// before setting the current command we wait for the active transfer connection, if any,
+		// to end using the wait group.
+		// If the transfer connection was not opened for a previous error such as a OpenFile error
+		// (see transferFile) and we received an ABOR before returning the transfer error then
+		// isTransferAborted will remain to true and the next transfer connection will fail, so we
+		// reset it here
 		c.isTransferAborted = false
 	}
 
@@ -379,30 +382,25 @@ func (c *clientHandler) handleCommand(line string) {
 		return
 	}
 
+	// all commands are serialized except the ones that require special attention
+	if !c.isSpecialAttentionCommand(command) {
+		c.transferWg.Wait()
+	}
+
+	c.SetCommand(command)
+
 	if c.canOpenTransfer(command) {
 		// these commands will be started in a separate goroutine so
-		// they can be aborted. A FTP client is not allowed to open a new transfer
-		// connection if another one is already open. We enforce this by serializing
-		// commands that can open a transfer connection using a wait group.
-		// The wg is also required to properly handle QUIT: we have to wait for the
-		// active transfer, if any, to end before quitting
-		c.transferWg.Wait()
-		c.SetCommand(command)
+		// they can be aborted.
 		c.transferWg.Add(1)
 
 		go func(cmd, param string) {
 			defer c.transferWg.Done()
 
 			c.executeCommandFn(cmdDesc, cmd, param)
-		}(c.command, param)
+		}(command, param)
 	} else {
-		// only special attention commands can be processed while a transfer is in progress
-		// we enforce this requirement to simplify our code
-		if !c.isSpecialAttentionCommand(command) {
-			c.transferWg.Wait()
-		}
-		c.SetCommand(command)
-		c.executeCommandFn(cmdDesc, c.command, param)
+		c.executeCommandFn(cmdDesc, command, param)
 	}
 }
 
