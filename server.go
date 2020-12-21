@@ -19,7 +19,7 @@ var (
 type CommandDescription struct {
 	Open            bool                               // Open to clients without auth
 	TransferRelated bool                               // This is a command that can open a transfer connection
-	SpecialAction   bool                               // This command should be handled even if there is a transfer in progress
+	SpecialAction   bool                               // Command to handle even if there is a transfer in progress
 	Fn              func(*clientHandler, string) error // Function to handle it
 }
 
