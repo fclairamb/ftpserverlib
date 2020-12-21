@@ -275,8 +275,8 @@ func (c *clientHandler) handleQUIT(param string) error {
 
 // param is the previous command, the one to abort
 func (c *clientHandler) handleABOR(param string) error {
-	c.Lock()
-	defer c.Unlock()
+	c.transferMu.Lock()
+	defer c.transferMu.Unlock()
 
 	if c.transfer != nil {
 		isOpened := c.isTransferOpen

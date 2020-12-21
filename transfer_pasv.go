@@ -164,9 +164,9 @@ func (c *clientHandler) handlePASV(param string) error {
 		c.writeMessage(StatusEnteringEPSV, fmt.Sprintf("Entering Extended Passive Mode (|||%d|)", p.Port))
 	}
 
-	c.Lock()
+	c.transferMu.Lock()
 	c.transfer = p
-	c.Unlock()
+	c.transferMu.Unlock()
 
 	return nil
 }

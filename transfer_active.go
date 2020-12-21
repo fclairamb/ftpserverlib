@@ -45,7 +45,7 @@ func (c *clientHandler) handlePORT(param string) error {
 		}
 	}
 
-	c.Lock()
+	c.transferMu.Lock()
 
 	c.transfer = &activeTransferHandler{
 		raddr:     raddr,
@@ -53,7 +53,7 @@ func (c *clientHandler) handlePORT(param string) error {
 		tlsConfig: tlsConfig,
 	}
 
-	c.Unlock()
+	c.transferMu.Unlock()
 
 	c.writeMessage(StatusOK, c.command+" command successful")
 

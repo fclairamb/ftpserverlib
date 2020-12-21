@@ -76,7 +76,7 @@ type clientHandler struct {
 	selectedHashAlgo  HASHAlgo        // algorithm used when we receive the HASH command
 	logger            log.Logger      // Client handler logging
 	transferWg        sync.WaitGroup  // wait group for command that open a transfer connection
-	sync.Mutex                        // this mutex will protect the transfer parameters
+	transferMu        sync.Mutex      // this mutex will protect the transfer parameters
 	transfer          transferHandler // Transfer connection (passive or active)s
 	isTransferOpen    bool            // indicate if the transfer connection is opened
 	isTransferAborted bool            // indicate if the transfer was aborted
@@ -192,7 +192,7 @@ func (c *clientHandler) closeTransfer() error {
 
 // Close closes the active transfer, if any, and the control connection
 func (c *clientHandler) Close(code int, message string) error {
-	c.Lock()
+	c.transferMu.Lock()
 
 	if err := c.closeTransfer(); err != nil {
 		c.logger.Warn(
@@ -201,7 +201,7 @@ func (c *clientHandler) Close(code int, message string) error {
 		)
 	}
 
-	c.Unlock()
+	c.transferMu.Unlock()
 
 	if code > 0 {
 		c.writeMessage(code, message)
@@ -218,8 +218,8 @@ func (c *clientHandler) end() {
 	c.server.driver.ClientDisconnected(c)
 	c.server.clientDeparture(c)
 
-	c.Lock()
-	defer c.Unlock()
+	c.transferMu.Lock()
+	defer c.transferMu.Unlock()
 
 	if err := c.closeTransfer(); err != nil {
 		c.logger.Warn(
@@ -230,8 +230,8 @@ func (c *clientHandler) end() {
 }
 
 func (c *clientHandler) isCommandAborted() (aborted bool) {
-	c.Lock()
-	defer c.Unlock()
+	c.transferMu.Lock()
+	defer c.transferMu.Unlock()
 
 	aborted = c.isTransferAborted
 
@@ -469,8 +469,8 @@ func (c *clientHandler) writeMessage(code int, message string) {
 }
 
 func (c *clientHandler) GetTranferInfo() string {
-	c.Lock()
-	defer c.Unlock()
+	c.transferMu.Lock()
+	defer c.transferMu.Unlock()
 
 	if c.transfer == nil {
 		return ""
@@ -480,8 +480,8 @@ func (c *clientHandler) GetTranferInfo() string {
 }
 
 func (c *clientHandler) TransferOpen(info string) (net.Conn, error) {
-	c.Lock()
-	defer c.Unlock()
+	c.transferMu.Lock()
+	defer c.transferMu.Unlock()
 
 	if c.transfer == nil {
 		// a transfer could be aborted before it is opened, in this case no response should be returned
@@ -529,8 +529,8 @@ func (c *clientHandler) TransferOpen(info string) (net.Conn, error) {
 }
 
 func (c *clientHandler) TransferClose(err error) {
-	c.Lock()
-	defer c.Unlock()
+	c.transferMu.Lock()
+	defer c.transferMu.Unlock()
 
 	errClose := c.closeTransfer()
 	if errClose != nil {
