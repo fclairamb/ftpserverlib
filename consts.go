@@ -40,6 +40,7 @@ const (
 	// but the error condition is temporary and the action may be requested again.
 	StatusServiceNotAvailable      = 421 // RFC 959, 4.2.1
 	StatusCannotOpenDataConnection = 425 // RFC 959, 4.2.1
+	StatusTransferAborted          = 426 // RFC 959, 4.2.1
 	StatusFileActionNotTaken       = 450 // RFC 959, 4.2.1
 
 	// 500 Series - Syntax error, command unrecognized and the requested action did not take
@@ -47,6 +48,7 @@ const (
 	StatusSyntaxErrorNotRecognised = 500 // RFC 959, 4.2.1
 	StatusSyntaxErrorParameters    = 501 // RFC 959, 4.2.1
 	StatusCommandNotImplemented    = 502 // RFC 959, 4.2.1
+	StatusBadCommandSequence       = 503 // RFC 959, 4.2.1
 	StatusNotLoggedIn              = 530 // RFC 959, 4.2.1
 	StatusActionNotTaken           = 550 // RFC 959, 4.2.1
 	StatusActionAborted            = 552 // RFC 959, 4.2.1

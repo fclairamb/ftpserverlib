@@ -56,6 +56,8 @@ func TestLoginSuccess(t *testing.T) {
 	raw, err := c.OpenRawConn()
 	require.NoError(t, err, "Couldn't open raw connection")
 
+	defer func() { require.NoError(t, raw.Close()) }()
+
 	rc, _, err := raw.SendCommand("NOOP")
 	require.NoError(t, err)
 	require.Equal(t, StatusOK, rc, "Couldn't NOOP")
@@ -109,8 +111,11 @@ func TestAuthTLS(t *testing.T) {
 
 	defer func() { panicOnError(c.Close()) }()
 
-	_, err = c.OpenRawConn()
+	raw, err := c.OpenRawConn()
 	require.NoError(t, err, "Couldn't upgrade connection to TLS")
+
+	err = raw.Close()
+	require.NoError(t, err)
 }
 
 func TestAuthTLSRequired(t *testing.T) {
@@ -145,6 +150,8 @@ func TestAuthTLSRequired(t *testing.T) {
 
 	raw, err := c.OpenRawConn()
 	require.NoError(t, err, "Couldn't open raw connection")
+
+	defer func() { require.NoError(t, raw.Close()) }()
 
 	rc, _, err := raw.SendCommand("STAT")
 	require.NoError(t, err)

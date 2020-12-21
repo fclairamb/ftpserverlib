@@ -27,6 +27,8 @@ func TestSiteCommand(t *testing.T) {
 	raw, err := c.OpenRawConn()
 	require.NoError(t, err, "Couldn't open raw connection")
 
+	defer func() { require.NoError(t, raw.Close()) }()
+
 	rc, response, err := raw.SendCommand("SITE help")
 	require.NoError(t, err)
 	require.Equal(t, StatusSyntaxErrorNotRecognised, rc, "Are we supporting it now ?")
@@ -52,6 +54,8 @@ func TestIdleTimeout(t *testing.T) {
 
 	raw, err := c.OpenRawConn()
 	require.NoError(t, err, "Couldn't open raw connection")
+
+	defer func() { require.NoError(t, raw.Close()) }()
 
 	time.Sleep(time.Second * 1) // < 2s : OK
 
@@ -111,6 +115,8 @@ func TestCLNT(t *testing.T) {
 	raw, err := c.OpenRawConn()
 	require.NoError(t, err, "Couldn't open raw connection")
 
+	defer func() { require.NoError(t, raw.Close()) }()
+
 	rc, _, err := raw.SendCommand("CLNT NcFTP 3.2.6 macosx10.15")
 	require.NoError(t, err)
 	require.Equal(t, StatusOK, rc)
@@ -130,6 +136,8 @@ func TestOPTSUTF8(t *testing.T) {
 
 	raw, err := c.OpenRawConn()
 	require.NoError(t, err, "Couldn't open raw connection")
+
+	defer func() { require.NoError(t, raw.Close()) }()
 
 	for _, cmd := range []string{"OPTS UTF8", "OPTS UTF8 ON"} {
 		rc, message, err := raw.SendCommand(cmd)
@@ -161,6 +169,8 @@ func TestOPTSHASH(t *testing.T) {
 
 	raw, err := c.OpenRawConn()
 	require.NoError(t, err, "Couldn't open raw connection")
+
+	defer func() { require.NoError(t, raw.Close()) }()
 
 	rc, message, err := raw.SendCommand("OPTS HASH")
 	require.NoError(t, err)
@@ -203,6 +213,8 @@ func TestAVBL(t *testing.T) {
 
 	raw, err := c.OpenRawConn()
 	require.NoError(t, err, "Couldn't open raw connection")
+
+	defer func() { require.NoError(t, raw.Close()) }()
 
 	rc, response, err := raw.SendCommand("AVBL")
 	require.NoError(t, err)
@@ -253,6 +265,8 @@ func TestQuit(t *testing.T) {
 	raw, err := c.OpenRawConn()
 	require.NoError(t, err, "Couldn't open raw connection")
 
+	defer func() { require.NoError(t, raw.Close()) }()
+
 	rc, _, err := raw.SendCommand("QUIT")
 	require.NoError(t, err)
 	require.Equal(t, StatusClosingControlConn, rc)
@@ -272,6 +286,8 @@ func TestTYPE(t *testing.T) {
 
 	raw, err := c.OpenRawConn()
 	require.NoError(t, err, "Couldn't open raw connection")
+
+	defer func() { require.NoError(t, raw.Close()) }()
 
 	rc, _, err := raw.SendCommand("TYPE I")
 	require.NoError(t, err)

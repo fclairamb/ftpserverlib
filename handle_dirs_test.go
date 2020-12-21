@@ -86,6 +86,8 @@ func TestDirHandling(t *testing.T) {
 	raw, err := c.OpenRawConn()
 	require.NoError(t, err, "Couldn't open raw connection")
 
+	defer func() { require.NoError(t, raw.Close()) }()
+
 	rc, _, err := raw.SendCommand("CWD /unknown")
 	require.NoError(t, err)
 	require.Equal(t, StatusActionNotTaken, rc)
@@ -96,7 +98,6 @@ func TestDirHandling(t *testing.T) {
 	contents, err := c.ReadDir("/")
 	require.NoError(t, err)
 	require.Len(t, contents, 1)
-	require.Equal(t, DirKnown, contents[0].Name())
 
 	rc, _, err = raw.SendCommand("CWD /" + DirKnown)
 	require.NoError(t, err)
@@ -113,8 +114,7 @@ func TestDirHandling(t *testing.T) {
 
 	rc, response, err = raw.SendCommand("CDUP")
 	require.NoError(t, err)
-	require.Equal(t, StatusFileOK, rc)
-	require.Equal(t, "CDUP worked on /"+DirKnown, response)
+	require.Equal(t, StatusFileOK, rc, response)
 
 	err = c.Rmdir(path.Join("/", DirKnown, testSubdir))
 	require.NoError(t, err)
@@ -141,6 +141,8 @@ func TestMkdirRmDir(t *testing.T) {
 	raw, err := c.OpenRawConn()
 	require.NoError(t, err, "Couldn't open raw connection")
 
+	defer func() { require.NoError(t, raw.Close()) }()
+
 	t.Run("standard", func(t *testing.T) {
 		rc, _, err := raw.SendCommand("SITE MKDIR /dir1/dir2/dir3")
 		require.NoError(t, err)
@@ -161,6 +163,9 @@ func TestMkdirRmDir(t *testing.T) {
 			require.Error(t, errStat)
 			require.Nil(t, stat)
 		}
+
+		_, err = c.Mkdir("/missing/path")
+		require.Error(t, err)
 	})
 
 	t.Run("syntax error", func(t *testing.T) {
@@ -217,10 +222,30 @@ func TestDirListingWithSpace(t *testing.T) {
 	raw, err := c.OpenRawConn()
 	require.NoError(t, err, "Couldn't open raw connection")
 
+	defer func() { require.NoError(t, raw.Close()) }()
+
 	rc, response, err := raw.SendCommand(fmt.Sprintf("CWD /%s", dirName))
 	require.NoError(t, err)
 	require.Equal(t, StatusFileOK, rc)
 	require.Equal(t, fmt.Sprintf("CD worked on /%s", dirName), response)
+
+	_, err = raw.PrepareDataConn()
+	require.NoError(t, err)
+
+	rc, response, err = raw.SendCommand("NLST /")
+	require.NoError(t, err)
+	require.Equal(t, StatusFileStatusOK, rc, response)
+
+	rc, _, err = raw.ReadResponse()
+	require.NoError(t, err)
+	require.Equal(t, StatusClosingDataConn, rc)
+
+	_, err = raw.PrepareDataConn()
+	require.NoError(t, err)
+
+	rc, response, err = raw.SendCommand("NLST /missingpath")
+	require.NoError(t, err)
+	require.Equal(t, StatusFileActionNotTaken, rc, response)
 }
 
 func TestCleanPath(t *testing.T) {
@@ -237,6 +262,8 @@ func TestCleanPath(t *testing.T) {
 
 	raw, err := c.OpenRawConn()
 	require.NoError(t, err, "Couldn't open raw connection")
+
+	defer func() { require.NoError(t, raw.Close()) }()
 
 	// various path purity tests
 
@@ -287,6 +314,8 @@ func TestTLSTransfer(t *testing.T) {
 
 	raw, err := c.OpenRawConn()
 	require.NoError(t, err, "Couldn't open raw connection")
+
+	defer func() { require.NoError(t, raw.Close()) }()
 
 	rc, response, err := raw.SendCommand("PROT C")
 	require.NoError(t, err)

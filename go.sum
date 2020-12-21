@@ -40,8 +40,8 @@ github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSs
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/dgrijalva/jwt-go v3.2.0+incompatible/go.mod h1:E3ru+11k8xSBh+hMPgOLZmtrrCbhqsmaPHjLKYnJCaQ=
-github.com/drakkan/goftp v0.0.0-20201217084041-93793d4ac54d h1:hIhohhJRpUzEuZj2qExBNzEUAxWk8+ahitt7BEFP1KU=
-github.com/drakkan/goftp v0.0.0-20201217084041-93793d4ac54d/go.mod h1:K3yqfa64LwJzUpdUWC6b524HO7U7DmBnrJuBjxKSZOQ=
+github.com/drakkan/goftp v0.0.0-20201220151643-27b7174e8caf h1:hb1QxC7CuOP25cKVNL5vVU+22w1m1A2ia76o4kt4n60=
+github.com/drakkan/goftp v0.0.0-20201220151643-27b7174e8caf/go.mod h1:K3yqfa64LwJzUpdUWC6b524HO7U7DmBnrJuBjxKSZOQ=
 github.com/dustin/go-humanize v0.0.0-20171111073723-bb3d318650d4/go.mod h1:HtrtbFcZ19U5GC7JDqmcUSB87Iq5E25KnS6fMYU6eOk=
 github.com/eapache/go-resiliency v1.1.0/go.mod h1:kFI+JgMyC7bLPUVY133qvEBtVayf5mFgVsvEsIPBvNs=
 github.com/eapache/go-xerial-snappy v0.0.0-20180814174437-776d5712da21/go.mod h1:+020luEh2TKB4/GOp8oxxtq0Daoen/Cii55CzbTV6DU=

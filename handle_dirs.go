@@ -23,8 +23,8 @@ func (c *clientHandler) absPath(p string) string {
 	return path.Clean(c.Path() + "/" + p)
 }
 
-func (c *clientHandler) handleCWD() error {
-	p := c.absPath(c.param)
+func (c *clientHandler) handleCWD(param string) error {
+	p := c.absPath(param)
 
 	if _, err := c.driver.Stat(p); err == nil {
 		c.SetPath(p)
@@ -36,8 +36,8 @@ func (c *clientHandler) handleCWD() error {
 	return nil
 }
 
-func (c *clientHandler) handleMKD() error {
-	p := c.absPath(c.param)
+func (c *clientHandler) handleMKD(param string) error {
+	p := c.absPath(param)
 	if err := c.driver.Mkdir(p, 0755); err == nil {
 		// handleMKD confirms to "qoute-doubling"
 		// https://tools.ietf.org/html/rfc959 , page 63
@@ -65,10 +65,10 @@ func (c *clientHandler) handleMKDIR(params string) {
 	}
 }
 
-func (c *clientHandler) handleRMD() error {
+func (c *clientHandler) handleRMD(param string) error {
 	var err error
 
-	p := c.absPath(c.param)
+	p := c.absPath(param)
 
 	if rmd, ok := c.driver.(ClientDriverExtensionRemoveDir); ok {
 		err = rmd.RemoveDir(p)
@@ -101,7 +101,7 @@ func (c *clientHandler) handleRMDIR(params string) {
 	}
 }
 
-func (c *clientHandler) handleCDUP() error {
+func (c *clientHandler) handleCDUP(param string) error {
 	parent, _ := path.Split(c.Path())
 	if parent != "/" && strings.HasSuffix(parent, "/") {
 		parent = parent[0 : len(parent)-1]
@@ -117,57 +117,68 @@ func (c *clientHandler) handleCDUP() error {
 	return nil
 }
 
-func (c *clientHandler) handlePWD() error {
+func (c *clientHandler) handlePWD(param string) error {
 	c.writeMessage(StatusPathCreated, "\""+c.Path()+"\" is the current directory")
 
 	return nil
 }
 
-func (c *clientHandler) checkLISTArgs() {
-	param := strings.ToLower(c.param)
+func (c *clientHandler) checkLISTArgs(args string) string {
+	result := args
+	param := strings.ToLower(args)
 
 	for _, arg := range supportedlistArgs {
 		if strings.HasPrefix(param, arg) {
 			// a check for a non-existent directory error is more appropriate here
 			// but we cannot assume that the driver implementation will return an
 			// os.IsNotExist error.
-			if _, err := c.driver.Stat(c.param); err != nil {
-				params := strings.SplitN(c.param, " ", 2)
+			if _, err := c.driver.Stat(args); err != nil {
+				params := strings.SplitN(args, " ", 2)
 				if len(params) == 1 {
-					c.param = ""
+					result = ""
 				} else {
-					c.param = params[1]
+					result = params[1]
 				}
 			}
 		}
 	}
+
+	return result
 }
 
-func (c *clientHandler) handleLIST() error {
-	if files, err := c.getFileList(); err == nil || err == io.EOF {
-		if tr, errTr := c.TransferOpen(); errTr == nil {
+func (c *clientHandler) handleLIST(param string) error {
+	info := fmt.Sprintf("LIST %v", param)
+
+	if files, err := c.getFileList(param); err == nil || err == io.EOF {
+		if tr, errTr := c.TransferOpen(info); errTr == nil {
 			err = c.dirTransferLIST(tr, files)
 			c.TransferClose(err)
 
-			return err
+			return nil
 		}
 	} else {
-		c.writeMessage(StatusActionNotTaken, fmt.Sprintf("Could not list: %v", err))
+		if !c.isCommandAborted() {
+			c.writeMessage(StatusFileActionNotTaken, fmt.Sprintf("Could not list: %v", err))
+		}
 	}
 
 	return nil
 }
 
-func (c *clientHandler) handleNLST() error {
-	if files, err := c.getFileList(); err == nil || err == io.EOF {
-		if tr, errTrOpen := c.TransferOpen(); errTrOpen == nil {
+func (c *clientHandler) handleNLST(param string) error {
+	info := fmt.Sprintf("NLST %v", param)
+
+	if files, err := c.getFileList(param); err == nil || err == io.EOF {
+		if tr, errTrOpen := c.TransferOpen(info); errTrOpen == nil {
 			err = c.dirTransferNLST(tr, files)
 			c.TransferClose(err)
 
-			return err
+			return nil
 		}
 	} else {
-		c.writeMessage(StatusSyntaxErrorNotRecognised, fmt.Sprintf("Could not list: %v", err))
+		if !c.isCommandAborted() {
+			c.writeMessage(StatusFileActionNotTaken, fmt.Sprintf("Could not list: %v", err))
+		}
 	}
 
 	return nil
@@ -189,22 +200,26 @@ func (c *clientHandler) dirTransferNLST(w io.Writer, files []os.FileInfo) error 
 	return nil
 }
 
-func (c *clientHandler) handleMLSD() error {
-	if c.server.settings.DisableMLSD {
+func (c *clientHandler) handleMLSD(param string) error {
+	if c.server.settings.DisableMLSD && !c.isCommandAborted() {
 		c.writeMessage(StatusSyntaxErrorNotRecognised, "MLSD has been disabled")
 
 		return nil
 	}
 
-	if files, err := c.getFileList(); err == nil || err == io.EOF {
-		if tr, errTr := c.TransferOpen(); errTr == nil {
+	info := fmt.Sprintf("MLSD %v", param)
+
+	if files, err := c.getFileList(param); err == nil || err == io.EOF {
+		if tr, errTr := c.TransferOpen(info); errTr == nil {
 			err = c.dirTransferMLSD(tr, files)
 			c.TransferClose(err)
 
-			return err
+			return nil
 		}
 	} else {
-		c.writeMessage(StatusActionNotTaken, fmt.Sprintf("Could not list: %v", err))
+		if !c.isCommandAborted() {
+			c.writeMessage(StatusActionNotTaken, fmt.Sprintf("Could not list: %v", err))
+		}
 	}
 
 	return nil
@@ -290,12 +305,12 @@ func (c *clientHandler) writeMLSxOutput(w io.Writer, file os.FileInfo) error {
 	return err
 }
 
-func (c *clientHandler) getFileList() ([]os.FileInfo, error) {
+func (c *clientHandler) getFileList(param string) ([]os.FileInfo, error) {
 	if !c.server.settings.DisableLISTArgs {
-		c.checkLISTArgs()
+		param = c.checkLISTArgs(param)
 	}
 
-	directoryPath := c.absPath(c.param)
+	directoryPath := c.absPath(param)
 
 	if fileList, ok := c.driver.(ClientDriverExtensionFileList); ok {
 		return fileList.ReadDir(directoryPath)
