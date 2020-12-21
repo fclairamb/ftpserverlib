@@ -157,7 +157,9 @@ func (c *clientHandler) handleLIST(param string) error {
 			return nil
 		}
 	} else {
-		c.writeMessage(StatusFileActionNotTaken, fmt.Sprintf("Could not list: %v", err))
+		if !c.isCommandAborted() {
+			c.writeMessage(StatusFileActionNotTaken, fmt.Sprintf("Could not list: %v", err))
+		}
 	}
 
 	return nil
@@ -174,7 +176,9 @@ func (c *clientHandler) handleNLST(param string) error {
 			return nil
 		}
 	} else {
-		c.writeMessage(StatusFileActionNotTaken, fmt.Sprintf("Could not list: %v", err))
+		if !c.isCommandAborted() {
+			c.writeMessage(StatusFileActionNotTaken, fmt.Sprintf("Could not list: %v", err))
+		}
 	}
 
 	return nil
@@ -197,7 +201,7 @@ func (c *clientHandler) dirTransferNLST(w io.Writer, files []os.FileInfo) error 
 }
 
 func (c *clientHandler) handleMLSD(param string) error {
-	if c.server.settings.DisableMLSD {
+	if c.server.settings.DisableMLSD && !c.isCommandAborted() {
 		c.writeMessage(StatusSyntaxErrorNotRecognised, "MLSD has been disabled")
 
 		return nil
@@ -213,7 +217,9 @@ func (c *clientHandler) handleMLSD(param string) error {
 			return nil
 		}
 	} else {
-		c.writeMessage(StatusActionNotTaken, fmt.Sprintf("Could not list: %v", err))
+		if !c.isCommandAborted() {
+			c.writeMessage(StatusActionNotTaken, fmt.Sprintf("Could not list: %v", err))
+		}
 	}
 
 	return nil

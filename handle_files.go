@@ -71,7 +71,10 @@ func (c *clientHandler) transferFile(write bool, append bool, param, info string
 
 	// If this fail, can stop right here and reset the seek position
 	if err != nil {
-		c.writeMessage(StatusActionNotTaken, "Could not access file: "+err.Error())
+		if !c.isCommandAborted() {
+			c.writeMessage(StatusActionNotTaken, "Could not access file: "+err.Error())
+		}
+
 		c.ctxRest = 0
 
 		return
@@ -85,7 +88,9 @@ func (c *clientHandler) transferFile(write bool, append bool, param, info string
 
 		if err != nil {
 			// if we are unable to seek we can stop right here and close the file
-			c.writeMessage(StatusActionNotTaken, "Could not seek file: "+err.Error())
+			if !c.isCommandAborted() {
+				c.writeMessage(StatusActionNotTaken, "Could not seek file: "+err.Error())
+			}
 			// we can ignore the close error here
 			c.closeUnchecked(file)
 

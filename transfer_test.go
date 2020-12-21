@@ -502,6 +502,63 @@ func TestTransferABOR(t *testing.T) {
 	})
 }
 
+func TestABORWithoutOpenTransfer(t *testing.T) {
+	s := NewTestServer(t, true)
+	conf := goftp.Config{
+		User:     authUser,
+		Password: authPass,
+	}
+	c, err := goftp.DialConfig(conf, s.Addr())
+	require.NoError(t, err, "Couldn't connect")
+
+	defer func() { require.NoError(t, c.Close()) }()
+
+	file := createTemporaryFile(t, 1*1024)
+	err = c.Store("file.bin", file)
+	require.NoError(t, err)
+
+	err = c.Rename("file.bin", "delay-io-fail-to-seek.bin")
+	require.NoError(t, err)
+
+	_, err = c.Mkdir("delay-io-fail-to-readdir")
+	require.NoError(t, err)
+
+	raw, err := c.OpenRawConn()
+	require.NoError(t, err)
+
+	defer func() { require.NoError(t, raw.Close()) }()
+
+	_, err = file.Seek(1, io.SeekStart)
+	require.NoError(t, err)
+
+	rc, response, err := raw.SendCommand("REST 1")
+	require.NoError(t, err)
+	require.Equal(t, StatusFileActionPending, rc, response)
+
+	for _, cmd := range []string{"RETR delay-io-fail-to-seek.bin", "LIST delay-io-fail-to-readdir",
+		"NLST delay-io-fail-to-readdir", "MLSD delay-io-fail-to-readdir"} {
+		_, err = raw.PrepareDataConn()
+		require.NoError(t, err)
+
+		err = raw.SendCommandNoWaitResponse(cmd)
+		require.NoError(t, err)
+
+		rc, response, err = raw.SendCommand(getABORCmd())
+		require.NoError(t, err)
+		require.Equal(t, StatusClosingDataConn, rc, response)
+		require.Equal(t, "ABOR successful; closing transfer connection", response)
+
+		// verify we are in sync
+		rc, _, err = raw.SendCommand("NOOP")
+		require.NoError(t, err)
+		require.Equal(t, StatusOK, rc)
+	}
+
+	rc, _, err = raw.SendCommand("QUIT")
+	require.NoError(t, err)
+	require.Equal(t, StatusClosingControlConn, rc)
+}
+
 func TestABORBeforeOpenTransfer(t *testing.T) {
 	t.Run("passive-mode", func(t *testing.T) {
 		s := NewTestServer(t, true)

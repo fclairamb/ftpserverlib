@@ -163,16 +163,6 @@ func (c *clientHandler) GetLastCommand() string {
 }
 
 func (c *clientHandler) SetCommand(cmd string) {
-	if c.command == "ABOR" {
-		// before setting the current command we wait for the active transfer connection, if any,
-		// to end using the wait group.
-		// If the transfer connection was not opened for a previous error such as a OpenFile error
-		// (see transferFile) and we received an ABOR before returning the transfer error then
-		// isTransferAborted will remain to true and the next transfer connection will fail, so we
-		// reset it here
-		c.isTransferAborted = false
-	}
-
 	c.command = cmd
 }
 
@@ -237,6 +227,15 @@ func (c *clientHandler) end() {
 			"err", err,
 		)
 	}
+}
+
+func (c *clientHandler) isCommandAborted() (aborted bool) {
+	c.Lock()
+	defer c.Unlock()
+
+	aborted = c.isTransferAborted
+
+	return
 }
 
 func (c *clientHandler) canOpenTransfer(command string) bool {
@@ -382,7 +381,10 @@ func (c *clientHandler) handleCommand(line string) {
 		return
 	}
 
-	// all commands are serialized except the ones that require special attention
+	// All commands are serialized except the ones that require special attention.
+	// Special attention commands are not executed in a separate goroutine so we can
+	// have at most one command that can open a transfer connection and one special
+	// attention command running at the same time
 	if !c.isSpecialAttentionCommand(command) {
 		c.transferWg.Wait()
 	}
@@ -392,6 +394,16 @@ func (c *clientHandler) handleCommand(line string) {
 	if c.canOpenTransfer(command) {
 		// these commands will be started in a separate goroutine so
 		// they can be aborted.
+		// We cannot have two concurrent transfers so also set isTransferAborted
+		// to false here.
+		// isTransferAborted could remain to true if the previous command is
+		// aborted and it does not open a transfer connection, see "transferFile"
+		// for details. For this to happen a client should send an ABOR before
+		// receiving the StatusFileStatusOK response. This is very unlikely
+		// A lock is not required here, we cannot have another concurrent ABOR
+		// or transfer active here
+		c.isTransferAborted = false
+
 		c.transferWg.Add(1)
 
 		go func(cmd, param string) {

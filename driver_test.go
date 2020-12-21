@@ -99,10 +99,12 @@ var errFailWrite = errors.New("couldn't write")
 
 var errFailSeek = errors.New("couldn't seek")
 
+var errFailReaddir = errors.New("couldn't readdir")
+
 func (f *testFile) Read(b []byte) (int, error) {
 	// simulating a slow reading allows us to test ABOR
 	if strings.Contains(f.File.Name(), "delay-io") {
-		time.Sleep(1 * time.Second)
+		time.Sleep(500 * time.Millisecond)
 	}
 
 	return f.File.Read(b)
@@ -115,7 +117,7 @@ func (f *testFile) Write(b []byte) (int, error) {
 
 	// simulating a slow writing allows us to test ABOR
 	if strings.Contains(f.File.Name(), "delay-io") {
-		time.Sleep(1 * time.Second)
+		time.Sleep(500 * time.Millisecond)
 	}
 
 	return f.File.Write(b)
@@ -130,19 +132,31 @@ func (f *testFile) Close() error {
 }
 
 func (f *testFile) Seek(offset int64, whence int) (int64, error) {
-	if strings.Contains(f.File.Name(), "fail-to-seek") {
-		return 0, errFailSeek
-	}
-
 	// by delaying the seek and sending a REST before the actual transfer
 	// we can delay the opening of the transfer and then test an ABOR before
 	// opening a transfer. I'm not sure if this can really happen but it is
 	// better to be prepared for buggy clients too
 	if strings.Contains(f.File.Name(), "delay-io") {
-		time.Sleep(1 * time.Second)
+		time.Sleep(500 * time.Millisecond)
+	}
+
+	if strings.Contains(f.File.Name(), "fail-to-seek") {
+		return 0, errFailSeek
 	}
 
 	return f.File.Seek(offset, whence)
+}
+
+func (f *testFile) Readdir(count int) ([]os.FileInfo, error) {
+	if strings.Contains(f.File.Name(), "delay-io") {
+		time.Sleep(500 * time.Millisecond)
+	}
+
+	if strings.Contains(f.File.Name(), "fail-to-readdir") {
+		return nil, errFailReaddir
+	}
+
+	return f.File.Readdir(count)
 }
 
 // NewTestClientDriver creates a client driver
@@ -209,6 +223,16 @@ func (driver *TestServerDriver) GetTLSConfig() (*tls.Config, error) {
 // OpenFile opens a file in 3 possible modes: read, write, appending write (use appropriate flags)
 func (driver *TestClientDriver) OpenFile(path string, flag int, perm os.FileMode) (afero.File, error) {
 	file, err := driver.Fs.OpenFile(path, flag, perm)
+
+	if err == nil {
+		file = &testFile{File: file}
+	}
+
+	return file, err
+}
+
+func (driver *TestClientDriver) Open(name string) (afero.File, error) {
+	file, err := driver.Fs.Open(name)
 
 	if err == nil {
 		file = &testFile{File: file}
