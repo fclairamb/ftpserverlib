@@ -238,26 +238,6 @@ func (c *clientHandler) isCommandAborted() (aborted bool) {
 	return
 }
 
-func (c *clientHandler) canOpenTransfer(command string) bool {
-	for _, cmd := range transferCommands {
-		if cmd == command {
-			return true
-		}
-	}
-
-	return false
-}
-
-func (c *clientHandler) isSpecialAttentionCommand(command string) bool {
-	for _, cmd := range specialAttentionCommands {
-		if cmd == command {
-			return true
-		}
-	}
-
-	return false
-}
-
 // HandleCommands reads the stream of commands
 func (c *clientHandler) HandleCommands() {
 	defer c.end()
@@ -358,11 +338,6 @@ func (c *clientHandler) handleCommand(line string) {
 				cmdDesc = commandsMap[cmd]
 				command = cmd
 
-				if cmd == "ABOR" {
-					// this way ABOR know about the command to abort
-					param = c.GetLastCommand()
-				}
-
 				break
 			}
 		}
@@ -381,17 +356,17 @@ func (c *clientHandler) handleCommand(line string) {
 		return
 	}
 
-	// All commands are serialized except the ones that require special attention.
-	// Special attention commands are not executed in a separate goroutine so we can
+	// All commands are serialized except the ones that require special action.
+	// Special action commands are not executed in a separate goroutine so we can
 	// have at most one command that can open a transfer connection and one special
-	// attention command running at the same time
-	if !c.isSpecialAttentionCommand(command) {
+	// action command running at the same time
+	if !cmdDesc.SpecialAction {
 		c.transferWg.Wait()
 	}
 
 	c.SetCommand(command)
 
-	if c.canOpenTransfer(command) {
+	if cmdDesc.TransferRelated {
 		// these commands will be started in a separate goroutine so
 		// they can be aborted.
 		// We cannot have two concurrent transfers so also set isTransferAborted

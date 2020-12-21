@@ -17,8 +17,10 @@ var (
 
 // CommandDescription defines which function should be used and if it should be open to anyone or only logged in users
 type CommandDescription struct {
-	Open bool                               // Open to clients without auth
-	Fn   func(*clientHandler, string) error // Function to handle it
+	Open            bool                               // Open to clients without auth
+	TransferRelated bool                               // This is a command that can open a transfer connection
+	SpecialAction   bool                               // This command should be handled even if there is a transfer in progress
+	Fn              func(*clientHandler, string) error // Function to handle it
 }
 
 // This is shared between FtpServer instances as there's no point in making the FTP commands behave differently
@@ -39,18 +41,18 @@ var commandsMap = map[string]*CommandDescription{
 	"SYST": {Fn: (*clientHandler).handleSYST, Open: true},
 	"NOOP": {Fn: (*clientHandler).handleNOOP, Open: true},
 	"OPTS": {Fn: (*clientHandler).handleOPTS, Open: true},
-	"QUIT": {Fn: (*clientHandler).handleQUIT, Open: true},
+	"QUIT": {Fn: (*clientHandler).handleQUIT, Open: true, SpecialAction: true},
 	"AVBL": {Fn: (*clientHandler).handleAVBL},
-	"ABOR": {Fn: (*clientHandler).handleABOR},
+	"ABOR": {Fn: (*clientHandler).handleABOR, SpecialAction: true},
 
 	// File access
 	"SIZE":    {Fn: (*clientHandler).handleSIZE},
-	"STAT":    {Fn: (*clientHandler).handleSTAT},
+	"STAT":    {Fn: (*clientHandler).handleSTAT, SpecialAction: true},
 	"MDTM":    {Fn: (*clientHandler).handleMDTM},
 	"MFMT":    {Fn: (*clientHandler).handleMFMT},
-	"RETR":    {Fn: (*clientHandler).handleRETR},
-	"STOR":    {Fn: (*clientHandler).handleSTOR},
-	"APPE":    {Fn: (*clientHandler).handleAPPE},
+	"RETR":    {Fn: (*clientHandler).handleRETR, TransferRelated: true},
+	"STOR":    {Fn: (*clientHandler).handleSTOR, TransferRelated: true},
+	"APPE":    {Fn: (*clientHandler).handleAPPE, TransferRelated: true},
 	"DELE":    {Fn: (*clientHandler).handleDELE},
 	"RNFR":    {Fn: (*clientHandler).handleRNFR},
 	"RNTO":    {Fn: (*clientHandler).handleRNTO},
@@ -73,9 +75,9 @@ var commandsMap = map[string]*CommandDescription{
 	"XCWD": {Fn: (*clientHandler).handleCWD},
 	"XPWD": {Fn: (*clientHandler).handlePWD},
 	"CDUP": {Fn: (*clientHandler).handleCDUP},
-	"NLST": {Fn: (*clientHandler).handleNLST},
-	"LIST": {Fn: (*clientHandler).handleLIST},
-	"MLSD": {Fn: (*clientHandler).handleMLSD},
+	"NLST": {Fn: (*clientHandler).handleNLST, TransferRelated: true},
+	"LIST": {Fn: (*clientHandler).handleLIST, TransferRelated: true},
+	"MLSD": {Fn: (*clientHandler).handleMLSD, TransferRelated: true},
 	"MLST": {Fn: (*clientHandler).handleMLST},
 	"MKD":  {Fn: (*clientHandler).handleMKD},
 	"RMD":  {Fn: (*clientHandler).handleRMD},
@@ -91,8 +93,6 @@ var commandsMap = map[string]*CommandDescription{
 }
 
 var (
-	// transfer command defines the commands that can open a transfer connection
-	transferCommands         = []string{"NLST", "LIST", "MLSD", "STOR", "APPE", "RETR"}
 	specialAttentionCommands = []string{"ABOR", "STAT", "QUIT"}
 )
 
