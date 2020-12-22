@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"os"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -82,6 +83,8 @@ type TestServerDriver struct {
 
 	Settings *Settings // Settings
 	fs       afero.Fs
+	clientMU sync.Mutex
+	Clients  []ClientContext
 }
 
 // TestClientDriver defines a minimal serverftp client driver
@@ -175,7 +178,11 @@ func mustStopServer(server *FtpServer) {
 
 // ClientConnected is the very first message people will see
 func (driver *TestServerDriver) ClientConnected(cc ClientContext) (string, error) {
+	driver.clientMU.Lock()
+	defer driver.clientMU.Unlock()
+
 	cc.SetDebug(driver.Debug)
+	driver.Clients = append(driver.Clients, cc)
 	// This will remain the official name for now
 	return "TEST Server", nil
 }
@@ -194,8 +201,59 @@ func (driver *TestServerDriver) AuthUser(_ ClientContext, user, pass string) (Cl
 }
 
 // ClientDisconnected is called when the user disconnects
-func (driver *TestServerDriver) ClientDisconnected(ClientContext) {
+func (driver *TestServerDriver) ClientDisconnected(cc ClientContext) {
+	driver.clientMU.Lock()
+	defer driver.clientMU.Unlock()
 
+	for idx, client := range driver.Clients {
+		if client.ID() == cc.ID() {
+			lastIdx := len(driver.Clients) - 1
+			driver.Clients[idx] = driver.Clients[lastIdx]
+			driver.Clients[lastIdx] = nil
+			driver.Clients = driver.Clients[:lastIdx]
+
+			return
+		}
+	}
+}
+
+// GetClientsInfo returns info about the connected clients
+func (driver *TestServerDriver) GetClientsInfo() map[uint32]interface{} {
+	driver.clientMU.Lock()
+	defer driver.clientMU.Unlock()
+
+	info := make(map[uint32]interface{})
+
+	for _, cc := range driver.Clients {
+		ccInfo := make(map[string]interface{})
+
+		ccInfo["localAddr"] = cc.LocalAddr()
+		ccInfo["remoteAddr"] = cc.RemoteAddr()
+		ccInfo["clientVersion"] = cc.GetClientVersion()
+		ccInfo["path"] = cc.Path()
+		ccInfo["hasTLSForControl"] = cc.HasTLSForControl()
+		ccInfo["hasTLSForTransfers"] = cc.HasTLSForTransfers()
+		ccInfo["lastCommand"] = cc.GetLastCommand()
+		ccInfo["debug"] = cc.Debug()
+
+		info[cc.ID()] = ccInfo
+	}
+
+	return info
+}
+
+var errNoClientConnected = errors.New("no client connected")
+
+// DisconnectClient disconnect one of the connected clients
+func (driver *TestServerDriver) DisconnectClient() error {
+	driver.clientMU.Lock()
+	defer driver.clientMU.Unlock()
+
+	if len(driver.Clients) > 0 {
+		return driver.Clients[0].Close()
+	}
+
+	return errNoClientConnected
 }
 
 // GetSettings fetches the basic server settings

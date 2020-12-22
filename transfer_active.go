@@ -22,21 +22,23 @@ func (c *clientHandler) handlePORT(param string) error {
 	var err error
 	var raddr *net.TCPAddr
 
-	if c.command == "EPRT" {
+	command := c.GetLastCommand()
+
+	if command == "EPRT" {
 		raddr, err = parseEPRTAddr(param)
 	} else { // PORT
 		raddr, err = parsePORTAddr(param)
 	}
 
 	if err != nil {
-		c.writeMessage(StatusSyntaxErrorNotRecognised, fmt.Sprintf("Problem parsing %s: %v", c.command, err))
+		c.writeMessage(StatusSyntaxErrorNotRecognised, fmt.Sprintf("Problem parsing %s: %v", param, err))
 
 		return nil
 	}
 
 	var tlsConfig *tls.Config
 
-	if c.transferTLS || c.server.settings.TLSRequired == ImplicitEncryption {
+	if c.HasTLSForTransfers() || c.server.settings.TLSRequired == ImplicitEncryption {
 		tlsConfig, err = c.server.driver.GetTLSConfig()
 		if err != nil {
 			c.writeMessage(StatusServiceNotAvailable, fmt.Sprintf("Cannot get a TLS config for active connection: %v", err))
@@ -55,7 +57,7 @@ func (c *clientHandler) handlePORT(param string) error {
 
 	c.transferMu.Unlock()
 
-	c.writeMessage(StatusOK, c.command+" command successful")
+	c.writeMessage(StatusOK, command+" command successful")
 
 	return nil
 }
