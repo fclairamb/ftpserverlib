@@ -97,15 +97,19 @@ func (c *clientHandler) handleSITE(param string) error {
 }
 
 func (c *clientHandler) handleSTATServer() error {
+	// we need to hold the transfer lock here:
+	// server STAT is a special action command so we need to ensure
+	// to write the whole STAT response before sending a transfer
+	// open/close message
+	c.transferMu.Lock()
+	defer c.transferMu.Unlock()
+
 	if c.server.settings.DisableSTAT {
 		c.writeMessage(StatusCommandNotImplemented, "STAT is disabled")
 
 		return nil
 	}
 
-	// drakkan(2020-12-17): we don't handle STAT properly,
-	// we should return the status for all the transfers and we should allow
-	// stat while a transfer is in progress, see RFC 959
 	defer c.multilineAnswer(StatusSystemStatus, "Server status")()
 
 	duration := time.Now().UTC().Sub(c.connectedAt)

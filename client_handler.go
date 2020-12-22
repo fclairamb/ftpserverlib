@@ -193,6 +193,7 @@ func (c *clientHandler) closeTransfer() error {
 // Close closes the active transfer, if any, and the control connection
 func (c *clientHandler) Close(code int, message string) error {
 	c.transferMu.Lock()
+	defer c.transferMu.Unlock()
 
 	if err := c.closeTransfer(); err != nil {
 		c.logger.Warn(
@@ -200,8 +201,6 @@ func (c *clientHandler) Close(code int, message string) error {
 			"err", err,
 		)
 	}
-
-	c.transferMu.Unlock()
 
 	if code > 0 {
 		c.writeMessage(code, message)
@@ -359,8 +358,9 @@ func (c *clientHandler) handleCommand(line string) {
 	// All commands are serialized except the ones that require special action.
 	// Special action commands are not executed in a separate goroutine so we can
 	// have at most one command that can open a transfer connection and one special
-	// action command running at the same time
-	if !cmdDesc.SpecialAction {
+	// action command running at the same time.
+	// Only server STAT is a special action command so we do an additional check here
+	if !cmdDesc.SpecialAction || (command == "STAT" && param != "") {
 		c.transferWg.Wait()
 	}
 
@@ -444,9 +444,6 @@ func (c *clientHandler) writeMessage(code int, message string) {
 }
 
 func (c *clientHandler) GetTranferInfo() string {
-	c.transferMu.Lock()
-	defer c.transferMu.Unlock()
-
 	if c.transfer == nil {
 		return ""
 	}
