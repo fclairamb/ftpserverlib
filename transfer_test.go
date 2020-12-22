@@ -624,6 +624,8 @@ func aborTransfer(t *testing.T, c *goftp.Client) {
 	require.NoError(t, err)
 	require.Equal(t, StatusSystemStatus, rc, response)
 	require.Contains(t, response, "RETR delay-io.bin")
+	require.NotContains(t, response, "Using transfer connection")
+	require.NotContains(t, response, "Closing transfer connection")
 
 	rc, response, err = raw.SendCommand(getABORCmd())
 	require.NoError(t, err)

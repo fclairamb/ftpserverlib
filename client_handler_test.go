@@ -1,7 +1,11 @@
 package ftpserver
 
 import (
+	"bufio"
+	"bytes"
 	"fmt"
+	"io"
+	"net"
 	"sync"
 	"testing"
 
@@ -88,6 +92,8 @@ func TestTLSMethods(t *testing.T) {
 			Settings: &Settings{
 				TLSRequired: ImplicitEncryption,
 			},
+			TLS:   true,
+			Debug: true,
 		})
 		cc := clientHandler{
 			server: s,
@@ -95,6 +101,37 @@ func TestTLSMethods(t *testing.T) {
 		require.True(t, cc.HasTLSForControl())
 		require.True(t, cc.HasTLSForTransfers())
 	})
+}
+
+func TestCloseInternal(t *testing.T) {
+	s := NewTestServer(t, false)
+	server, client := net.Pipe()
+
+	cc := clientHandler{
+		server: s,
+		conn:   server,
+		reader: bufio.NewReader(server),
+		writer: bufio.NewWriter(server),
+	}
+
+	done := make(chan bool, 1)
+
+	go func() {
+		err := cc.Close(StatusServiceNotAvailable, "bye")
+		require.NoError(t, err)
+		done <- true
+	}()
+
+	buf := bytes.NewBuffer(nil)
+	_, err := io.Copy(buf, client)
+	require.NoError(t, err)
+	require.Equal(t, "421 bye\r\n", buf.String())
+
+	err = client.Close()
+	require.NoError(t, err)
+
+	err = server.Close()
+	require.NoError(t, err)
 }
 
 type multilineMessage struct {
