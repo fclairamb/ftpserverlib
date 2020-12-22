@@ -118,6 +118,28 @@ func TestAuthTLS(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestAuthExplicitTLSFailure(t *testing.T) {
+	s := NewTestServer(t, true)
+
+	conf := goftp.Config{
+		User:     authUser,
+		Password: authPass,
+		TLSConfig: &tls.Config{
+			// nolint:gosec
+			InsecureSkipVerify: true,
+		},
+		TLSMode: goftp.TLSExplicit,
+	}
+
+	c, err := goftp.DialConfig(conf, s.Addr())
+	require.NoError(t, err, "Couldn't connect")
+
+	defer func() { panicOnError(c.Close()) }()
+
+	_, err = c.OpenRawConn()
+	require.Error(t, err, "Upgrade to TLS should fail, TLS is not configured server side")
+}
+
 func TestAuthTLSRequired(t *testing.T) {
 	s := NewTestServerWithDriver(t, &TestServerDriver{
 		Debug: true,

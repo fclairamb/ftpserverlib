@@ -203,6 +203,8 @@ func (driver *TestServerDriver) GetSettings() (*Settings, error) {
 	return driver.Settings, nil
 }
 
+var errNoTLS = errors.New("TLS is not configured")
+
 // GetTLSConfig fetches the TLS config
 func (driver *TestServerDriver) GetTLSConfig() (*tls.Config, error) {
 	if driver.TLS {
@@ -217,7 +219,7 @@ func (driver *TestServerDriver) GetTLSConfig() (*tls.Config, error) {
 		}, nil
 	}
 
-	return nil, nil
+	return nil, errNoTLS
 }
 
 // OpenFile opens a file in 3 possible modes: read, write, appending write (use appropriate flags)

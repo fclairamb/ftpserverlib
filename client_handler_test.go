@@ -88,6 +88,8 @@ func TestTLSMethods(t *testing.T) {
 			Settings: &Settings{
 				TLSRequired: ImplicitEncryption,
 			},
+			TLS:   true,
+			Debug: true,
 		})
 		cc := clientHandler{
 			server: s,
