@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"time"
 
 	"github.com/fclairamb/ftpserverlib/log"
 )
@@ -177,6 +178,8 @@ func (server *FtpServer) Listen() error {
 
 // Serve accepts and processes any new incoming client
 func (server *FtpServer) Serve() error {
+	var tempDelay time.Duration // how long to sleep on accept failure
+
 	for {
 		connection, err := server.listener.Accept()
 
@@ -188,6 +191,25 @@ func (server *FtpServer) Serve() error {
 
 					return nil
 				}
+			}
+
+			if ne, ok := err.(net.Error); ok && ne.Temporary() {
+				if tempDelay == 0 {
+					tempDelay = 5 * time.Millisecond
+				} else {
+					tempDelay *= 2
+				}
+
+				if max := 1 * time.Second; tempDelay > max {
+					tempDelay = max
+				}
+
+				server.Logger.Warn(
+					"accept error", err,
+					"retry delay", tempDelay)
+				time.Sleep(tempDelay)
+
+				continue
 			}
 
 			server.Logger.Error("Listener accept error", "err", err)
