@@ -5,9 +5,12 @@ import (
 	"net"
 	"testing"
 
-	"github.com/fclairamb/ftpserverlib/log"
 	"github.com/stretchr/testify/require"
+
+	"github.com/fclairamb/ftpserverlib/log"
 )
+
+var errListenerAccept = errors.New("error accepting a connection")
 
 type fakeNetError struct {
 	error
@@ -20,6 +23,7 @@ func (e *fakeNetError) Timeout() bool {
 
 func (e *fakeNetError) Temporary() bool {
 	e.count++
+
 	return e.count < 10
 }
 
@@ -40,9 +44,11 @@ func (l *fakeListener) Accept() (net.Conn, error) {
 func (l *fakeListener) Close() error {
 	errClient := l.client.Close()
 	errServer := l.server.Close()
+
 	if errServer != nil {
 		return errServer
 	}
+
 	return errClient
 }
 
@@ -61,15 +67,14 @@ func newFakeListener(err error) net.Listener {
 }
 
 func TestListernerAcceptErrors(t *testing.T) {
-	errFake := errors.New("a fake error")
-	errNetFake := &fakeNetError{error: errFake}
+	errNetFake := &fakeNetError{error: errListenerAccept}
 
 	server := FtpServer{
 		listener: newFakeListener(errNetFake),
 		Logger:   log.Nothing(),
 	}
 	err := server.Serve()
-	require.EqualError(t, err, errFake.Error())
+	require.EqualError(t, err, errListenerAccept.Error())
 }
 
 func TestPortCommandFormatOK(t *testing.T) {
