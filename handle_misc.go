@@ -18,7 +18,7 @@ func (c *clientHandler) handleAUTH(param string) error {
 		c.conn = tls.Server(c.conn, tlsConfig)
 		c.reader = bufio.NewReader(c.conn)
 		c.writer = bufio.NewWriter(c.conn)
-		c.controlTLS = true
+		c.setTLSForControl(true)
 	} else {
 		c.writeMessage(StatusActionNotTaken, fmt.Sprintf("Cannot get a TLS config: %v", err))
 	}
@@ -28,7 +28,7 @@ func (c *clientHandler) handleAUTH(param string) error {
 
 func (c *clientHandler) handlePROT(param string) error {
 	// P for Private, C for Clear
-	c.transferTLS = param == "P"
+	c.setTLSForTransfer(param == "P")
 	c.writeMessage(StatusOK, "OK")
 
 	return nil
@@ -185,7 +185,7 @@ func (c *clientHandler) handleNOOP(param string) error {
 }
 
 func (c *clientHandler) handleCLNT(param string) error {
-	c.clnt = param
+	c.setClientVersion(param)
 	c.writeMessage(StatusOK, "Good to know")
 
 	return nil
@@ -201,6 +201,8 @@ func (c *clientHandler) handleFEAT(param string) error {
 		"SIZE",
 		"MDTM",
 		"REST STREAM",
+		"EPRT",
+		"EPSV",
 	}
 
 	if !c.server.settings.DisableMLSD {
@@ -217,7 +219,7 @@ func (c *clientHandler) handleFEAT(param string) error {
 
 	// This code made me think about adding this: https://github.com/stianstr/ftpserver/commit/387f2ba
 	if tlsConfig, err := c.server.driver.GetTLSConfig(); tlsConfig != nil && err == nil {
-		features = append(features, "AUTH TLS")
+		features = append(features, "AUTH TLS", "PBSZ", "PROT")
 	}
 
 	if c.server.settings.EnableHASH {

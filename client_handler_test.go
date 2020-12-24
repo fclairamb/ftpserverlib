@@ -1,13 +1,10 @@
 package ftpserver
 
 import (
-	"bufio"
-	"bytes"
 	"fmt"
-	"io"
-	"net"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/secsy/goftp"
 	"github.com/stretchr/testify/assert"
@@ -103,35 +100,95 @@ func TestTLSMethods(t *testing.T) {
 	})
 }
 
-func TestCloseInternal(t *testing.T) {
-	s := NewTestServer(t, false)
-	server, client := net.Pipe()
+func TestCloseConnection(t *testing.T) {
+	driver := &TestServerDriver{
+		Debug: true,
+	}
+	s := NewTestServerWithDriver(t, driver)
 
-	cc := clientHandler{
-		server: s,
-		conn:   server,
-		reader: bufio.NewReader(server),
-		writer: bufio.NewWriter(server),
+	conf := goftp.Config{
+		User:     authUser,
+		Password: authPass,
 	}
 
+	c, err := goftp.DialConfig(conf, s.Addr())
+	require.NoError(t, err, "Couldn't connect")
+
+	ftpUpload(t, c, createTemporaryFile(t, 1024*1024), "file.bin")
+
+	require.Len(t, driver.GetClientsInfo(), 1)
+
+	err = c.Rename("file.bin", "delay-io.bin")
+	require.NoError(t, err)
+
+	raw, err := c.OpenRawConn()
+	require.NoError(t, err)
+
+	defer func() { require.NoError(t, raw.Close()) }()
+
+	require.Len(t, driver.GetClientsInfo(), 2)
+
+	err = driver.DisconnectClient()
+	require.NoError(t, err)
+
+	assert.Eventually(t, func() bool {
+		return len(driver.GetClientsInfo()) == 1
+	}, 1*time.Second, 50*time.Millisecond)
+
+	err = driver.DisconnectClient()
+	require.NoError(t, err)
+
+	assert.Eventually(t, func() bool {
+		return len(driver.GetClientsInfo()) == 0
+	}, 1*time.Second, 50*time.Millisecond)
+}
+
+func TestClientContextConcurrency(t *testing.T) {
+	driver := &TestServerDriver{}
+	s := NewTestServerWithDriver(t, driver)
+
+	conf := goftp.Config{
+		User:     authUser,
+		Password: authPass,
+	}
+
+	c, err := goftp.DialConfig(conf, s.Addr())
+	require.NoError(t, err, "Couldn't connect")
+
+	defer func() { panicOnError(c.Close()) }()
+
 	done := make(chan bool, 1)
+	connected := make(chan bool, 1)
 
 	go func() {
-		err := cc.Close(StatusServiceNotAvailable, "bye")
-		require.NoError(t, err)
+		_, err := c.Getwd()
+		assert.NoError(t, err)
+		connected <- true
+
+		counter := 0
+
+		for counter < 100 {
+			_, err := c.Getwd()
+			assert.NoError(t, err)
+			counter++
+		}
+
 		done <- true
 	}()
 
-	buf := bytes.NewBuffer(nil)
-	_, err := io.Copy(buf, client)
-	require.NoError(t, err)
-	require.Equal(t, "421 bye\r\n", buf.String())
+	<-connected
 
-	err = client.Close()
-	require.NoError(t, err)
+	isDone := false
+	for !isDone {
+		info := driver.GetClientsInfo()
+		assert.Len(t, info, 1)
 
-	err = server.Close()
-	require.NoError(t, err)
+		select {
+		case <-done:
+			isDone = true
+		default:
+		}
+	}
 }
 
 type multilineMessage struct {

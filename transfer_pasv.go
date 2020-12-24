@@ -101,10 +101,10 @@ func (c *clientHandler) findListenerWithinPortRange(portRange *PortRange) (*net.
 }
 
 func (c *clientHandler) handlePASV(param string) error {
+	command := c.GetLastCommand()
 	addr, _ := net.ResolveTCPAddr("tcp", ":0")
 
 	var tcpListener *net.TCPListener
-
 	var err error
 
 	portRange := c.server.settings.PassiveTransferPortRange
@@ -125,7 +125,7 @@ func (c *clientHandler) handlePASV(param string) error {
 	// The listener will either be plain TCP or TLS
 	var listener net.Listener
 
-	if c.transferTLS || c.server.settings.TLSRequired == ImplicitEncryption {
+	if c.HasTLSForTransfers() || c.server.settings.TLSRequired == ImplicitEncryption {
 		if tlsConfig, err := c.server.driver.GetTLSConfig(); err == nil {
 			listener = tls.NewListener(tcpListener, tlsConfig)
 		} else {
@@ -146,7 +146,7 @@ func (c *clientHandler) handlePASV(param string) error {
 	}
 
 	// We should rewrite this part
-	if c.command == "PASV" {
+	if command == "PASV" {
 		p1 := p.Port / 256
 		p2 := p.Port - (p1 * 256)
 		quads, err2 := c.getCurrentIP()
