@@ -13,16 +13,16 @@ import (
 )
 
 func (c *clientHandler) handlePORT(param string) error {
+	command := c.GetLastCommand()
+
 	if c.server.settings.DisableActiveMode {
-		c.writeMessage(StatusServiceNotAvailable, "PORT command is disabled")
+		c.writeMessage(StatusServiceNotAvailable, fmt.Sprintf("%v command is disabled", command))
 
 		return nil
 	}
 
 	var err error
 	var raddr *net.TCPAddr
-
-	command := c.GetLastCommand()
 
 	if command == "EPRT" {
 		raddr, err = parseEPRTAddr(param)
