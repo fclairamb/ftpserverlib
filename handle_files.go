@@ -648,6 +648,8 @@ func (c *clientHandler) computeHashForFile(filePath string, algo HASHAlgo, start
 		return "", err
 	}
 
+	defer c.closeUnchecked(file) // we ignore close error here
+
 	if start > 0 {
 		_, err = file.Seek(start, io.SeekStart)
 		if err != nil {
@@ -656,7 +658,6 @@ func (c *clientHandler) computeHashForFile(filePath string, algo HASHAlgo, start
 	}
 
 	_, err = io.CopyN(h, file, end-start)
-	defer c.closeUnchecked(file) // we ignore close error here
 
 	if err != nil && err != io.EOF {
 		return "", err
