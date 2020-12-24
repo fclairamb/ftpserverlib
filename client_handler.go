@@ -27,8 +27,8 @@ const (
 )
 
 var (
-	errNoTrasferConnection = errors.New("unable to open transfer: no transfer connection")
-	errTLSRequired         = errors.New("unable to open transfer: TLS is required")
+	errNoTransferConnection = errors.New("unable to open transfer: no transfer connection")
+	errTLSRequired          = errors.New("unable to open transfer: TLS is required")
 )
 
 func getHashMapping() map[string]HASHAlgo {
@@ -80,6 +80,7 @@ type clientHandler struct {
 	transfer          transferHandler // Transfer connection (passive or active)s
 	isTransferOpen    bool            // indicate if the transfer connection is opened
 	isTransferAborted bool            // indicate if the transfer was aborted
+	paramsMutex       sync.RWMutex    // mutex to protect the parameters exposed to the library users
 }
 
 // newClientHandler initializes a client handler when someone connects
@@ -110,21 +111,33 @@ func (c *clientHandler) disconnect() {
 
 // Path provides the current working directory of the client
 func (c *clientHandler) Path() string {
+	c.paramsMutex.RLock()
+	defer c.paramsMutex.RUnlock()
+
 	return c.path
 }
 
 // SetPath changes the current working directory
-func (c *clientHandler) SetPath(path string) {
-	c.path = path
+func (c *clientHandler) SetPath(value string) {
+	c.paramsMutex.Lock()
+	defer c.paramsMutex.Unlock()
+
+	c.path = value
 }
 
 // Debug defines if we will list all interaction
 func (c *clientHandler) Debug() bool {
+	c.paramsMutex.RLock()
+	defer c.paramsMutex.RUnlock()
+
 	return c.debug
 }
 
 // SetDebug changes the debug flag
 func (c *clientHandler) SetDebug(debug bool) {
+	c.paramsMutex.Lock()
+	defer c.paramsMutex.Unlock()
+
 	c.debug = debug
 }
 
@@ -145,7 +158,17 @@ func (c *clientHandler) LocalAddr() net.Addr {
 
 // GetClientVersion returns the identified client, can be empty.
 func (c *clientHandler) GetClientVersion() string {
+	c.paramsMutex.RLock()
+	defer c.paramsMutex.RUnlock()
+
 	return c.clnt
+}
+
+func (c *clientHandler) setClientVersion(value string) {
+	c.paramsMutex.Lock()
+	defer c.paramsMutex.Unlock()
+
+	c.clnt = value
 }
 
 // HasTLSForControl returns true if the control connection is over TLS
@@ -154,16 +177,17 @@ func (c *clientHandler) HasTLSForControl() bool {
 		return true
 	}
 
+	c.paramsMutex.RLock()
+	defer c.paramsMutex.RUnlock()
+
 	return c.controlTLS
 }
 
-// GetLastCommand returns the last received command
-func (c *clientHandler) GetLastCommand() string {
-	return c.command
-}
+func (c *clientHandler) setTLSForControl(value bool) {
+	c.paramsMutex.Lock()
+	defer c.paramsMutex.Unlock()
 
-func (c *clientHandler) SetCommand(cmd string) {
-	c.command = cmd
+	c.controlTLS = value
 }
 
 // HasTLSForTransfers returns true if the transfer connection is over TLS
@@ -172,7 +196,32 @@ func (c *clientHandler) HasTLSForTransfers() bool {
 		return true
 	}
 
+	c.paramsMutex.RLock()
+	defer c.paramsMutex.RUnlock()
+
 	return c.transferTLS
+}
+
+func (c *clientHandler) setTLSForTransfer(value bool) {
+	c.paramsMutex.Lock()
+	defer c.paramsMutex.Unlock()
+
+	c.transferTLS = value
+}
+
+// GetLastCommand returns the last received command
+func (c *clientHandler) GetLastCommand() string {
+	c.paramsMutex.RLock()
+	defer c.paramsMutex.RUnlock()
+
+	return c.command
+}
+
+func (c *clientHandler) SetLastCommand(cmd string) {
+	c.paramsMutex.Lock()
+	defer c.paramsMutex.Unlock()
+
+	c.command = cmd
 }
 
 func (c *clientHandler) closeTransfer() error {
@@ -191,9 +240,13 @@ func (c *clientHandler) closeTransfer() error {
 }
 
 // Close closes the active transfer, if any, and the control connection
-func (c *clientHandler) Close(code int, message string) error {
+func (c *clientHandler) Close() error {
 	c.transferMu.Lock()
 	defer c.transferMu.Unlock()
+
+	// set isTransferAborted to true so any transfer in progress will not try to write
+	// to the closed connection on transfer close
+	c.isTransferAborted = true
 
 	if err := c.closeTransfer(); err != nil {
 		c.logger.Warn(
@@ -202,14 +255,13 @@ func (c *clientHandler) Close(code int, message string) error {
 		)
 	}
 
-	if code > 0 {
-		c.writeMessage(code, message)
-	}
-
-	if err := c.writer.Flush(); err != nil {
-		c.logger.Error("Flush error", "err", err)
-	}
-
+	// don't be tempted to send a message to the client before
+	// closing the connection:
+	//
+	// 1) it is racy, we need to lock writeMessage to do this
+	// 2) the client could wait for another response and so we break the protocol
+	//
+	// closing the connection from a different goroutine should be safe
 	return c.conn.Close()
 }
 
@@ -342,7 +394,7 @@ func (c *clientHandler) handleCommand(line string) {
 		}
 
 		if cmdDesc == nil {
-			c.SetCommand(command)
+			c.SetLastCommand(command)
 			c.writeMessage(StatusSyntaxErrorNotRecognised, fmt.Sprintf("Unknown command %#v", command))
 
 			return
@@ -364,7 +416,7 @@ func (c *clientHandler) handleCommand(line string) {
 		c.transferWg.Wait()
 	}
 
-	c.SetCommand(command)
+	c.SetLastCommand(command)
 
 	if cmdDesc.TransferRelated {
 		// these commands will be started in a separate goroutine so
@@ -460,15 +512,15 @@ func (c *clientHandler) TransferOpen(info string) (net.Conn, error) {
 		if c.isTransferAborted {
 			c.isTransferAborted = false
 
-			return nil, errNoTrasferConnection
+			return nil, errNoTransferConnection
 		}
 
-		c.writeMessage(StatusActionNotTaken, errNoTrasferConnection.Error())
+		c.writeMessage(StatusActionNotTaken, errNoTransferConnection.Error())
 
-		return nil, errNoTrasferConnection
+		return nil, errNoTransferConnection
 	}
 
-	if c.server.settings.TLSRequired == MandatoryEncryption && !c.transferTLS {
+	if c.server.settings.TLSRequired == MandatoryEncryption && !c.HasTLSForTransfers() {
 		c.writeMessage(StatusServiceNotAvailable, errTLSRequired.Error())
 
 		return nil, errTLSRequired
