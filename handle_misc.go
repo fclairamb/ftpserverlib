@@ -201,6 +201,8 @@ func (c *clientHandler) handleFEAT(param string) error {
 		"SIZE",
 		"MDTM",
 		"REST STREAM",
+		"EPRT",
+		"EPSV",
 	}
 
 	if !c.server.settings.DisableMLSD {
@@ -217,7 +219,7 @@ func (c *clientHandler) handleFEAT(param string) error {
 
 	// This code made me think about adding this: https://github.com/stianstr/ftpserver/commit/387f2ba
 	if tlsConfig, err := c.server.driver.GetTLSConfig(); tlsConfig != nil && err == nil {
-		features = append(features, "AUTH TLS")
+		features = append(features, "AUTH TLS", "PBSZ", "PROT")
 	}
 
 	if c.server.settings.EnableHASH {
