@@ -1,10 +1,81 @@
 package ftpserver
 
 import (
+	"errors"
+	"net"
 	"testing"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/fclairamb/ftpserverlib/log"
 )
+
+var errListenerAccept = errors.New("error accepting a connection")
+
+type fakeNetError struct {
+	error
+	count int
+}
+
+func (e *fakeNetError) Timeout() bool {
+	return false
+}
+
+func (e *fakeNetError) Temporary() bool {
+	e.count++
+
+	return e.count < 10
+}
+
+func (e *fakeNetError) Error() string {
+	return e.error.Error()
+}
+
+type fakeListener struct {
+	server net.Conn
+	client net.Conn
+	err    error
+}
+
+func (l *fakeListener) Accept() (net.Conn, error) {
+	return l.client, l.err
+}
+
+func (l *fakeListener) Close() error {
+	errClient := l.client.Close()
+	errServer := l.server.Close()
+
+	if errServer != nil {
+		return errServer
+	}
+
+	return errClient
+}
+
+func (l *fakeListener) Addr() net.Addr {
+	return l.server.LocalAddr()
+}
+
+func newFakeListener(err error) net.Listener {
+	server, client := net.Pipe()
+
+	return &fakeListener{
+		server: server,
+		client: client,
+		err:    err,
+	}
+}
+
+func TestListernerAcceptErrors(t *testing.T) {
+	errNetFake := &fakeNetError{error: errListenerAccept}
+
+	server := FtpServer{
+		listener: newFakeListener(errNetFake),
+		Logger:   log.Nothing(),
+	}
+	err := server.Serve()
+	require.EqualError(t, err, errListenerAccept.Error())
+}
 
 func TestPortCommandFormatOK(t *testing.T) {
 	net, err := parsePORTAddr("127,0,0,1,239,163")
