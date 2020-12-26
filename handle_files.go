@@ -15,6 +15,7 @@ import (
 	"io"
 	"net"
 	"os"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -122,14 +123,25 @@ func (c *clientHandler) doFileTransfer(tr net.Conn, file io.ReadWriter, write bo
 	var in io.Reader
 	var out io.Writer
 
+	conversionMode := convertModeToCRLF
+
 	// Copy the data
 	if write { // ... from the connection to the file
 		in = tr
 		out = file
+
+		if runtime.GOOS != "windows" {
+			conversionMode = convertModeToLF
+		}
 	} else { // ... from the file to the connection
 		in = file
 		out = tr
 	}
+
+	if c.currentTransferType == TransferTypeASCII {
+		in = newASCIIConverter(in, conversionMode)
+	}
+
 	// for reads io.EOF isn't an error, for writes it must be considered an error
 	if written, errCopy := io.Copy(out, in); errCopy != nil && (errCopy != io.EOF || write) {
 		err = errCopy
@@ -370,7 +382,21 @@ func (c *clientHandler) handleRNTO(param string) error {
 	return nil
 }
 
+// properly handling the SIZE command when TYPE ASCII is used would
+// require to scan the entire file to perform the ASCII translation
+// logic. Considering that calculating such result could be very
+// resource-intensive and also dangerous (DoS) we reject SIZE when
+// the current TYPE is ASCII.
+// However, clients in general should not be resuming downloads
+// in ASCII mode. Resuming downloads in binary mode is the
+// recommended way as specified in RFC-3659
 func (c *clientHandler) handleSIZE(param string) error {
+	if c.currentTransferType == TransferTypeASCII {
+		c.writeMessage(StatusActionNotTaken, "SIZE not allowed in ASCII mode")
+
+		return nil
+	}
+
 	path := c.absPath(param)
 	if info, err := c.driver.Stat(path); err == nil {
 		c.writeMessage(StatusFileStatus, fmt.Sprintf("%d", info.Size()))
@@ -467,6 +493,12 @@ func (c *clientHandler) handleALLO(param string) error {
 
 func (c *clientHandler) handleREST(param string) error {
 	if size, err := strconv.ParseInt(param, 10, 0); err == nil {
+		if c.currentTransferType == TransferTypeASCII {
+			c.writeMessage(StatusSyntaxErrorParameters, "Resuming transfers not allowed in ASCII mode")
+
+			return nil
+		}
+
 		c.ctxRest = size
 		c.writeMessage(StatusFileActionPending, "OK")
 	} else {

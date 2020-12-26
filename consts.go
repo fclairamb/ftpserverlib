@@ -49,6 +49,7 @@ const (
 	StatusSyntaxErrorParameters    = 501 // RFC 959, 4.2.1
 	StatusCommandNotImplemented    = 502 // RFC 959, 4.2.1
 	StatusBadCommandSequence       = 503 // RFC 959, 4.2.1
+	StatusNotImplementedParam      = 504 // RFC 959, 4.2.1
 	StatusNotLoggedIn              = 530 // RFC 959, 4.2.1
 	StatusActionNotTaken           = 550 // RFC 959, 4.2.1
 	StatusActionAborted            = 552 // RFC 959, 4.2.1

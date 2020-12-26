@@ -10,6 +10,7 @@ import (
 	"io/ioutil"
 	"math/rand"
 	"os"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -98,6 +99,54 @@ func ftpDownloadAndHash(t *testing.T, ftp *goftp.Client, filename string) string
 	require.NoError(t, err, "Couldn't fetch file")
 
 	return hex.EncodeToString(hasher.Sum(nil))
+}
+
+func ftpDownloadAndHashWithRawConnection(t *testing.T, raw goftp.RawConn, fileName string) string {
+	hasher := sha256.New()
+
+	dcGetter, err := raw.PrepareDataConn()
+	assert.NoError(t, err)
+
+	rc, response, err := raw.SendCommand(fmt.Sprintf("RETR %v", fileName))
+	require.NoError(t, err)
+	require.Equal(t, StatusFileStatusOK, rc, response)
+
+	dc, err := dcGetter()
+	assert.NoError(t, err)
+
+	_, err = io.Copy(hasher, dc)
+	assert.NoError(t, err)
+
+	err = dc.Close()
+	assert.NoError(t, err)
+
+	rc, response, err = raw.ReadResponse()
+	assert.NoError(t, err)
+	assert.Equal(t, StatusClosingDataConn, rc, response)
+
+	return hex.EncodeToString(hasher.Sum(nil))
+}
+
+func ftpUploadWithRawConnection(t *testing.T, raw goftp.RawConn, file io.Reader, fileName string) {
+	dcGetter, err := raw.PrepareDataConn()
+	assert.NoError(t, err)
+
+	rc, response, err := raw.SendCommand(fmt.Sprintf("STOR %v", fileName))
+	require.NoError(t, err)
+	require.Equal(t, StatusFileStatusOK, rc, response)
+
+	dc, err := dcGetter()
+	assert.NoError(t, err)
+
+	_, err = io.Copy(dc, file)
+	assert.NoError(t, err)
+
+	err = dc.Close()
+	assert.NoError(t, err)
+
+	rc, response, err = raw.ReadResponse()
+	assert.NoError(t, err)
+	assert.Equal(t, StatusClosingDataConn, rc, response)
 }
 
 func ftpDelete(t *testing.T, ftp *goftp.Client, filename string) {
@@ -678,4 +727,94 @@ func aborBeforeOpenTransfer(t *testing.T, c *goftp.Client) {
 	rc, _, err = raw.SendCommand("NOOP")
 	require.NoError(t, err)
 	require.Equal(t, StatusOK, rc)
+}
+
+func TestASCIITransfers(t *testing.T) {
+	s := NewTestServer(t, true)
+	conf := goftp.Config{
+		User:     authUser,
+		Password: authPass,
+	}
+	c, err := goftp.DialConfig(conf, s.Addr())
+	require.NoError(t, err, "Couldn't connect")
+
+	defer func() { require.NoError(t, c.Close()) }()
+
+	raw, err := c.OpenRawConn()
+	require.NoError(t, err)
+
+	defer func() { require.NoError(t, raw.Close()) }()
+
+	file, err := ioutil.TempFile("", "ftpserver")
+	require.NoError(t, err)
+
+	contents := []byte("line1\r\n\r\nline3\r\n,line4")
+	_, err = file.Write(contents)
+	require.NoError(t, err)
+
+	defer func() { require.NoError(t, file.Close()) }()
+
+	rc, response, err := raw.SendCommand("TYPE A")
+	require.NoError(t, err)
+	require.Equal(t, StatusOK, rc, response)
+
+	_, err = file.Seek(0, io.SeekStart)
+	require.NoError(t, err)
+
+	ftpUploadWithRawConnection(t, raw, file, "file.txt")
+
+	files, err := c.ReadDir("/")
+	require.NoError(t, err)
+	require.Len(t, files, 1)
+
+	if runtime.GOOS != "windows" {
+		require.Equal(t, int64(len(contents)-3), files[0].Size())
+	} else {
+		require.Equal(t, int64(len(contents)), files[0].Size())
+	}
+
+	remoteHash := ftpDownloadAndHashWithRawConnection(t, raw, "file.txt")
+	localHash := hashFile(t, file)
+	require.Equal(t, localHash, remoteHash)
+}
+
+func TestASCIITransfersInvalidFiles(t *testing.T) {
+	s := NewTestServer(t, true)
+	conf := goftp.Config{
+		User:     authUser,
+		Password: authPass,
+	}
+	c, err := goftp.DialConfig(conf, s.Addr())
+	require.NoError(t, err, "Couldn't connect")
+
+	defer func() { require.NoError(t, c.Close()) }()
+
+	raw, err := c.OpenRawConn()
+	require.NoError(t, err)
+
+	defer func() { require.NoError(t, raw.Close()) }()
+
+	file, err := ioutil.TempFile("", "ftpserver")
+	require.NoError(t, err)
+
+	defer func() { require.NoError(t, file.Close()) }()
+
+	buf := make([]byte, 1024*1024)
+	for j := range buf {
+		buf[j] = 65
+	}
+
+	_, err = file.Write(buf)
+	require.NoError(t, err)
+
+	localHash := hashFile(t, file)
+
+	rc, response, err := raw.SendCommand("TYPE A")
+	require.NoError(t, err)
+	require.Equal(t, StatusOK, rc, response)
+
+	ftpUploadWithRawConnection(t, raw, file, "file.bin")
+
+	remoteHash := ftpDownloadAndHashWithRawConnection(t, raw, "file.bin")
+	require.Equal(t, localHash, remoteHash)
 }

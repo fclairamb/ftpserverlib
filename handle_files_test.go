@@ -108,6 +108,11 @@ func TestALLO(t *testing.T) {
 	rc, _, err = raw.SendCommand("ALLO 500000")
 	require.NoError(t, err)
 	require.Equal(t, StatusOK, rc, "Should have been accepted")
+
+	// Wrong size
+	rc, _, err = raw.SendCommand("ALLO 500000a")
+	require.NoError(t, err)
+	require.Equal(t, StatusSyntaxErrorParameters, rc, "Should have been refused")
 }
 
 func TestCHMOD(t *testing.T) {
@@ -663,6 +668,79 @@ func TestCOMBAppend(t *testing.T) {
 	contents, err := c.ReadDir("/")
 	require.NoError(t, err)
 	require.Len(t, contents, 1)
+}
+
+func TestREST(t *testing.T) {
+	s := NewTestServer(t, true)
+	conf := goftp.Config{
+		User:     authUser,
+		Password: authPass,
+	}
+
+	c, err := goftp.DialConfig(conf, s.Addr())
+	require.NoError(t, err, "Couldn't connect")
+
+	defer func() { panicOnError(c.Close()) }()
+
+	raw, err := c.OpenRawConn()
+	require.NoError(t, err, "Couldn't open raw connection")
+
+	defer func() { require.NoError(t, raw.Close()) }()
+
+	rc, response, err := raw.SendCommand("TYPE A")
+	require.NoError(t, err)
+	require.Equal(t, StatusOK, rc, response)
+
+	rc, response, err = raw.SendCommand("REST 10")
+	require.NoError(t, err)
+	require.Equal(t, StatusSyntaxErrorParameters, rc, response)
+
+	rc, response, err = raw.SendCommand("TYPE I")
+	require.NoError(t, err)
+	require.Equal(t, StatusOK, rc, response)
+
+	rc, response, err = raw.SendCommand("REST a")
+	require.NoError(t, err)
+	require.Equal(t, StatusActionNotTaken, rc, response)
+	require.True(t, strings.HasPrefix(response, "Couldn't parse size"))
+}
+
+func TestSIZE(t *testing.T) {
+	s := NewTestServer(t, true)
+	conf := goftp.Config{
+		User:     authUser,
+		Password: authPass,
+	}
+	c, err := goftp.DialConfig(conf, s.Addr())
+	require.NoError(t, err, "Couldn't connect")
+
+	defer func() { panicOnError(c.Close()) }()
+
+	raw, err := c.OpenRawConn()
+	require.NoError(t, err, "Couldn't open raw connection")
+
+	defer func() { require.NoError(t, raw.Close()) }()
+
+	rc, response, err := raw.SendCommand("SIZE file.bin")
+	require.NoError(t, err)
+	require.Equal(t, StatusActionNotTaken, rc, response)
+	require.True(t, strings.HasPrefix(response, "Couldn't access"))
+
+	ftpUpload(t, c, createTemporaryFile(t, 10), "file.bin")
+
+	rc, response, err = raw.SendCommand("SIZE file.bin")
+	require.NoError(t, err)
+	require.Equal(t, StatusFileStatus, rc, response)
+	require.Equal(t, "10", response)
+
+	rc, response, err = raw.SendCommand("TYPE A")
+	require.NoError(t, err)
+	require.Equal(t, StatusOK, rc, response)
+
+	rc, response, err = raw.SendCommand("SIZE file.bin")
+	require.NoError(t, err)
+	require.Equal(t, StatusActionNotTaken, rc, response)
+	require.Equal(t, "SIZE not allowed in ASCII mode", response)
 }
 
 func TestCOMBErrors(t *testing.T) {

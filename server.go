@@ -271,7 +271,7 @@ func (server *FtpServer) clientArrival(conn net.Conn) {
 	server.clientCounter++
 	id := server.clientCounter
 
-	c := server.newClientHandler(conn, id)
+	c := server.newClientHandler(conn, id, server.settings.DefaultTransferType)
 	go c.HandleCommands()
 
 	c.logger.Info("Client connected", "clientIp", conn.RemoteAddr())

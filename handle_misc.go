@@ -259,12 +259,14 @@ func (c *clientHandler) handleFEAT(param string) error {
 
 func (c *clientHandler) handleTYPE(param string) error {
 	switch param {
-	case "I":
+	case "I", "L8":
+		c.currentTransferType = TransferTypeBinary
 		c.writeMessage(StatusOK, "Type set to binary")
-	case "A":
-		c.writeMessage(StatusOK, "ASCII isn't properly supported: https://github.com/fclairamb/ftpserverlib/issues/86")
+	case "A", "L7":
+		c.currentTransferType = TransferTypeASCII
+		c.writeMessage(StatusOK, "Type set to ASCII")
 	default:
-		c.writeMessage(StatusSyntaxErrorNotRecognised, "Not understood")
+		c.writeMessage(StatusNotImplementedParam, "Unsupported transfer type")
 	}
 
 	return nil

@@ -34,7 +34,9 @@ func NewTestServerWithDriver(t *testing.T, driver *TestServerDriver) *FtpServer 
 	t.Parallel()
 
 	if driver.Settings == nil {
-		driver.Settings = &Settings{}
+		driver.Settings = &Settings{
+			DefaultTransferType: TransferTypeBinary,
+		}
 	}
 
 	if driver.Settings.ListenAddr == "" {
