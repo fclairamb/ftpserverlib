@@ -26,6 +26,15 @@ const (
 	HASHAlgoSHA512
 )
 
+// TransferType is the enumerable that represents the supported transfer types
+type TransferType int
+
+// Supported transfer type
+const (
+	TransferTypeASCII TransferType = iota
+	TransferTypeBinary
+)
+
 var (
 	errNoTransferConnection = errors.New("unable to open transfer: no transfer connection")
 	errTLSRequired          = errors.New("unable to open transfer: TLS is required")
@@ -57,44 +66,46 @@ func getHashName(algo HASHAlgo) string {
 
 // nolint: maligned
 type clientHandler struct {
-	id                uint32          // ID of the client
-	server            *FtpServer      // Server on which the connection was accepted
-	driver            ClientDriver    // Client handling driver
-	conn              net.Conn        // TCP connection
-	writer            *bufio.Writer   // Writer on the TCP connection
-	reader            *bufio.Reader   // Reader on the TCP connection
-	user              string          // Authenticated user
-	path              string          // Current path
-	clnt              string          // Identified client
-	command           string          // Command received on the connection
-	connectedAt       time.Time       // Date of connection
-	ctxRnfr           string          // Rename from
-	ctxRest           int64           // Restart point
-	debug             bool            // Show debugging info on the server side
-	transferTLS       bool            // Use TLS for transfer connection
-	controlTLS        bool            // Use TLS for control connection
-	selectedHashAlgo  HASHAlgo        // algorithm used when we receive the HASH command
-	logger            log.Logger      // Client handler logging
-	transferWg        sync.WaitGroup  // wait group for command that open a transfer connection
-	transferMu        sync.Mutex      // this mutex will protect the transfer parameters
-	transfer          transferHandler // Transfer connection (passive or active)s
-	isTransferOpen    bool            // indicate if the transfer connection is opened
-	isTransferAborted bool            // indicate if the transfer was aborted
-	paramsMutex       sync.RWMutex    // mutex to protect the parameters exposed to the library users
+	id                  uint32          // ID of the client
+	server              *FtpServer      // Server on which the connection was accepted
+	driver              ClientDriver    // Client handling driver
+	conn                net.Conn        // TCP connection
+	writer              *bufio.Writer   // Writer on the TCP connection
+	reader              *bufio.Reader   // Reader on the TCP connection
+	user                string          // Authenticated user
+	path                string          // Current path
+	clnt                string          // Identified client
+	command             string          // Command received on the connection
+	connectedAt         time.Time       // Date of connection
+	ctxRnfr             string          // Rename from
+	ctxRest             int64           // Restart point
+	debug               bool            // Show debugging info on the server side
+	transferTLS         bool            // Use TLS for transfer connection
+	controlTLS          bool            // Use TLS for control connection
+	selectedHashAlgo    HASHAlgo        // algorithm used when we receive the HASH command
+	logger              log.Logger      // Client handler logging
+	currentTransferType TransferType    // current transfer type
+	transferWg          sync.WaitGroup  // wait group for command that open a transfer connection
+	transferMu          sync.Mutex      // this mutex will protect the transfer parameters
+	transfer            transferHandler // Transfer connection (passive or active)s
+	isTransferOpen      bool            // indicate if the transfer connection is opened
+	isTransferAborted   bool            // indicate if the transfer was aborted
+	paramsMutex         sync.RWMutex    // mutex to protect the parameters exposed to the library users
 }
 
 // newClientHandler initializes a client handler when someone connects
-func (server *FtpServer) newClientHandler(connection net.Conn, id uint32) *clientHandler {
+func (server *FtpServer) newClientHandler(connection net.Conn, id uint32, transferType TransferType) *clientHandler {
 	p := &clientHandler{
-		server:           server,
-		conn:             connection,
-		id:               id,
-		writer:           bufio.NewWriter(connection),
-		reader:           bufio.NewReader(connection),
-		connectedAt:      time.Now().UTC(),
-		path:             "/",
-		selectedHashAlgo: HASHAlgoSHA256,
-		logger:           server.Logger.With("clientId", id),
+		server:              server,
+		conn:                connection,
+		id:                  id,
+		writer:              bufio.NewWriter(connection),
+		reader:              bufio.NewReader(connection),
+		connectedAt:         time.Now().UTC(),
+		path:                "/",
+		selectedHashAlgo:    HASHAlgoSHA256,
+		currentTransferType: transferType,
+		logger:              server.Logger.With("clientId", id),
 	}
 
 	return p

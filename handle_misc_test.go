@@ -299,5 +299,5 @@ func TestTYPE(t *testing.T) {
 
 	rc, _, err = raw.SendCommand("TYPE wrong")
 	require.NoError(t, err)
-	require.Equal(t, StatusSyntaxErrorNotRecognised, rc)
+	require.Equal(t, StatusNotImplementedParam, rc)
 }

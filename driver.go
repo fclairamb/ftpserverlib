@@ -195,4 +195,5 @@ type Settings struct {
 	DisableSTAT              bool             // Disable Server STATUS, STAT on files and directories will still work
 	DisableSYST              bool             // Disable SYST
 	EnableCOMB               bool             // Enable COMB support
+	DefaultTransferType      TransferType     // Transfer type to use if the client don't send the TYPE command
 }
