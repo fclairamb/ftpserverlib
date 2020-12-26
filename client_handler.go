@@ -35,6 +35,10 @@ const (
 	TransferTypeBinary
 )
 
+const (
+	maxCommandSize = 4096
+)
+
 var (
 	errNoTransferConnection = errors.New("unable to open transfer: no transfer connection")
 	errTLSRequired          = errors.New("unable to open transfer: TLS is required")
@@ -100,7 +104,7 @@ func (server *FtpServer) newClientHandler(connection net.Conn, id uint32, transf
 		conn:                connection,
 		id:                  id,
 		writer:              bufio.NewWriter(connection),
-		reader:              bufio.NewReader(connection),
+		reader:              bufio.NewReaderSize(connection, maxCommandSize),
 		connectedAt:         time.Now().UTC(),
 		path:                "/",
 		selectedHashAlgo:    HASHAlgoSHA256,
@@ -329,13 +333,24 @@ func (c *clientHandler) HandleCommands() {
 			}
 		}
 
-		line, err := c.reader.ReadString('\n')
+		lineSlice, isPrefix, err := c.reader.ReadLine()
+
+		if isPrefix {
+			if c.debug {
+				c.logger.Warn("Received line too long, disconnecting client",
+					"size", len(lineSlice))
+			}
+
+			return
+		}
 
 		if err != nil {
 			c.handleCommandsStreamError(err)
 
 			return
 		}
+
+		line := string(lineSlice)
 
 		if c.debug {
 			c.logger.Debug("Received line", "line", line)
@@ -593,7 +608,7 @@ func (c *clientHandler) TransferClose(err error) {
 }
 
 func parseLine(line string) (string, string) {
-	params := strings.SplitN(strings.Trim(line, "\r\n"), " ", 2)
+	params := strings.SplitN(line, " ", 2)
 	if len(params) == 1 {
 		return params[0], ""
 	}

@@ -16,7 +16,7 @@ func (c *clientHandler) handleAUTH(param string) error {
 	if tlsConfig, err := c.server.driver.GetTLSConfig(); err == nil {
 		c.writeMessage(StatusAuthAccepted, "AUTH command ok. Expecting TLS Negotiation.")
 		c.conn = tls.Server(c.conn, tlsConfig)
-		c.reader = bufio.NewReader(c.conn)
+		c.reader = bufio.NewReaderSize(c.conn, maxCommandSize)
 		c.writer = bufio.NewWriter(c.conn)
 		c.setTLSForControl(true)
 	} else {
