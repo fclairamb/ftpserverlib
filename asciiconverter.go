@@ -20,7 +20,7 @@ type asciiConverter struct {
 }
 
 func newASCIIConverter(r io.Reader, mode convertMode) *asciiConverter {
-	reader := bufio.NewReader(r)
+	reader := bufio.NewReaderSize(r, 4096)
 
 	return &asciiConverter{
 		reader:    reader,
