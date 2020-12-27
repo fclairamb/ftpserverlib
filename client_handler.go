@@ -284,6 +284,13 @@ func (c *clientHandler) end() {
 	c.server.driver.ClientDisconnected(c)
 	c.server.clientDeparture(c)
 
+	if err := c.conn.Close(); err != nil {
+		c.logger.Debug(
+			"Problem closing control connection",
+			"err", err,
+		)
+	}
+
 	c.transferMu.Lock()
 	defer c.transferMu.Unlock()
 
@@ -336,12 +343,9 @@ func (c *clientHandler) HandleCommands() {
 		lineSlice, isPrefix, err := c.reader.ReadLine()
 
 		if isPrefix {
-			err = c.conn.Close()
-
 			if c.debug {
 				c.logger.Warn("Received line too long, disconnecting client",
-					"line_size", len(lineSlice),
-					"close_err", err)
+					"size", len(lineSlice))
 			}
 
 			return
@@ -380,10 +384,6 @@ func (c *clientHandler) handleCommandsStreamError(err error) {
 
 			if err := c.writer.Flush(); err != nil {
 				c.logger.Error("Flush error", "err", err)
-			}
-
-			if err := c.conn.Close(); err != nil {
-				c.logger.Error("Close error", "err", err)
 			}
 
 			break

@@ -80,8 +80,9 @@ func NewTestServerWithDriver(t *testing.T, driver *TestServerDriver) *FtpServer 
 
 // TestServerDriver defines a minimal serverftp server driver
 type TestServerDriver struct {
-	Debug bool // To display connection logs information
-	TLS   bool
+	Debug          bool // To display connection logs information
+	TLS            bool
+	CloseOnConnect bool // disconnect the client as soon as it connects
 
 	Settings *Settings // Settings
 	fs       afero.Fs
@@ -178,15 +179,23 @@ func mustStopServer(server *FtpServer) {
 	}
 }
 
+var errConnectionNotAllowed = errors.New("connection not allowed")
+
 // ClientConnected is the very first message people will see
 func (driver *TestServerDriver) ClientConnected(cc ClientContext) (string, error) {
 	driver.clientMU.Lock()
 	defer driver.clientMU.Unlock()
 
+	var err error
+
+	if driver.CloseOnConnect {
+		err = errConnectionNotAllowed
+	}
+
 	cc.SetDebug(driver.Debug)
 	driver.Clients = append(driver.Clients, cc)
 	// This will remain the official name for now
-	return "TEST Server", nil
+	return "TEST Server", err
 }
 
 var errBadUserNameOrPassword = errors.New("bad username or password")
