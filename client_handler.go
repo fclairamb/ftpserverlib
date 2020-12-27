@@ -336,9 +336,12 @@ func (c *clientHandler) HandleCommands() {
 		lineSlice, isPrefix, err := c.reader.ReadLine()
 
 		if isPrefix {
+			err = c.conn.Close()
+
 			if c.debug {
 				c.logger.Warn("Received line too long, disconnecting client",
-					"size", len(lineSlice))
+					"line_size", len(lineSlice),
+					"close_err", err)
 			}
 
 			return
