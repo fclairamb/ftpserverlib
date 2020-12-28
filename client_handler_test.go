@@ -135,6 +135,35 @@ func TestTLSMethods(t *testing.T) {
 	})
 }
 
+func TestConnectionNotAllowed(t *testing.T) {
+	driver := &TestServerDriver{
+		Debug:          true,
+		CloseOnConnect: true,
+	}
+	s := NewTestServerWithDriver(t, driver)
+
+	conn, err := net.DialTimeout("tcp", s.Addr(), 5*time.Second)
+	require.NoError(t, err)
+
+	defer func() {
+		err = conn.Close()
+		require.NoError(t, err)
+	}()
+
+	buf := make([]byte, 128)
+	n, err := conn.Read(buf)
+	require.NoError(t, err)
+
+	response := string(buf[:n])
+	require.Equal(t, "500 TEST Server\r\n", response)
+
+	_, err = conn.Write([]byte("NOOP\r\n"))
+	require.NoError(t, err)
+
+	_, err = conn.Read(buf)
+	require.Error(t, err)
+}
+
 func TestCloseConnection(t *testing.T) {
 	driver := &TestServerDriver{
 		Debug: true,
