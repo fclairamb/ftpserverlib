@@ -7,8 +7,7 @@
 
 This library allows to easily build a simple and fully-featured FTP server using [afero](https://github.com/spf13/afero) as the backend filesystem.
 
-If you're interested in a fully featured FTP server, you should use [ftpserver](https://github.com/fclairamb/ftpserver) 
-or [sftpgo](https://github.com/drakkan/).
+If you're interested in a fully featured FTP server, you should use [sftpgo](https://github.com/drakkan/sftpgo) (fully featured SFTP/FTP server) or [ftpserver](https://github.com/fclairamb/ftpserver) (basic FTP server).
 
 ## Current status of the project
 
