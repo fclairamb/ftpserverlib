@@ -36,77 +36,49 @@ If you're interested in a fully featured FTP server, you should use [sftpgo](htt
    * [REST](https://tools.ietf.org/html/rfc3659#page-13) - Restart of interrupted transfer
    * [MLST](https://tools.ietf.org/html/rfc3659#page-23) - Simple file listing for machine processing
    * [MLSD](https://tools.ietf.org/html/rfc3659#page-23) - Directory listing for machine processing
+   * [HASH](https://tools.ietf.org/html/draft-bryan-ftpext-hash-02) - Hashing of files
+   * [AVLB](https://tools.ietf.org/html/draft-peterson-streamlined-ftp-command-extensions-10#section-4) - Available space
+   * [COMB](https://help.globalscape.com/help/archive/eft6-4/mergedprojects/eft/allowingmultiparttransferscomb_command.htm) - Combine files
 
 ## Quick test
-We are providing a server so that you can test how the library behaves.
-
-```sh
-# Get and install the server
-go install github.com/fclairamb/ftpserver
-
-# Create a storage dir
-mkdir -p data
-
-ftpserver -data data &
-
-# Download some file
-if [ ! -f file.bin ]; then
-    wget -O file.bin.tmp https://github.com/fclairamb/ftpserver/releases/download/v0.5/ftpserver-linux-amd64 && mv file.bin.tmp file.bin
-fi
-
-# Connecting to the server and uploading the file
-ftp ftp://test:test@localhost:2121
-put file.bin
-quit
-ls -lh data/file.bin
-```
-
-## Quick test with docker
-There's also a containerized version of the demo server (15MB, based on alpine).
-
-```sh
-# Creating a storage dir
-mkdir -p data
-
-# Starting the sample FTP server
-docker run --rm -d -p 2121-2130:2121-2130 -v $(pwd)/data:/data fclairamb/ftpserver
-
-# Download some file
-if [ ! -f kitty.jpg ]; then
-    curl -o kitty.jpg.tmp https://placekitten.com/2048/2048 && mv kitty.jpg.tmp kitty.jpg
-fi
-
-curl -v -T kitty.bin ftp://test:test@localhost:2121/
-```
+The easiest way to test this library is to use [ftpserver](https://github.com/fclairamb/ftpserver).
 
 ## The driver
+The simplest way to get a good understanding of how the driver shall be implemented, you can have a look at the [tests driver](https://github.com/fclairamb/ftpserverlib/blob/master/driver_test.go). 
 
-### The API
+### The base API
 
 The API is directly based on [afero](https://github.com/spf13/afero).
+
 ```go
-// ServerDriver handles the authentication and ClientHandlingDriver selection
-type ServerDriver interface {
-	// Load some general settings around the server setup
-	GetSettings() *Settings
+// MainDriver handles the authentication and ClientHandlingDriver selection
+type MainDriver interface {
+	// GetSettings returns some general settings around the server setup
+	GetSettings() (*Settings, error)
 
-	// WelcomeUser is called to send the very first welcome message
-	WelcomeUser(cc ClientContext) (string, error)
+	// ClientConnected is called to send the very first welcome message
+	ClientConnected(cc ClientContext) (string, error)
 
-	// UserLeft is called when the user disconnects, even if he never authenticated
-	UserLeft(cc ClientContext)
+	// ClientDisconnected is called when the user disconnects, even if he never authenticated
+	ClientDisconnected(cc ClientContext)
 
 	// AuthUser authenticates the user and selects an handling driver
-	AuthUser(cc ClientContext, user, pass string) (afero.Fs, error)
+	AuthUser(cc ClientContext, user, pass string) (ClientDriver, error)
 
-	// GetCertificate returns a TLS Certificate to use
+	// GetTLSConfig returns a TLS Certificate to use
 	// The certificate could frequently change if we use something like "let's encrypt"
 	GetTLSConfig() (*tls.Config, error)
 }
 
+
+// ClientDriver is the base FS implementation that allows to manipulate files
+type ClientDriver interface {
+	afero.Fs
+}
+
 // ClientContext is implemented on the server side to provide some access to few data around the client
 type ClientContext interface {
-	// Get current path
+	// Path provides the path of the current connection
 	Path() string
 
 	// SetDebug activates the debugging of this connection commands
@@ -114,70 +86,100 @@ type ClientContext interface {
 
 	// Debug returns the current debugging status of this connection commands
 	Debug() bool
-	
+
 	// Client's ID on the server
 	ID() uint32
 
 	// Client's address
 	RemoteAddr() net.Addr
+
+	// Servers's address
+	LocalAddr() net.Addr
+
+	// Client's version can be empty
+	GetClientVersion() string
+
+	// Close closes the connection and disconnects the client.
+	Close() error
+
+	// HasTLSForControl returns true if the control connection is over TLS
+	HasTLSForControl() bool
+
+	// HasTLSForTransfers returns true if the transfer connection is over TLS
+	HasTLSForTransfers() bool
+
+	// GetLastCommand returns the last received command
+	GetLastCommand() string
 }
 
 // Settings define all the server settings
 type Settings struct {
-	ListenHost     string     // Host to receive connections on
-	ListenPort     int        // Port to listen on
-	PublicHost     string     // Public IP to expose (only an IP address is accepted at this stage)
-	DataPortRange  *PortRange // Port Range for data connections. Random one will be used if not specified
+	Listener                 net.Listener     // (Optional) To provide an already initialized listener
+	ListenAddr               string           // Listening address
+	PublicHost               string           // Public IP to expose (only an IP address is accepted at this stage)
+	PublicIPResolver         PublicIPResolver // (Optional) To fetch a public IP lookup
+	PassiveTransferPortRange *PortRange       // (Optional) Port Range for data connections. Random if not specified
+	ActiveTransferPortNon20  bool             // Do not impose the port 20 for active data transfer (#88, RFC 1579)
+	IdleTimeout              int              // Maximum inactivity time before disconnecting (#58)
+	ConnectionTimeout        int              // Maximum time to establish passive or active transfer connections
+	DisableMLSD              bool             // Disable MLSD support
+	DisableMLST              bool             // Disable MLST support
+	DisableMFMT              bool             // Disable MFMT support (modify file mtime)
+	Banner                   string           // Banner to use in server status response
+	TLSRequired              TLSRequirement   // defines the TLS mode
+	DisableLISTArgs          bool             // Disable ls like options (-a,-la etc.) for directory listing
+	DisableSite              bool             // Disable SITE command
+	DisableActiveMode        bool             // Disable Active FTP
+	EnableHASH               bool             // Enable support for calculating hash value of files
+	DisableSTAT              bool             // Disable Server STATUS, STAT on files and directories will still work
+	DisableSYST              bool             // Disable SYST
+	EnableCOMB               bool             // Enable COMB support
+	DefaultTransferType      TransferType     // Transfer type to use if the client don't send the TYPE command
 }
 ```
 
-### Sample implementation
+### Extensions
+There are a few extensions to the base afero APIs so that you can perform some operations that aren't offered by afero.
 
-Have a look at the [sample driver](https://github.com/fclairamb/ftpserver/tree/master/sample). It shows how you can plug your FTP server to something else, in this case your file system.
+#### Pre-allocate some space
+```go
+// ClientDriverExtensionAllocate is an extension to support the "ALLO" - file allocation - command
+type ClientDriverExtensionAllocate interface {
 
-## Sample run
+	// AllocateSpace reserves the space necessary to upload files
+	AllocateSpace(size int) error
+}
 ```
-$ ftp ftp://a:a@localhost:2121
-Trying ::1...
-Connected to localhost.
-220 Welcome on https://github.com/fclairamb/ftpserver
-331 OK
-230 Password ok, continue
-Remote system type is UNIX.
-Using binary mode to transfer files.
-200 Type set to binary
-ftp> put iMX7D_RM_Rev_B.pdf 
-local: iMX7D_RM_Rev_B.pdf remote: iMX7D_RM_Rev_B.pdf
-229 Entering Extended Passive Mode (|||62362|)
-150 Using transfer connection
-100% |******************************************************************************************************************************************************************| 44333 KiB  635.92 MiB/s    00:00 ETA
-226 OK, received 45397173 bytes
-45397173 bytes sent in 00:00 (538.68 MiB/s)
-ftp> cd virtual
-250 CD worked on /virtual
-ftp> ls
-229 Entering Extended Passive Mode (|||62369|)
-150 Using transfer connection
--rw-rw-rw- 1 ftp ftp         1024 Sep 28 01:44 localpath.txt
--rw-rw-rw- 1 ftp ftp         2048 Sep 28 01:44 file2.txt
 
-226 Closing data connection, sent some bytes
-ftp> get localpath.txt
-local: localpath.txt remote: localpath.txt
-229 Entering Extended Passive Mode (|||62371|)
-150 Using transfer connection
-    67      241.43 KiB/s 
-226 OK, sent 67 bytes
-67 bytes received in 00:00 (160.36 KiB/s)
-ftp> ^D
-221 Goodbye
-$ more localpath.txt 
-/var/folders/vk/vgsfkf9975xfrc4_fk102g200000gn/T/ftpserver020090599
-$ shasum /var/folders/vk/vgsfkf9975xfrc4_fk102g200000gn/T/ftpserver020090599/iMX7D_RM_Rev_B.pdf 
-03b3686b31867fb14d3f3a61e20d28a029883a32  /var/folders/vk/vgsfkf9975xfrc4_fk102g200000gn/T/ftpserver020090599/iMX7D_RM_Rev_B.pdf
-$ more localpath.txt 
-$ shasum iMX7D_RM_Rev_B.pdf 
-03b3686b31867fb14d3f3a61e20d28a029883a32  iMX7D_RM_Rev_B.pdf
+#### Get available space
+```go
+// ClientDriverExtensionAvailableSpace is an extension to implement to support
+// the AVBL ftp command
+type ClientDriverExtensionAvailableSpace interface {
+	GetAvailableSpace(dirName string) (int64, error)
+}
+```
+
+#### Create symbolic link
+```go
+// ClientDriverExtensionSymlink is an extension to support the "SITE SYMLINK" - symbolic link creation - command
+type ClientDriverExtensionSymlink interface {
+
+	// Symlink creates a symlink
+	Symlink(oldname, newname string) error
+
+	// SymlinkIfPossible allows to get the source of a symlink (but we don't need for now)
+	// ReadlinkIfPossible(name string) (string, error)
+}
+```
+
+#### Compute file hash
+```go
+// ClientDriverExtensionHasher is an extension to implement if you want to handle file digests
+// yourself. You have to set EnableHASH to true for this extension to be called
+type ClientDriverExtensionHasher interface {
+	ComputeHash(name string, algo HASHAlgo, startOffset, endOffset int64) (string, error)
+}
 ```
 
 ## History of the project
@@ -189,5 +191,3 @@ I wanted to make a system which would accept files through FTP and redirect them
 * [yob/graval](https://github.com/yob/graval) is 3 years old and “experimental”.
 * [goftp/server](https://github.com/goftp/server) seemed OK but I couldn't use it on both Filezilla and the MacOs ftp client.
 * [andrewarrow/paradise_ftp](https://github.com/andrewarrow/paradise_ftp) - Was the only one of the list I could test right away. This is the project I forked from.
-
-That's why I forked from this last one.
