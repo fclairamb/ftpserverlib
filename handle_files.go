@@ -229,7 +229,7 @@ func (c *clientHandler) combineFiles(targetPath string, fileFlag int, sourcePath
 		if err != nil {
 			c.closeUnchecked(src)
 			c.closeUnchecked(file)
-			c.writeMessage(StatusActionNotTaken, fmt.Sprintf("Could combine file %#v: %v", partial, err))
+			c.writeMessage(StatusActionNotTaken, fmt.Sprintf("Could not combine file %#v: %v", partial, err))
 
 			return
 		}
@@ -239,7 +239,7 @@ func (c *clientHandler) combineFiles(targetPath string, fileFlag int, sourcePath
 		err = c.driver.Remove(partial)
 		if err != nil {
 			c.closeUnchecked(file)
-			c.writeMessage(StatusActionNotTaken, fmt.Sprintf("Could delete file %#v after combine: %v", partial, err))
+			c.writeMessage(StatusActionNotTaken, fmt.Sprintf("Could not delete file %#v after combine: %v", partial, err))
 
 			return
 		}
@@ -247,7 +247,7 @@ func (c *clientHandler) combineFiles(targetPath string, fileFlag int, sourcePath
 
 	err = file.Close()
 	if err != nil {
-		c.writeMessage(StatusActionNotTaken, fmt.Sprintf("Could close combined file %#v: %v", targetPath, err))
+		c.writeMessage(StatusActionNotTaken, fmt.Sprintf("Could not close combined file %#v: %v", targetPath, err))
 
 		return
 	}

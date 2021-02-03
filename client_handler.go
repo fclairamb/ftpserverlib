@@ -232,7 +232,7 @@ func (c *clientHandler) GetLastCommand() string {
 	return c.command
 }
 
-func (c *clientHandler) SetLastCommand(cmd string) {
+func (c *clientHandler) setLastCommand(cmd string) {
 	c.paramsMutex.Lock()
 	defer c.paramsMutex.Unlock()
 
@@ -423,7 +423,7 @@ func (c *clientHandler) handleCommand(line string) {
 		}
 
 		if cmdDesc == nil {
-			c.SetLastCommand(command)
+			c.setLastCommand(command)
 			c.writeMessage(StatusSyntaxErrorNotRecognised, fmt.Sprintf("Unknown command %#v", command))
 
 			return
@@ -445,7 +445,7 @@ func (c *clientHandler) handleCommand(line string) {
 		c.transferWg.Wait()
 	}
 
-	c.SetLastCommand(command)
+	c.setLastCommand(command)
 
 	if cmdDesc.TransferRelated {
 		// these commands will be started in a separate goroutine so
