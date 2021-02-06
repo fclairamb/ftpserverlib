@@ -61,13 +61,13 @@ func NewTestServerWithDriver(t *testing.T, driver *TestServerDriver) *FtpServer 
 		)
 	}
 
-	t.Cleanup(func() {
-		mustStopServer(s)
-	})
-
 	if err := s.Listen(); err != nil {
 		return nil
 	}
+
+	t.Cleanup(func() {
+		mustStopServer(s)
+	})
 
 	go func() {
 		if err := s.Serve(); err != nil && err != io.EOF {
