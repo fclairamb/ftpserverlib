@@ -670,6 +670,33 @@ func TestCOMBAppend(t *testing.T) {
 	require.Len(t, contents, 1)
 }
 
+func TestCOMBCloseError(t *testing.T) {
+	s := NewTestServer(t, true)
+	conf := goftp.Config{
+		User:     authUser,
+		Password: authPass,
+	}
+	s.settings.EnableCOMB = true
+
+	c, err := goftp.DialConfig(conf, s.Addr())
+	require.NoError(t, err, "Couldn't connect")
+
+	defer func() { panicOnError(c.Close()) }()
+
+	raw, err := c.OpenRawConn()
+	require.NoError(t, err, "Couldn't open raw connection")
+
+	defer func() { require.NoError(t, raw.Close()) }()
+
+	ftpUpload(t, c, createTemporaryFile(t, 10), "1.bin")
+	ftpUpload(t, c, createTemporaryFile(t, 10), "2.bin")
+
+	rc, message, err := raw.SendCommand("COMB fail-to-close.bin 1.bin 2.bin")
+	require.NoError(t, err)
+	require.Equal(t, StatusActionNotTaken, rc, message)
+	require.Contains(t, message, "Could not close combined file")
+}
+
 func TestREST(t *testing.T) {
 	s := NewTestServer(t, true)
 	conf := goftp.Config{
