@@ -169,6 +169,10 @@ func TestTransferIPv6(t *testing.T) {
 		},
 	)
 
+	if s == nil {
+		t.Skip("IPv6 is not supported here")
+	}
+
 	t.Run("active", func(t *testing.T) { testTransferOnConnection(t, s, true, false, false) })
 	t.Run("passive", func(t *testing.T) { testTransferOnConnection(t, s, false, false, false) })
 }
