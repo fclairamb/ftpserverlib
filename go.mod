@@ -1,6 +1,6 @@
 module github.com/fclairamb/ftpserverlib
 
-go 1.14
+go 1.15
 
 require (
 	github.com/go-kit/kit v0.10.0
