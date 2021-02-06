@@ -66,7 +66,7 @@ func newFakeListener(err error) net.Listener {
 	}
 }
 
-func TestListernerAcceptErrors(t *testing.T) {
+func TestListenerAcceptErrors(t *testing.T) {
 	errNetFake := &fakeNetError{error: errListenerAccept}
 
 	server := FtpServer{
