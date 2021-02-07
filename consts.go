@@ -1,5 +1,4 @@
-// Package ftpserver provides all the tools to build your own FTP server: The core library and the driver.
-package ftpserver
+package ftpserver // nolint
 
 // from @stevenh's PR proposal
 // https://github.com/fclairamb/ftpserverlib/blob/becc125a0770e3b670c4ced7e7bd12594fb024ff/server/consts.go

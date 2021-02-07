@@ -1,5 +1,4 @@
-// Package ftpserver provides all the tools to build your own FTP server: The core library and the driver.
-package ftpserver
+package ftpserver // nolint
 
 import "fmt"
 
