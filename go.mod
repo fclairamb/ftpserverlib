@@ -10,4 +10,4 @@ require (
 	golang.org/x/text v0.3.4 // indirect
 )
 
-replace github.com/secsy/goftp => github.com/drakkan/goftp v0.0.0-20201220151643-27b7174e8caf
+replace github.com/secsy/goftp => github.com/drakkan/goftp v0.0.0-20200609142545-aa2de14babf4
