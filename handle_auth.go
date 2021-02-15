@@ -1,6 +1,8 @@
 package ftpserver // nolint
 
-import "fmt"
+import (
+	"fmt"
+)
 
 // Handle the "USER" command
 func (c *clientHandler) handleUSER(param string) error {
@@ -8,6 +10,16 @@ func (c *clientHandler) handleUSER(param string) error {
 		c.writeMessage(StatusServiceNotAvailable, "TLS is required")
 
 		return nil
+	}
+
+	if c.HasTLSForControl() && c.server.settings.SkipPasswordIfClientCertMatchesUser {
+		clientCertificates := c.controlTLSConn.ConnectionState().PeerCertificates
+		// TODO: Add check for subjectAltName as well
+		if len(clientCertificates) > 0 && clientCertificates[0].Subject.CommonName == param {
+			c.user = param
+			c.writeMessage(StatusUserLoggedIn, "User logged in, no password required.")
+			return nil
+		}
 	}
 
 	c.user = param

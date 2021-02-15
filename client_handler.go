@@ -2,6 +2,7 @@ package ftpserver // nolint
 
 import (
 	"bufio"
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"io"
@@ -85,6 +86,7 @@ type clientHandler struct {
 	debug               bool            // Show debugging info on the server side
 	transferTLS         bool            // Use TLS for transfer connection
 	controlTLS          bool            // Use TLS for control connection
+	controlTLSConn      *tls.Conn       // Store TLS for control connection
 	selectedHashAlgo    HASHAlgo        // algorithm used when we receive the HASH command
 	logger              log.Logger      // Client handler logging
 	currentTransferType TransferType    // current transfer type

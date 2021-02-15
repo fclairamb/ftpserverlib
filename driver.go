@@ -174,25 +174,26 @@ const (
 // Settings defines all the server settings
 // nolint: maligned
 type Settings struct {
-	Listener                 net.Listener     // (Optional) To provide an already initialized listener
-	ListenAddr               string           // Listening address
-	PublicHost               string           // Public IP to expose (only an IP address is accepted at this stage)
-	PublicIPResolver         PublicIPResolver // (Optional) To fetch a public IP lookup
-	PassiveTransferPortRange *PortRange       // (Optional) Port Range for data connections. Random if not specified
-	ActiveTransferPortNon20  bool             // Do not impose the port 20 for active data transfer (#88, RFC 1579)
-	IdleTimeout              int              // Maximum inactivity time before disconnecting (#58)
-	ConnectionTimeout        int              // Maximum time to establish passive or active transfer connections
-	DisableMLSD              bool             // Disable MLSD support
-	DisableMLST              bool             // Disable MLST support
-	DisableMFMT              bool             // Disable MFMT support (modify file mtime)
-	Banner                   string           // Banner to use in server status response
-	TLSRequired              TLSRequirement   // defines the TLS mode
-	DisableLISTArgs          bool             // Disable ls like options (-a,-la etc.) for directory listing
-	DisableSite              bool             // Disable SITE command
-	DisableActiveMode        bool             // Disable Active FTP
-	EnableHASH               bool             // Enable support for calculating hash value of files
-	DisableSTAT              bool             // Disable Server STATUS, STAT on files and directories will still work
-	DisableSYST              bool             // Disable SYST
-	EnableCOMB               bool             // Enable COMB support
-	DefaultTransferType      TransferType     // Transfer type to use if the client don't send the TYPE command
+	Listener                            net.Listener     // (Optional) To provide an already initialized listener
+	ListenAddr                          string           // Listening address
+	PublicHost                          string           // Public IP to expose (only an IP address is accepted at this stage)
+	PublicIPResolver                    PublicIPResolver // (Optional) To fetch a public IP lookup
+	PassiveTransferPortRange            *PortRange       // (Optional) Port Range for data connections. Random if not specified
+	ActiveTransferPortNon20             bool             // Do not impose the port 20 for active data transfer (#88, RFC 1579)
+	IdleTimeout                         int              // Maximum inactivity time before disconnecting (#58)
+	ConnectionTimeout                   int              // Maximum time to establish passive or active transfer connections
+	DisableMLSD                         bool             // Disable MLSD support
+	DisableMLST                         bool             // Disable MLST support
+	DisableMFMT                         bool             // Disable MFMT support (modify file mtime)
+	Banner                              string           // Banner to use in server status response
+	SkipPasswordIfClientCertMatchesUser bool             // Skip password if client certificate is required for TLS negotiation
+	TLSRequired                         TLSRequirement   // Defines the TLS mode
+	DisableLISTArgs                     bool             // Disable ls like options (-a,-la etc.) for directory listing
+	DisableSite                         bool             // Disable SITE command
+	DisableActiveMode                   bool             // Disable Active FTP
+	EnableHASH                          bool             // Enable support for calculating hash value of files
+	DisableSTAT                         bool             // Disable Server STATUS, STAT on files and directories will still work
+	DisableSYST                         bool             // Disable SYST
+	EnableCOMB                          bool             // Enable COMB support
+	DefaultTransferType                 TransferType     // Transfer type to use if the client don't send the TYPE command
 }
