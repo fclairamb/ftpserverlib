@@ -179,3 +179,60 @@ func TestAuthTLSRequired(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, StatusSystemStatus, rc)
 }
+
+func TestAuthTLSVerificationFailed(t *testing.T) {
+	s := NewTestServerWithDriver(t, &TestServerDriver{
+		Debug:                true,
+		TLS:                  true,
+		TLSVerificationReply: tlsVerificationFailed,
+	})
+
+	conf := goftp.Config{
+		User:     authUser,
+		Password: authPass,
+		TLSConfig: &tls.Config{
+			// nolint:gosec
+			InsecureSkipVerify: true,
+		},
+		TLSMode: goftp.TLSExplicit,
+	}
+
+	c, err := goftp.DialConfig(conf, s.Addr())
+	require.NoError(t, err, "Couldn't connect")
+
+	defer func() { panicOnError(c.Close()) }()
+
+	_, err = c.OpenRawConn()
+	require.Error(t, err, "TLS verification shoul fail")
+}
+
+func TestAuthTLSCertificate(t *testing.T) {
+	s := NewTestServerWithDriver(t, &TestServerDriver{
+		Debug:                true,
+		TLS:                  true,
+		TLSVerificationReply: tlsVerificationAuthenticated,
+	})
+
+	conf := goftp.Config{
+		User: authUser,
+		TLSConfig: &tls.Config{
+			// nolint:gosec
+			InsecureSkipVerify: true,
+		},
+		TLSMode: goftp.TLSExplicit,
+	}
+
+	c, err := goftp.DialConfig(conf, s.Addr())
+	require.NoError(t, err, "Couldn't connect")
+
+	defer func() { panicOnError(c.Close()) }()
+
+	raw, err := c.OpenRawConn()
+	require.NoError(t, err, "Couldn't open raw connection")
+
+	defer func() { require.NoError(t, raw.Close()) }()
+
+	rc, _, err := raw.SendCommand("STAT")
+	require.NoError(t, err)
+	require.Equal(t, StatusSystemStatus, rc)
+}

@@ -30,6 +30,16 @@ type MainDriver interface {
 	GetTLSConfig() (*tls.Config, error)
 }
 
+// MainDriverExtensionTLSVerifier is an extension that allows to verify the TLS connection
+// estabilished on the control channel
+type MainDriverExtensionTLSVerifier interface {
+
+	// VerifyConnection is called after certificate verification.
+	// If it returns a non-nil error, the handshake is aborted.
+	// If the returned ClientDriver is not nil the client is authenticated, no password is required.
+	VerifyConnection(cc ClientContext, user string, tlsConn *tls.Conn) (ClientDriver, error)
+}
+
 // ClientDriver is the base FS implementation that allows to manipulate files
 type ClientDriver interface {
 	afero.Fs
