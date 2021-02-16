@@ -34,9 +34,10 @@ type MainDriver interface {
 // estabilished on the control channel
 type MainDriverExtensionTLSVerifier interface {
 
-	// VerifyConnection is called after certificate verification.
-	// If it returns a non-nil error, the handshake is aborted.
-	// If the returned ClientDriver is not nil the client is authenticated, no password is required.
+	// VerifyConnection is called when receiving the "USER" command.
+	// If it returns a non-nil error, the client will receive a 530 error and it will be disconnected.
+	// If it returns a non-nil ClientDriver and a nil error the client will be authenticated.
+	// If it returns a nil ClientDriver and a nil error the user password is required
 	VerifyConnection(cc ClientContext, user string, tlsConn *tls.Conn) (ClientDriver, error)
 }
 
