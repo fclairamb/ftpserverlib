@@ -17,12 +17,25 @@ import (
 	"github.com/fclairamb/ftpserverlib/log/gokit"
 )
 
+type tlsVerificationReply int
+
+const (
+	// tls certificate is ok but a password is required too
+	tlsVerificationOK tlsVerificationReply = iota
+	// tls certificate verification failed, the client will be disconnected
+	tlsVerificationFailed
+	// tls certificate is ok and no password is required
+	tlsVerificationAuthenticated
+)
+
 const (
 	authUser    = "test"
 	authPass    = "test"
 	authUserID  = 1000
 	authGroupID = 500
 )
+
+var errInvalidTLSCertificate = errors.New("invalid TLS certificate")
 
 // NewTestServer provides a test server with or without debugging
 func NewTestServer(t *testing.T, debug bool) *FtpServer {
@@ -84,10 +97,11 @@ type TestServerDriver struct {
 	TLS            bool
 	CloseOnConnect bool // disconnect the client as soon as it connects
 
-	Settings *Settings // Settings
-	fs       afero.Fs
-	clientMU sync.Mutex
-	Clients  []ClientContext
+	Settings             *Settings // Settings
+	fs                   afero.Fs
+	clientMU             sync.Mutex
+	Clients              []ClientContext
+	TLSVerificationReply tlsVerificationReply
 }
 
 // TestClientDriver defines a minimal serverftp client driver
@@ -289,6 +303,22 @@ func (driver *TestServerDriver) GetTLSConfig() (*tls.Config, error) {
 	}
 
 	return nil, errNoTLS
+}
+
+func (driver *TestServerDriver) VerifyConnection(cc ClientContext, user string,
+	tlsConn *tls.Conn) (ClientDriver, error) {
+	switch driver.TLSVerificationReply {
+	case tlsVerificationFailed:
+		return nil, errInvalidTLSCertificate
+	case tlsVerificationAuthenticated:
+		clientdriver := NewTestClientDriver(driver)
+
+		return clientdriver, nil
+	case tlsVerificationOK:
+		return nil, nil
+	}
+
+	return nil, nil
 }
 
 // OpenFile opens a file in 3 possible modes: read, write, appending write (use appropriate flags)
