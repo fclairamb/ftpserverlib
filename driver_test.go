@@ -260,6 +260,7 @@ func (driver *TestServerDriver) GetClientsInfo() map[uint32]interface{} {
 		ccInfo["hasTLSForTransfers"] = cc.HasTLSForTransfers()
 		ccInfo["lastCommand"] = cc.GetLastCommand()
 		ccInfo["debug"] = cc.Debug()
+		ccInfo["isTLSVerified"] = cc.IsTLSVerified()
 
 		info[cc.ID()] = ccInfo
 	}

@@ -85,6 +85,7 @@ type clientHandler struct {
 	debug               bool            // Show debugging info on the server side
 	transferTLS         bool            // Use TLS for transfer connection
 	controlTLS          bool            // Use TLS for control connection
+	verifiedTLS         bool            // Is true if the MainDriverExtensionTLSVerifier was called and returned no error
 	selectedHashAlgo    HASHAlgo        // algorithm used when we receive the HASH command
 	logger              log.Logger      // Client handler logging
 	currentTransferType TransferType    // current transfer type
@@ -236,6 +237,21 @@ func (c *clientHandler) setLastCommand(cmd string) {
 	defer c.paramsMutex.Unlock()
 
 	c.command = cmd
+}
+
+// IsTLSVerified returns the TLS connection verification status
+func (c *clientHandler) IsTLSVerified() bool {
+	c.paramsMutex.RLock()
+	defer c.paramsMutex.RUnlock()
+
+	return c.verifiedTLS
+}
+
+func (c *clientHandler) setTLSVerified(value bool) {
+	c.paramsMutex.Lock()
+	defer c.paramsMutex.Unlock()
+
+	c.verifiedTLS = value
 }
 
 func (c *clientHandler) closeTransfer() error {

@@ -147,6 +147,9 @@ type ClientContext interface {
 
 	// GetLastCommand returns the last received command
 	GetLastCommand() string
+
+	// IsTLSVerified returns true if the TLS control connection was successfully verified
+	IsTLSVerified() bool
 }
 
 // FileTransfer defines the inferface for file transfers.

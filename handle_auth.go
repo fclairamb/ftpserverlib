@@ -18,6 +18,8 @@ func (c *clientHandler) handleUSER(param string) error {
 			if tlsConn, ok := c.conn.(*tls.Conn); ok {
 				driver, err := verifier.VerifyConnection(c, param, tlsConn)
 
+				c.setTLSVerified(err == nil)
+
 				if err != nil {
 					c.writeMessage(StatusNotLoggedIn, fmt.Sprintf("TLS verification failed: %v", err))
 					c.disconnect()
