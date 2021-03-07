@@ -7,6 +7,7 @@
 [![gocover.io](https://gocover.io/_badge/github.com/fclairamb/ftpserverlib)](https://gocover.io/github.com/fclairamb/ftpserverlib)
 [![Go Report Card](https://goreportcard.com/badge/fclairamb/ftpserverlib)](https://goreportcard.com/report/fclairamb/ftpserverlib)
 [![GoDoc](https://godoc.org/github.com/fclairamb/ftpserverlib?status.svg)](https://godoc.org/github.com/fclairamb/ftpserverlib)
+[![Mentioned in Awesome Go](https://awesome.re/mentioned-badge.svg)](https://github.com/avelino/awesome-go)
 
 This library allows to easily build a simple and fully-featured FTP server using [afero](https://github.com/spf13/afero) as the backend filesystem.
 
