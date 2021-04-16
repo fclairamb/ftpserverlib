@@ -56,7 +56,16 @@ func (c *clientHandler) getCurrentIP() ([]string, error) {
 		}
 	}
 
-	return strings.Split(ip, "."), nil
+	parsedId := net.ParseIP(ip)
+	if parsedId == nil {
+		return nil, fmt.Errorf("invalid passive IP %#v", ip)
+	}
+	parsedId = parsedId.To4()
+	if parsedId == nil {
+		return nil, fmt.Errorf("invalid IPv4 passive IP %#v", ip)
+	}
+
+	return strings.Split(parsedId.String(), "."), nil
 }
 
 // ErrNoAvailableListeningPort is returned when no port could be found to accept incoming connection
