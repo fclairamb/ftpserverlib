@@ -822,3 +822,41 @@ func TestASCIITransfersInvalidFiles(t *testing.T) {
 	remoteHash := ftpDownloadAndHashWithRawConnection(t, raw, "file.bin")
 	require.Equal(t, localHash, remoteHash)
 }
+
+func TestPASVInvalidPublicHost(t *testing.T) {
+	s := NewTestServer(t, true)
+	s.settings.PublicHost = "not an IP"
+
+	conf := goftp.Config{
+		User:     authUser,
+		Password: authPass,
+	}
+
+	c, err := goftp.DialConfig(conf, s.Addr())
+	require.NoError(t, err, "Couldn't connect")
+
+	defer func() { require.NoError(t, c.Close()) }()
+
+	raw, err := c.OpenRawConn()
+	require.NoError(t, err, "Couldn't open raw connection")
+
+	rc, resp, err := raw.SendCommand("PASV")
+	require.NoError(t, err)
+	require.Equal(t, StatusServiceNotAvailable, rc)
+	require.Contains(t, resp, "invalid passive IP")
+
+	s.settings.PublicHost = "::1"
+	rc, resp, err = raw.SendCommand("PASV")
+	require.NoError(t, err)
+	require.Equal(t, StatusServiceNotAvailable, rc)
+	require.Contains(t, resp, "invalid IPv4 passive IP")
+
+	s.settings.PublicHost = ""
+	s.settings.PublicIPResolver = func(cc ClientContext) (string, error) {
+		return "127.0.0", nil
+	}
+	rc, resp, err = raw.SendCommand("PASV")
+	require.NoError(t, err)
+	require.Equal(t, StatusServiceNotAvailable, rc)
+	require.Contains(t, resp, "invalid passive IP")
+}

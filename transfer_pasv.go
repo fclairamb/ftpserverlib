@@ -37,6 +37,14 @@ type passiveTransferHandler struct {
 	logger      log.Logger       // Logger
 }
 
+type ipValidationError struct {
+	error string
+}
+
+func (e *ipValidationError) Error() string {
+	return e.error
+}
+
 func (c *clientHandler) getCurrentIP() ([]string, error) {
 	// Provide our external IP address so the ftp client can connect back to us
 	ip := c.server.settings.PublicHost
@@ -56,7 +64,17 @@ func (c *clientHandler) getCurrentIP() ([]string, error) {
 		}
 	}
 
-	return strings.Split(ip, "."), nil
+	parsedIP := net.ParseIP(ip)
+	if parsedIP == nil {
+		return nil, &ipValidationError{error: fmt.Sprintf("invalid passive IP %#v", ip)}
+	}
+
+	parsedIP = parsedIP.To4()
+	if parsedIP == nil {
+		return nil, &ipValidationError{error: fmt.Sprintf("invalid IPv4 passive IP %#v", ip)}
+	}
+
+	return strings.Split(parsedIP.String(), "."), nil
 }
 
 // ErrNoAvailableListeningPort is returned when no port could be found to accept incoming connection
