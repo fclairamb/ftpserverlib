@@ -126,6 +126,37 @@ func TestDirHandling(t *testing.T) {
 	require.Error(t, err, "We shouldn't have been able to ftpDelete known again")
 }
 
+func TestCWDToRegularFile(t *testing.T) {
+	s := NewTestServer(t, true)
+	conf := goftp.Config{
+		User:     authUser,
+		Password: authPass,
+	}
+
+	c, err := goftp.DialConfig(conf, s.Addr())
+	require.NoError(t, err, "Couldn't connect")
+
+	defer func() { panicOnError(c.Close()) }()
+
+	// Getwd will send a PWD command
+	p, err := c.Getwd()
+	require.NoError(t, err)
+	require.Equal(t, "/", p, "Bad path")
+
+	raw, err := c.OpenRawConn()
+	require.NoError(t, err, "Couldn't open raw connection")
+
+	defer func() { require.NoError(t, raw.Close()) }()
+
+	// Creating a tiny file
+	ftpUpload(t, c, createTemporaryFile(t, 10), "file.txt")
+
+	rc, msg, err := raw.SendCommand("CWD /file.txt")
+	require.NoError(t, err)
+	require.Equal(t, `Can't change directory to /file.txt: Not a Directory`, msg)
+	require.Equal(t, StatusActionNotTaken, rc, "We shouldn't have been able to CWD to a regular file")
+}
+
 func TestMkdirRmDir(t *testing.T) {
 	s := NewTestServer(t, true)
 	conf := goftp.Config{

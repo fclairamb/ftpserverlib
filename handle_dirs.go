@@ -25,9 +25,13 @@ func (c *clientHandler) absPath(p string) string {
 func (c *clientHandler) handleCWD(param string) error {
 	p := c.absPath(param)
 
-	if _, err := c.driver.Stat(p); err == nil {
-		c.SetPath(p)
-		c.writeMessage(StatusFileOK, fmt.Sprintf("CD worked on %s", p))
+	if stat, err := c.driver.Stat(p); err == nil {
+		if stat.IsDir() {
+			c.SetPath(p)
+			c.writeMessage(StatusFileOK, fmt.Sprintf("CD worked on %s", p))
+		} else {
+			c.writeMessage(StatusActionNotTaken, fmt.Sprintf("Can't change directory to %s: Not a Directory", p))
+		}
 	} else {
 		c.writeMessage(StatusActionNotTaken, fmt.Sprintf("CD issue: %v", err))
 	}
