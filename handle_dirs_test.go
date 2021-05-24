@@ -151,8 +151,9 @@ func TestCWDToRegularFile(t *testing.T) {
 	// Creating a tiny file
 	ftpUpload(t, c, createTemporaryFile(t, 10), "file.txt")
 
-	rc, _, err := raw.SendCommand("CWD /file.txt")
+	rc, msg, err := raw.SendCommand("CWD /file.txt")
 	require.NoError(t, err)
+	require.Equal(t, `Can't change directory to /file.txt: Not a Directory`, msg)
 	require.Equal(t, StatusActionNotTaken, rc, "We shouldn't have been able to CWD to a regular file")
 }
 
