@@ -1,6 +1,7 @@
 package ftpserver
 
 import (
+	"bytes"
 	"crypto/tls"
 	"fmt"
 	"net"
@@ -447,4 +448,20 @@ func testListDirArgs(t *testing.T, s *FtpServer) {
 		err = c.Rmdir(arg)
 		require.NoError(t, err)
 	}
+}
+
+func TestWriteMLSxOutput(t *testing.T) {
+	b := bytes.Buffer{}
+	client := clientHandler{}
+	Eastern, _ := time.LoadLocation(`America/New_York`)
+	fileModTime := time.Date(2021, time.May, 25, 10, 13, 57, 123, Eastern)
+	fileInfo := NewFileInfo(`test.txt`, false, 10, fileModTime, true)
+	dirInfo := NewFileInfo(`/files`, true, 0, fileModTime.Add(time.Hour), false)
+
+	require.NoError(t, client.writeMLSxOutput(&b, fileInfo))
+	require.NoError(t, client.writeMLSxOutput(&b, dirInfo))
+
+	Expected := "Type=file;Size=10;Modify=20210525141357; test.txt\r\n" +
+		"Type=dir;Size=0;Modify=20210525151357; files\r\n"
+	require.Equal(t, Expected, b.String())
 }

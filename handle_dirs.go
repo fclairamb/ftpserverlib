@@ -301,7 +301,7 @@ func (c *clientHandler) writeMLSxOutput(w io.Writer, file os.FileInfo) error {
 		"Type=%s;Size=%d;Modify=%s; %s\r\n",
 		listType,
 		file.Size(),
-		file.ModTime().Format(dateFormatMLSD),
+		file.ModTime().UTC().Format(dateFormatMLSD),
 		file.Name(),
 	)
 
