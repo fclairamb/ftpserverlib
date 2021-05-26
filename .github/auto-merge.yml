@@ -10,6 +10,6 @@ blockingLabels:
 blockingTitleRegex: '\bWIP\b'
 rules:
   - minApprovals:
-      CONTRIBUTOR: 1
+      CONTRIBUTOR: 2
   - requiredLabels:
       - automerge
