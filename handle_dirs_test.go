@@ -4,6 +4,7 @@ import (
 	"crypto/tls"
 	"fmt"
 	"net"
+	"os"
 	"path"
 	"testing"
 	"time"
@@ -13,6 +14,18 @@ import (
 )
 
 const DirKnown = "known"
+
+func TestMain(m *testing.M) {
+	loc, err := time.LoadLocation("America/New_York")
+	if err != nil {
+		fmt.Printf("unable to set timezone: %v\n", err)
+		os.Exit(1)
+	}
+
+	time.Local = loc
+
+	os.Exit(m.Run())
+}
 
 func TestDirListing(t *testing.T) {
 	// MLSD is disabled we relies on LIST of files listing
@@ -461,19 +474,10 @@ func TestMLSDTimezone(t *testing.T) {
 
 	defer func() { panicOnError(c.Close()) }()
 
-	currentLocalTime := time.Local
-
-	loc, err := time.LoadLocation("America/New_York")
-	require.NoError(t, err)
-
-	time.Local = loc
-
 	ftpUpload(t, c, createTemporaryFile(t, 10), "file")
 	contents, err := c.ReadDir("/")
 	require.NoError(t, err)
 	require.Len(t, contents, 1)
 	require.Equal(t, "file", contents[0].Name())
 	require.InDelta(t, time.Now().Unix(), contents[0].ModTime().Unix(), 5)
-
-	time.Local = currentLocalTime
 }
