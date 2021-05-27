@@ -1,7 +1,6 @@
 package ftpserver
 
 import (
-	"bytes"
 	"crypto/tls"
 	"fmt"
 	"net"
@@ -450,18 +449,31 @@ func testListDirArgs(t *testing.T, s *FtpServer) {
 	}
 }
 
-func TestWriteMLSxOutput(t *testing.T) {
-	b := bytes.Buffer{}
-	client := clientHandler{}
-	Eastern, _ := time.LoadLocation(`America/New_York`)
-	fileModTime := time.Date(2021, time.May, 25, 10, 13, 57, 123, Eastern)
-	fileInfo := NewFileInfo(`test.txt`, false, 10, fileModTime, true)
-	dirInfo := NewFileInfo(`/files`, true, 0, fileModTime.Add(time.Hour), false)
+func TestMLSDTimezone(t *testing.T) {
+	s := NewTestServer(t, true)
+	conf := goftp.Config{
+		User:     authUser,
+		Password: authPass,
+	}
 
-	require.NoError(t, client.writeMLSxOutput(&b, fileInfo))
-	require.NoError(t, client.writeMLSxOutput(&b, dirInfo))
+	c, err := goftp.DialConfig(conf, s.Addr())
+	require.NoError(t, err, "Couldn't connect")
 
-	Expected := "Type=file;Size=10;Modify=20210525141357; test.txt\r\n" +
-		"Type=dir;Size=0;Modify=20210525151357; files\r\n"
-	require.Equal(t, Expected, b.String())
+	defer func() { panicOnError(c.Close()) }()
+
+	currentLocalTime := time.Local
+
+	loc, err := time.LoadLocation("America/New_York")
+	require.NoError(t, err)
+
+	time.Local = loc
+
+	ftpUpload(t, c, createTemporaryFile(t, 10), "file")
+	contents, err := c.ReadDir("/")
+	require.NoError(t, err)
+	require.Len(t, contents, 1)
+	require.Equal(t, "file", contents[0].Name())
+	require.InDelta(t, time.Now().Unix(), contents[0].ModTime().Unix(), 5)
+
+	time.Local = currentLocalTime
 }
