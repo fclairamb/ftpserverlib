@@ -48,6 +48,15 @@ func TestDirListing(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, contents, 1)
 	require.Equal(t, DirKnown, contents[0].Name())
+
+	// LIST also works for filePath
+	var fileName = "testfile.ext"
+	ftpUpload(t, c, createTemporaryFile(t, 10), fileName)
+
+	fileContents, err := c.ReadDir(fileName)
+	require.NoError(t, err)
+	require.Len(t, fileContents, 1)
+	require.Equal(t, fileName, fileContents[0].Name())
 }
 
 func TestDirListingPathArg(t *testing.T) {

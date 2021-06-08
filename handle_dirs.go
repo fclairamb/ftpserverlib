@@ -1,6 +1,7 @@
 package ftpserver // nolint
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -152,7 +153,7 @@ func (c *clientHandler) checkLISTArgs(args string) string {
 func (c *clientHandler) handleLIST(param string) error {
 	info := fmt.Sprintf("LIST %v", param)
 
-	if files, err := c.getFileList(param); err == nil || err == io.EOF {
+	if files, err := c.getFileList(param, true); err == nil || err == io.EOF {
 		if tr, errTr := c.TransferOpen(info); errTr == nil {
 			err = c.dirTransferLIST(tr, files)
 			c.TransferClose(err)
@@ -171,7 +172,7 @@ func (c *clientHandler) handleLIST(param string) error {
 func (c *clientHandler) handleNLST(param string) error {
 	info := fmt.Sprintf("NLST %v", param)
 
-	if files, err := c.getFileList(param); err == nil || err == io.EOF {
+	if files, err := c.getFileList(param, false); err == nil || err == io.EOF {
 		if tr, errTrOpen := c.TransferOpen(info); errTrOpen == nil {
 			err = c.dirTransferNLST(tr, files)
 			c.TransferClose(err)
@@ -212,7 +213,7 @@ func (c *clientHandler) handleMLSD(param string) error {
 
 	info := fmt.Sprintf("MLSD %v", param)
 
-	if files, err := c.getFileList(param); err == nil || err == io.EOF {
+	if files, err := c.getFileList(param, false); err == nil || err == io.EOF {
 		if tr, errTr := c.TransferOpen(info); errTr == nil {
 			err = c.dirTransferMLSD(tr, files)
 			c.TransferClose(err)
@@ -308,12 +309,21 @@ func (c *clientHandler) writeMLSxOutput(w io.Writer, file os.FileInfo) error {
 	return err
 }
 
-func (c *clientHandler) getFileList(param string) ([]os.FileInfo, error) {
+func (c *clientHandler) getFileList(param string, filePathAllowed bool) ([]os.FileInfo, error) {
 	if !c.server.settings.DisableLISTArgs {
 		param = c.checkLISTArgs(param)
 	}
-
+	// directory or filePath
 	directoryPath := c.absPath(param)
+
+	// return list of single file if directoryPath points to file and filePathAllowed
+	if info, err := c.driver.Stat(directoryPath); err != nil {
+		return nil, err
+	} else if filePathAllowed && !info.IsDir() {
+		return []os.FileInfo{info}, nil
+	} else if !info.IsDir() {
+		return nil, errors.New("listing of file is't allowed")
+	}
 
 	if fileList, ok := c.driver.(ClientDriverExtensionFileList); ok {
 		return fileList.ReadDir(directoryPath)
