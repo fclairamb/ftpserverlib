@@ -12,6 +12,9 @@ import (
 	"github.com/spf13/afero"
 )
 
+// thrown if listing with a filePath isn't supported (MLSD, NLST)
+var errListingOfFile = errors.New("listing of file isn't allowed")
+
 // the order matter, put parameters with more characters first
 var supportedlistArgs = []string{"-al", "-la", "-a", "-l"}
 
@@ -317,12 +320,17 @@ func (c *clientHandler) getFileList(param string, filePathAllowed bool) ([]os.Fi
 	directoryPath := c.absPath(param)
 
 	// return list of single file if directoryPath points to file and filePathAllowed
-	if info, err := c.driver.Stat(directoryPath); err != nil {
+	info, err := c.driver.Stat(directoryPath)
+	if err != nil {
 		return nil, err
-	} else if filePathAllowed && !info.IsDir() {
-		return []os.FileInfo{info}, nil
-	} else if !info.IsDir() {
-		return nil, errors.New("listing of file is't allowed")
+	}
+
+	if !info.IsDir() {
+		if filePathAllowed {
+			return []os.FileInfo{info}, nil
+		}
+
+		return nil, errListingOfFile
 	}
 
 	if fileList, ok := c.driver.(ClientDriverExtensionFileList); ok {
