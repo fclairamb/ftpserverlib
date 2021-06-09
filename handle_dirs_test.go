@@ -491,3 +491,40 @@ func TestMLSDTimezone(t *testing.T) {
 	require.Equal(t, "file", contents[0].Name())
 	require.InDelta(t, time.Now().Unix(), contents[0].ModTime().Unix(), 5)
 }
+
+func TestMLSDAndNLSTFilePathError(t *testing.T) {
+	s := NewTestServer(t, true)
+	conf := goftp.Config{
+		User:     authUser,
+		Password: authPass,
+	}
+
+	c, err := goftp.DialConfig(conf, s.Addr())
+	require.NoError(t, err, "Couldn't connect")
+
+	defer func() { panicOnError(c.Close()) }()
+
+	var fileName = "testfile.ext"
+
+	ftpUpload(t, c, createTemporaryFile(t, 10), fileName)
+
+	// MLSD shouldn't work for filePaths
+	_, err = c.ReadDir(fileName)
+	require.Error(t, err, "MLSD is enabled MLSD for filePath must fail")
+
+	// NLST shouldn't work for filePath
+	raw, err := c.OpenRawConn()
+	require.NoError(t, err, "Couldn't open raw connection")
+
+	defer func() { require.NoError(t, raw.Close()) }()
+
+	_, err = raw.PrepareDataConn()
+	require.NoError(t, err)
+
+	rc, response, err := raw.SendCommand("NLST /" + fileName)
+	require.NoError(t, err)
+	require.Equal(t, StatusFileActionNotTaken, rc, response)
+
+	_, _, err = raw.ReadResponse()
+	require.Error(t, err, "MLSD is enabled MLSD for filePath must fail")
+}
