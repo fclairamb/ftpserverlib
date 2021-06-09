@@ -51,6 +51,7 @@ func TestDirListing(t *testing.T) {
 
 	// LIST also works for filePath
 	var fileName = "testfile.ext"
+
 	ftpUpload(t, c, createTemporaryFile(t, 10), fileName)
 
 	fileContents, err := c.ReadDir(fileName)
