@@ -52,6 +52,9 @@ func TestDirListing(t *testing.T) {
 	// LIST also works for filePath
 	var fileName = "testfile.ext"
 
+	_, err = c.ReadDir(fileName)
+	require.Error(t, err, "LIST for not existing filePath must fail")
+
 	ftpUpload(t, c, createTemporaryFile(t, 10), fileName)
 
 	fileContents, err := c.ReadDir(fileName)
@@ -504,13 +507,16 @@ func TestMLSDAndNLSTFilePathError(t *testing.T) {
 
 	defer func() { panicOnError(c.Close()) }()
 
+	// MLSD shouldn't work for filePaths
 	var fileName = "testfile.ext"
+
+	_, err = c.ReadDir(fileName)
+	require.Error(t, err, "MLSD for not existing filePath must fail")
 
 	ftpUpload(t, c, createTemporaryFile(t, 10), fileName)
 
-	// MLSD shouldn't work for filePaths
 	_, err = c.ReadDir(fileName)
-	require.Error(t, err, "MLSD is enabled MLSD for filePath must fail")
+	require.Error(t, err, "MLSD is enabled, MLSD for filePath must fail")
 
 	// NLST shouldn't work for filePath
 	raw, err := c.OpenRawConn()
@@ -526,5 +532,5 @@ func TestMLSDAndNLSTFilePathError(t *testing.T) {
 	require.Equal(t, StatusFileActionNotTaken, rc, response)
 
 	_, _, err = raw.ReadResponse()
-	require.Error(t, err, "MLSD is enabled MLSD for filePath must fail")
+	require.Error(t, err, "NLST for filePath must fail")
 }
