@@ -2,13 +2,29 @@ package ftpserver
 
 import (
 	"errors"
+	"fmt"
 	"net"
+	"os"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
 	"github.com/fclairamb/ftpserverlib/log"
 )
+
+func TestMain(m *testing.M) {
+	// we change the timezone to be able to test that MLSD/MLST commands write UTC timestamps
+	loc, err := time.LoadLocation("America/New_York")
+	if err != nil {
+		fmt.Printf("unable to set timezone: %v\n", err)
+		os.Exit(1)
+	}
+
+	time.Local = loc
+
+	os.Exit(m.Run())
+}
 
 var errListenerAccept = errors.New("error accepting a connection")
 

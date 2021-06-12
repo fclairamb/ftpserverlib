@@ -13,7 +13,7 @@ import (
 )
 
 // thrown if listing with a filePath isn't supported (MLSD, NLST)
-var errListingOfFile = errors.New("listing of file isn't allowed")
+var errFileList = errors.New("listing a file isn't allowed")
 
 // the order matter, put parameters with more characters first
 var supportedlistArgs = []string{"-al", "-la", "-a", "-l"}
@@ -317,10 +317,10 @@ func (c *clientHandler) getFileList(param string, filePathAllowed bool) ([]os.Fi
 		param = c.checkLISTArgs(param)
 	}
 	// directory or filePath
-	directoryPath := c.absPath(param)
+	listPath := c.absPath(param)
 
 	// return list of single file if directoryPath points to file and filePathAllowed
-	info, err := c.driver.Stat(directoryPath)
+	info, err := c.driver.Stat(listPath)
 	if err != nil {
 		return nil, err
 	}
@@ -330,19 +330,19 @@ func (c *clientHandler) getFileList(param string, filePathAllowed bool) ([]os.Fi
 			return []os.FileInfo{info}, nil
 		}
 
-		return nil, errListingOfFile
+		return nil, errFileList
 	}
 
 	if fileList, ok := c.driver.(ClientDriverExtensionFileList); ok {
-		return fileList.ReadDir(directoryPath)
+		return fileList.ReadDir(listPath)
 	}
 
-	directory, errOpenFile := c.driver.Open(directoryPath)
+	directory, errOpenFile := c.driver.Open(listPath)
 	if errOpenFile != nil {
 		return nil, errOpenFile
 	}
 
-	defer c.closeDirectory(directoryPath, directory)
+	defer c.closeDirectory(listPath, directory)
 
 	return directory.Readdir(-1)
 }

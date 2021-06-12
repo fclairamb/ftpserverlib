@@ -414,8 +414,6 @@ func (c *clientHandler) handleSTATFile(param string) error {
 			var files []os.FileInfo
 			var errList error
 
-			defer c.multilineAnswer(StatusDirectoryStatus, fmt.Sprintf("STAT %v", param))()
-
 			directoryPath := c.absPath(param)
 
 			if fileList, ok := c.driver.(ClientDriverExtensionFileList); ok {
@@ -433,9 +431,13 @@ func (c *clientHandler) handleSTATFile(param string) error {
 			}
 
 			if errList == nil {
+				defer c.multilineAnswer(StatusDirectoryStatus, fmt.Sprintf("STAT %v", param))()
+
 				for _, f := range files {
 					c.writeLine(fmt.Sprintf(" %s", c.fileStat(f)))
 				}
+			} else {
+				c.writeMessage(StatusFileActionNotTaken, fmt.Sprintf("Could not list: %v", errList))
 			}
 		} else {
 			defer c.multilineAnswer(StatusFileStatus, fmt.Sprintf("STAT %v", param))()

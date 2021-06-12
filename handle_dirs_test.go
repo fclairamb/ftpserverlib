@@ -4,7 +4,6 @@ import (
 	"crypto/tls"
 	"fmt"
 	"net"
-	"os"
 	"path"
 	"testing"
 	"time"
@@ -14,18 +13,6 @@ import (
 )
 
 const DirKnown = "known"
-
-func TestMain(m *testing.M) {
-	loc, err := time.LoadLocation("America/New_York")
-	if err != nil {
-		fmt.Printf("unable to set timezone: %v\n", err)
-		os.Exit(1)
-	}
-
-	time.Local = loc
-
-	os.Exit(m.Run())
-}
 
 func TestDirListing(t *testing.T) {
 	// MLSD is disabled we relies on LIST of files listing
@@ -50,7 +37,7 @@ func TestDirListing(t *testing.T) {
 	require.Equal(t, DirKnown, contents[0].Name())
 
 	// LIST also works for filePath
-	var fileName = "testfile.ext"
+	fileName := "testfile.ext"
 
 	_, err = c.ReadDir(fileName)
 	require.Error(t, err, "LIST for not existing filePath must fail")
@@ -61,6 +48,12 @@ func TestDirListing(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, fileContents, 1)
 	require.Equal(t, fileName, fileContents[0].Name())
+
+	// the test driver will fail to open this dir
+	dirName, err = c.Mkdir("fail-to-open-dir")
+	require.NoError(t, err)
+	_, err = c.ReadDir(dirName)
+	require.Error(t, err)
 }
 
 func TestDirListingPathArg(t *testing.T) {
