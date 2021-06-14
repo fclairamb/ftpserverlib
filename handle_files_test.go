@@ -351,6 +351,14 @@ func TestSTATFile(t *testing.T) {
 	rc, _, err = raw.SendCommand("STAT missing")
 	require.NoError(t, err)
 	require.Equal(t, StatusFileActionNotTaken, rc)
+
+	// the test driver will fail to open this dir
+	dirName, err := c.Mkdir("fail-to-open")
+	require.NoError(t, err)
+
+	rc, _, err = raw.SendCommand(fmt.Sprintf("STAT %v", dirName))
+	require.NoError(t, err)
+	require.Equal(t, StatusFileActionNotTaken, rc)
 }
 
 func TestMDTM(t *testing.T) {
@@ -396,6 +404,10 @@ func TestRename(t *testing.T) {
 
 	err = c.Rename("file", "file1")
 	require.NoError(t, err)
+
+	// renaming a missing file must fail
+	err = c.Rename("missingfile", "file1")
+	require.Error(t, err)
 
 	raw, err := c.OpenRawConn()
 	require.NoError(t, err, "Couldn't open raw connection")

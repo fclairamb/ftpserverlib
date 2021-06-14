@@ -113,13 +113,13 @@ type testFile struct {
 	afero.File
 }
 
-var errFailClose = errors.New("couldn't close")
-
-var errFailWrite = errors.New("couldn't write")
-
-var errFailSeek = errors.New("couldn't seek")
-
-var errFailReaddir = errors.New("couldn't readdir")
+var (
+	errFailClose   = errors.New("couldn't close")
+	errFailWrite   = errors.New("couldn't write")
+	errFailSeek    = errors.New("couldn't seek")
+	errFailReaddir = errors.New("couldn't readdir")
+	errFailOpen    = errors.New("couldn't open")
+)
 
 func (f *testFile) Read(b []byte) (int, error) {
 	// simulating a slow reading allows us to test ABOR
@@ -323,6 +323,10 @@ func (driver *TestServerDriver) VerifyConnection(cc ClientContext, user string,
 
 // OpenFile opens a file in 3 possible modes: read, write, appending write (use appropriate flags)
 func (driver *TestClientDriver) OpenFile(path string, flag int, perm os.FileMode) (afero.File, error) {
+	if strings.Contains(path, "fail-to-open") {
+		return nil, errFailOpen
+	}
+
 	file, err := driver.Fs.OpenFile(path, flag, perm)
 
 	if err == nil {
@@ -333,6 +337,10 @@ func (driver *TestClientDriver) OpenFile(path string, flag int, perm os.FileMode
 }
 
 func (driver *TestClientDriver) Open(name string) (afero.File, error) {
+	if strings.Contains(name, "fail-to-open") {
+		return nil, errFailOpen
+	}
+
 	file, err := driver.Fs.Open(name)
 
 	if err == nil {

@@ -4,7 +4,6 @@ import (
 	"crypto/tls"
 	"fmt"
 	"net"
-	"os"
 	"path"
 	"testing"
 	"time"
@@ -14,18 +13,6 @@ import (
 )
 
 const DirKnown = "known"
-
-func TestMain(m *testing.M) {
-	loc, err := time.LoadLocation("America/New_York")
-	if err != nil {
-		fmt.Printf("unable to set timezone: %v\n", err)
-		os.Exit(1)
-	}
-
-	time.Local = loc
-
-	os.Exit(m.Run())
-}
 
 func TestDirListing(t *testing.T) {
 	// MLSD is disabled we relies on LIST of files listing
@@ -48,6 +35,25 @@ func TestDirListing(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, contents, 1)
 	require.Equal(t, DirKnown, contents[0].Name())
+
+	// LIST also works for filePath
+	fileName := "testfile.ext"
+
+	_, err = c.ReadDir(fileName)
+	require.Error(t, err, "LIST for not existing filePath must fail")
+
+	ftpUpload(t, c, createTemporaryFile(t, 10), fileName)
+
+	fileContents, err := c.ReadDir(fileName)
+	require.NoError(t, err)
+	require.Len(t, fileContents, 1)
+	require.Equal(t, fileName, fileContents[0].Name())
+
+	// the test driver will fail to open this dir
+	dirName, err = c.Mkdir("fail-to-open-dir")
+	require.NoError(t, err)
+	_, err = c.ReadDir(dirName)
+	require.Error(t, err)
 }
 
 func TestDirListingPathArg(t *testing.T) {
@@ -480,4 +486,44 @@ func TestMLSDTimezone(t *testing.T) {
 	require.Len(t, contents, 1)
 	require.Equal(t, "file", contents[0].Name())
 	require.InDelta(t, time.Now().Unix(), contents[0].ModTime().Unix(), 5)
+}
+
+func TestMLSDAndNLSTFilePathError(t *testing.T) {
+	s := NewTestServer(t, true)
+	conf := goftp.Config{
+		User:     authUser,
+		Password: authPass,
+	}
+
+	c, err := goftp.DialConfig(conf, s.Addr())
+	require.NoError(t, err, "Couldn't connect")
+
+	defer func() { panicOnError(c.Close()) }()
+
+	// MLSD shouldn't work for filePaths
+	var fileName = "testfile.ext"
+
+	_, err = c.ReadDir(fileName)
+	require.Error(t, err, "MLSD for not existing filePath must fail")
+
+	ftpUpload(t, c, createTemporaryFile(t, 10), fileName)
+
+	_, err = c.ReadDir(fileName)
+	require.Error(t, err, "MLSD is enabled, MLSD for filePath must fail")
+
+	// NLST shouldn't work for filePath
+	raw, err := c.OpenRawConn()
+	require.NoError(t, err, "Couldn't open raw connection")
+
+	defer func() { require.NoError(t, raw.Close()) }()
+
+	_, err = raw.PrepareDataConn()
+	require.NoError(t, err)
+
+	rc, response, err := raw.SendCommand("NLST /" + fileName)
+	require.NoError(t, err)
+	require.Equal(t, StatusFileActionNotTaken, rc, response)
+
+	_, _, err = raw.ReadResponse()
+	require.Error(t, err, "NLST for filePath must fail")
 }
