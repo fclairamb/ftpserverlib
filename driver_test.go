@@ -327,6 +327,14 @@ func (driver *TestClientDriver) OpenFile(path string, flag int, perm os.FileMode
 		return nil, errFailOpen
 	}
 
+	if strings.Contains(path, "quota-exceeded") {
+		return nil, &quotaExceededError{}
+	}
+
+	if strings.Contains(path, "not-allowed") {
+		return nil, &fileNotAllowedError{}
+	}
+
 	file, err := driver.Fs.OpenFile(path, flag, perm)
 
 	if err == nil {
@@ -348,6 +356,14 @@ func (driver *TestClientDriver) Open(name string) (afero.File, error) {
 	}
 
 	return file, err
+}
+
+func (driver *TestClientDriver) Rename(oldname, newname string) error {
+	if strings.Contains(newname, "not-allowed") {
+		return &fileNotAllowedError{}
+	}
+
+	return driver.Fs.Rename(oldname, newname)
 }
 
 var errTooMuchSpaceRequested = errors.New("you're requesting too much space")

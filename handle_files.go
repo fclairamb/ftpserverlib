@@ -72,7 +72,7 @@ func (c *clientHandler) transferFile(write bool, append bool, param, info string
 	// If this fail, can stop right here and reset the seek position
 	if err != nil {
 		if !c.isCommandAborted() {
-			c.writeMessage(StatusActionNotTaken, "Could not access file: "+err.Error())
+			c.writeMessage(getErrorCode(err, StatusActionNotTaken), "Could not access file: "+err.Error())
 		}
 
 		c.ctxRest = 0
@@ -89,7 +89,7 @@ func (c *clientHandler) transferFile(write bool, append bool, param, info string
 		if err != nil {
 			// if we are unable to seek we can stop right here and close the file
 			if !c.isCommandAborted() {
-				c.writeMessage(StatusActionNotTaken, "Could not seek file: "+err.Error())
+				c.writeMessage(getErrorCode(err, StatusActionNotTaken), "Could not seek file: "+err.Error())
 			}
 			// we can ignore the close error here
 			c.closeUnchecked(file)
@@ -208,7 +208,7 @@ func (c *clientHandler) handleCOMB(param string) error {
 func (c *clientHandler) combineFiles(targetPath string, fileFlag int, sourcePaths []string) {
 	file, err := c.getFileHandle(targetPath, fileFlag, 0)
 	if err != nil {
-		c.writeMessage(StatusActionNotTaken, fmt.Sprintf("Could not access file %#v: %v", targetPath, err))
+		c.writeMessage(getErrorCode(err, StatusActionNotTaken), fmt.Sprintf("Could not access file %#v: %v", targetPath, err))
 
 		return
 	}
@@ -219,7 +219,7 @@ func (c *clientHandler) combineFiles(targetPath string, fileFlag int, sourcePath
 		src, err = c.getFileHandle(partial, os.O_RDONLY, 0)
 		if err != nil {
 			c.closeUnchecked(file)
-			c.writeMessage(StatusActionNotTaken, fmt.Sprintf("Could not access file %#v: %v", partial, err))
+			c.writeMessage(getErrorCode(err, StatusActionNotTaken), fmt.Sprintf("Could not access file %#v: %v", partial, err))
 
 			return
 		}
@@ -228,7 +228,7 @@ func (c *clientHandler) combineFiles(targetPath string, fileFlag int, sourcePath
 		if err != nil {
 			c.closeUnchecked(src)
 			c.closeUnchecked(file)
-			c.writeMessage(StatusActionNotTaken, fmt.Sprintf("Could not combine file %#v: %v", partial, err))
+			c.writeMessage(getErrorCode(err, StatusActionNotTaken), fmt.Sprintf("Could not combine file %#v: %v", partial, err))
 
 			return
 		}
@@ -372,7 +372,8 @@ func (c *clientHandler) handleRNTO(param string) error {
 			c.writeMessage(StatusFileOK, "Done !")
 			c.ctxRnfr = ""
 		} else {
-			c.writeMessage(StatusActionNotTaken, fmt.Sprintf("Couldn't rename %s to %s: %s", c.ctxRnfr, dst, err.Error()))
+			c.writeMessage(getErrorCode(err, StatusActionNotTaken), fmt.Sprintf("Couldn't rename %s to %s: %s",
+				c.ctxRnfr, dst, err.Error()))
 		}
 	} else {
 		c.writeMessage(StatusBadCommandSequence, "RNFR is expected before RNTO")

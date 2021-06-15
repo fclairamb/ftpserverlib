@@ -13,6 +13,7 @@ import (
 	"testing"
 
 	"github.com/secsy/goftp"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -405,9 +406,17 @@ func TestRename(t *testing.T) {
 	err = c.Rename("file", "file1")
 	require.NoError(t, err)
 
+	// the test driver returns FileNameNotAllowedError in this case, the error code should be 553 instead of 550
+	err = c.Rename("file1", "not-allowed")
+	if assert.Error(t, err) {
+		assert.True(t, strings.Contains(err.Error(), "553-Couldn't rename"), err.Error())
+	}
+
 	// renaming a missing file must fail
 	err = c.Rename("missingfile", "file1")
-	require.Error(t, err)
+	if assert.Error(t, err) {
+		assert.True(t, strings.Contains(err.Error(), "550-Couldn't access"), err.Error())
+	}
 
 	raw, err := c.OpenRawConn()
 	require.NoError(t, err, "Couldn't open raw connection")
@@ -417,6 +426,35 @@ func TestRename(t *testing.T) {
 	rc, _, err := raw.SendCommand("RNTO file2")
 	require.NoError(t, err)
 	require.Equal(t, StatusBadCommandSequence, rc)
+}
+
+func TestUploadErrorCodes(t *testing.T) {
+	s := NewTestServer(t, true)
+	conf := goftp.Config{
+		User:     authUser,
+		Password: authPass,
+	}
+	c, err := goftp.DialConfig(conf, s.Addr())
+	require.NoError(t, err, "Couldn't connect")
+
+	defer func() { panicOnError(c.Close()) }()
+
+	f := createTemporaryFile(t, 10)
+	_, err = f.Seek(0, 0)
+	require.NoError(t, err, "Couldn't seek")
+	err = c.Store("quota-exceeded", f)
+
+	if assert.Error(t, err) {
+		assert.Contains(t, err.Error(), "552-Could not access file")
+	}
+
+	_, err = f.Seek(0, 0)
+	require.NoError(t, err, "Couldn't seek")
+	err = c.Store("not-allowed", f)
+
+	if assert.Error(t, err) {
+		assert.Contains(t, err.Error(), "553-Could not access file")
+	}
 }
 
 func TestHASHDisabled(t *testing.T) {
