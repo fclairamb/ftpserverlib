@@ -328,11 +328,11 @@ func (driver *TestClientDriver) OpenFile(path string, flag int, perm os.FileMode
 	}
 
 	if strings.Contains(path, "quota-exceeded") {
-		return nil, &quotaExceededError{}
+		return nil, ErrStorageExceeded
 	}
 
 	if strings.Contains(path, "not-allowed") {
-		return nil, &fileNotAllowedError{}
+		return nil, ErrFileNameNotAllowed
 	}
 
 	file, err := driver.Fs.OpenFile(path, flag, perm)
@@ -360,7 +360,7 @@ func (driver *TestClientDriver) Open(name string) (afero.File, error) {
 
 func (driver *TestClientDriver) Rename(oldname, newname string) error {
 	if strings.Contains(newname, "not-allowed") {
-		return &fileNotAllowedError{}
+		return ErrFileNameNotAllowed
 	}
 
 	return driver.Fs.Rename(oldname, newname)

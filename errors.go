@@ -1,28 +1,23 @@
 package ftpserver // nolint
 
-// StorageExceededError should be implemented by errors that should return 552 code.
-// As for RFC 959 this error can be returned for STOR, APPE
-type StorageExceededError interface {
-	IsExceeded() bool
-}
+import "errors"
 
-// FileNameNotAllowedError should be implemented by errors that should return 553 code.
-// As for RFC 959 this error can be returned for STOR, APPE, RNTO
-type FileNameNotAllowedError interface {
-	IsNotAllowed() bool
-}
+var (
+	// ErrStorageExceeded defines the error mapped to the FTP 552 reply code.
+	// As for RFC 959 this error is checked for STOR, APPE
+	ErrStorageExceeded = errors.New("storage limit exceeded")
+	// ErrFileNameNotAllowed defines the error mapped to the FTP 553 reply code.
+	// As for RFC 959 this error is checked for STOR, APPE, RNTO
+	ErrFileNameNotAllowed = errors.New("filename not allowed")
+)
 
 func getErrorCode(err error, defaultCode int) int {
-	switch e := err.(type) {
-	case StorageExceededError:
-		if e.IsExceeded() {
-			return StatusActionAborted
-		}
-	case FileNameNotAllowedError:
-		if e.IsNotAllowed() {
-			return StatusActionNotTakenNoFile
-		}
+	switch {
+	case errors.Is(err, ErrStorageExceeded):
+		return StatusActionAborted
+	case errors.Is(err, ErrFileNameNotAllowed):
+		return StatusActionNotTakenNoFile
+	default:
+		return defaultCode
 	}
-
-	return defaultCode
 }

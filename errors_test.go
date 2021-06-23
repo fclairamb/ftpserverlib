@@ -10,30 +10,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-type quotaExceededError struct{}
-
-func (q *quotaExceededError) IsExceeded() bool {
-	return true
-}
-
-func (q *quotaExceededError) Error() string {
-	return "quota exceeded"
-}
-
-type fileNotAllowedError struct{}
-
-func (f *fileNotAllowedError) IsNotAllowed() bool {
-	return true
-}
-
-func (f *fileNotAllowedError) Error() string {
-	return "file name not allowed"
-}
-
 func TestCustomErrorsCode(t *testing.T) {
-	code := getErrorCode(&quotaExceededError{}, StatusActionNotTaken)
+	code := getErrorCode(ErrStorageExceeded, StatusActionNotTaken)
 	assert.Equal(t, StatusActionAborted, code)
-	code = getErrorCode(&fileNotAllowedError{}, StatusActionNotTaken)
+	code = getErrorCode(ErrFileNameNotAllowed, StatusActionNotTaken)
 	assert.Equal(t, StatusActionNotTakenNoFile, code)
 	code = getErrorCode(os.ErrPermission, StatusActionNotTaken)
 	assert.Equal(t, StatusActionNotTaken, code)
@@ -44,6 +24,6 @@ func TestCustomErrorsCode(t *testing.T) {
 func TestTransferCloseStorageExceeded(t *testing.T) {
 	buf := bytes.Buffer{}
 	h := clientHandler{writer: bufio.NewWriter(&buf)}
-	h.TransferClose(&quotaExceededError{})
-	require.Equal(t, "552 Issue during transfer: quota exceeded\r\n", buf.String())
+	h.TransferClose(ErrStorageExceeded)
+	require.Equal(t, "552 Issue during transfer: storage limit exceeded\r\n", buf.String())
 }
