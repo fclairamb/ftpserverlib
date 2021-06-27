@@ -605,7 +605,7 @@ func (c *clientHandler) TransferClose(err error) {
 	case errClose != nil:
 		c.writeMessage(StatusActionNotTaken, fmt.Sprintf("Issue during transfer close: %v", errClose))
 	case err != nil:
-		c.writeMessage(StatusActionNotTaken, fmt.Sprintf("Issue during transfer: %v", err))
+		c.writeMessage(getErrorCode(err, StatusActionNotTaken), fmt.Sprintf("Issue during transfer: %v", err))
 	}
 }
 
