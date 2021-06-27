@@ -26,7 +26,7 @@ If you're interested in a fully featured FTP server, you should use [sftpgo](htt
  * Active socket connections (PORT and EPRT commands)
  * IPv6 support (EPSV + EPRT)
  * Small memory footprint
- * Clean code: No sync, no sleep, no panic
+ * Clean code: No sleep, no panic, no global sync (only around control/transfer connection per client) 
  * Uses only the standard library except for:
    * [afero](https://github.com/spf13/afero) for generic file systems handling
    * [go-kit log](https://github.com/go-kit/kit/tree/master/log) (optional) for logging
