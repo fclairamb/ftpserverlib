@@ -422,6 +422,7 @@ func (c *clientHandler) handleCommand(line string) {
 		}
 
 		if cmdDesc == nil {
+			c.logger.Warn("Unknown command", "command", command)
 			c.setLastCommand(command)
 			c.writeMessage(StatusSyntaxErrorNotRecognised, fmt.Sprintf("Unknown command %#v", command))
 

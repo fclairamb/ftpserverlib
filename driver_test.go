@@ -111,6 +111,7 @@ type TestClientDriver struct {
 
 type testFile struct {
 	afero.File
+	errTransfer error
 }
 
 var (
@@ -177,6 +178,11 @@ func (f *testFile) Readdir(count int) ([]os.FileInfo, error) {
 	}
 
 	return f.File.Readdir(count)
+}
+
+// TransferError implements the FileTransferError interface
+func (f *testFile) TransferError(err error) {
+	f.errTransfer = err
 }
 
 // NewTestClientDriver creates a client driver
