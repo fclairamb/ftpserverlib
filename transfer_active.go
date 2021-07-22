@@ -48,6 +48,7 @@ func (c *clientHandler) handlePORT(param string) error {
 
 	c.transferMu.Lock()
 
+	c.lastDataChannel = `active`
 	c.transfer = &activeTransferHandler{
 		raddr:     raddr,
 		settings:  c.server.settings,

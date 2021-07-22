@@ -91,6 +91,7 @@ type clientHandler struct {
 	transferWg          sync.WaitGroup  // wait group for command that open a transfer connection
 	transferMu          sync.Mutex      // this mutex will protect the transfer parameters
 	transfer            transferHandler // Transfer connection (passive or active)s
+	lastDataChannel     string          // Last data channel mode (passive or active)
 	isTransferOpen      bool            // indicate if the transfer connection is opened
 	isTransferAborted   bool            // indicate if the transfer was aborted
 	paramsMutex         sync.RWMutex    // mutex to protect the parameters exposed to the library users
@@ -229,6 +230,14 @@ func (c *clientHandler) GetLastCommand() string {
 	defer c.paramsMutex.RUnlock()
 
 	return c.command
+}
+
+// GetLastDataChannel returns the last data channel mode
+func (c *clientHandler) GetLastDataChannel() string {
+	c.paramsMutex.RLock()
+	defer c.paramsMutex.RUnlock()
+
+	return c.lastDataChannel
 }
 
 func (c *clientHandler) setLastCommand(cmd string) {
