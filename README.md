@@ -114,6 +114,9 @@ type ClientContext interface {
 
 	// GetLastCommand returns the last received command
 	GetLastCommand() string
+
+	// GetLastDataChannel returns the last data channel mode
+	GetLastDataChannel() string
 }
 
 // Settings define all the server settings
