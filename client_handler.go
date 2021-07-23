@@ -247,6 +247,13 @@ func (c *clientHandler) setLastCommand(cmd string) {
 	c.command = cmd
 }
 
+func (c *clientHandler) setLastDataChannel(channel string) {
+	c.paramsMutex.Lock()
+	defer c.paramsMutex.Unlock()
+
+	c.lastDataChannel = channel
+}
+
 func (c *clientHandler) closeTransfer() error {
 	var err error
 	if c.transfer != nil {

@@ -182,9 +182,9 @@ func (c *clientHandler) handlePASV(param string) error {
 	}
 
 	c.transferMu.Lock()
-	c.lastDataChannel = `passive`
 	c.transfer = p
 	c.transferMu.Unlock()
+	c.setLastDataChannel(`passive`)
 
 	return nil
 }
