@@ -10,7 +10,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/fclairamb/ftpserverlib/log"
+	log "github.com/fclairamb/go-log"
 )
 
 // HASHAlgo is the enumerable that represents the supported HASH algorithms
