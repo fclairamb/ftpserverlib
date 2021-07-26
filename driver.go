@@ -149,7 +149,7 @@ type ClientContext interface {
 	GetLastCommand() string
 
 	// GetLastDataChannel returns the last data channel mode
-	GetLastDataChannel() string
+	GetLastDataChannel() DataChannel
 }
 
 // FileTransfer defines the inferface for file transfers.

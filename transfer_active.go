@@ -55,7 +55,7 @@ func (c *clientHandler) handlePORT(param string) error {
 	}
 
 	c.transferMu.Unlock()
-	c.setLastDataChannel(`active`)
+	c.setLastDataChannel(DataChannelActive)
 
 	c.writeMessage(StatusOK, command+" command successful")
 

@@ -87,8 +87,8 @@ func TestLastCommand(t *testing.T) {
 }
 
 func TestLastDataChannel(t *testing.T) {
-	cc := clientHandler{lastDataChannel: `passive`}
-	assert.Equal(t, `passive`, cc.GetLastDataChannel())
+	cc := clientHandler{lastDataChannel: DataChannelPassive}
+	assert.Equal(t, DataChannelPassive, cc.GetLastDataChannel())
 }
 
 func TestTransferOpenError(t *testing.T) {
