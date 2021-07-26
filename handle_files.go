@@ -100,6 +100,9 @@ func (c *clientHandler) transferFile(write bool, append bool, param, info string
 
 	tr, err := c.TransferOpen(info)
 	if err != nil {
+		if fileTransferError, ok := file.(FileTransferError); ok {
+			fileTransferError.TransferError(err)
+		}
 		// an error is already returned to the FTP client
 		// we can stop right here and close the file ignoring close error if any
 		c.closeUnchecked(file)
