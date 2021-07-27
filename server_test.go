@@ -10,7 +10,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/fclairamb/ftpserverlib/log"
+	lognoop "github.com/fclairamb/go-log/noop"
 )
 
 func TestMain(m *testing.M) {
@@ -87,7 +87,7 @@ func TestListenerAcceptErrors(t *testing.T) {
 
 	server := FtpServer{
 		listener: newFakeListener(errNetFake),
-		Logger:   log.Nothing(),
+		Logger:   lognoop.NewNoOpLogger(),
 	}
 	err := server.Serve()
 	require.EqualError(t, err, errListenerAccept.Error())

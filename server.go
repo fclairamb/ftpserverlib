@@ -8,7 +8,8 @@ import (
 	"net"
 	"time"
 
-	"github.com/fclairamb/ftpserverlib/log"
+	log "github.com/fclairamb/go-log"
+	lognoop "github.com/fclairamb/go-log/noop"
 )
 
 var (
@@ -236,7 +237,7 @@ func (server *FtpServer) ListenAndServe() error {
 func NewFtpServer(driver MainDriver) *FtpServer {
 	return &FtpServer{
 		driver: driver,
-		Logger: log.Nothing(),
+		Logger: lognoop.NewNoOpLogger(),
 	}
 }
 
