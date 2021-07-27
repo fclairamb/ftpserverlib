@@ -34,6 +34,15 @@ const (
 	TransferTypeBinary
 )
 
+// DataChannel is the enumerable that represents the data channel (active or passive)
+type DataChannel int
+
+// Supported data channel types
+const (
+	DataChannelPassive DataChannel = iota + 1
+	DataChannelActive
+)
+
 const (
 	maxCommandSize = 4096
 )
@@ -91,6 +100,7 @@ type clientHandler struct {
 	transferWg          sync.WaitGroup  // wait group for command that open a transfer connection
 	transferMu          sync.Mutex      // this mutex will protect the transfer parameters
 	transfer            transferHandler // Transfer connection (passive or active)s
+	lastDataChannel     DataChannel     // Last data channel mode (passive or active)
 	isTransferOpen      bool            // indicate if the transfer connection is opened
 	isTransferAborted   bool            // indicate if the transfer was aborted
 	paramsMutex         sync.RWMutex    // mutex to protect the parameters exposed to the library users
@@ -231,11 +241,26 @@ func (c *clientHandler) GetLastCommand() string {
 	return c.command
 }
 
+// GetLastDataChannel returns the last data channel mode
+func (c *clientHandler) GetLastDataChannel() DataChannel {
+	c.paramsMutex.RLock()
+	defer c.paramsMutex.RUnlock()
+
+	return c.lastDataChannel
+}
+
 func (c *clientHandler) setLastCommand(cmd string) {
 	c.paramsMutex.Lock()
 	defer c.paramsMutex.Unlock()
 
 	c.command = cmd
+}
+
+func (c *clientHandler) setLastDataChannel(channel DataChannel) {
+	c.paramsMutex.Lock()
+	defer c.paramsMutex.Unlock()
+
+	c.lastDataChannel = channel
 }
 
 func (c *clientHandler) closeTransfer() error {

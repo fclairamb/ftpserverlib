@@ -86,6 +86,11 @@ func TestLastCommand(t *testing.T) {
 	assert.Empty(t, cc.GetLastCommand())
 }
 
+func TestLastDataChannel(t *testing.T) {
+	cc := clientHandler{lastDataChannel: DataChannelPassive}
+	assert.Equal(t, DataChannelPassive, cc.GetLastDataChannel())
+}
+
 func TestTransferOpenError(t *testing.T) {
 	s := NewTestServer(t, true)
 	conf := goftp.Config{
