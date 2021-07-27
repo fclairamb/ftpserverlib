@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/fclairamb/ftpserverlib/log"
+	log "github.com/fclairamb/go-log"
 )
 
 // Active/Passive transfer connection handler

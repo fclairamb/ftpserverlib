@@ -11,10 +11,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/fclairamb/go-log/gokit"
 	gklog "github.com/go-kit/kit/log"
 	"github.com/spf13/afero"
-
-	"github.com/fclairamb/ftpserverlib/log/gokit"
 )
 
 type tlsVerificationReply int
