@@ -30,7 +30,17 @@ func (c *clientHandler) handlePORT(param string) error {
 	}
 
 	if err != nil {
-		c.writeMessage(StatusSyntaxErrorNotRecognised, fmt.Sprintf("Problem parsing %s: %v", param, err))
+		c.writeMessage(StatusSyntaxErrorParameters, fmt.Sprintf("Problem parsing %s: %v", param, err))
+
+		return nil
+	}
+
+	err = c.checkDataConnectionRequirement(raddr.IP, DataChannelActive)
+	if err != nil {
+		// we don't want to expose the full error to the client, we just log it
+		c.logger.Warn("Could not validate active data connection requirement", "err", err)
+		c.writeMessage(StatusSyntaxErrorParameters, "Your request does not meet "+
+			"the configured security requirements")
 
 		return nil
 	}

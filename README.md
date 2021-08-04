@@ -26,7 +26,7 @@ If you're interested in a fully featured FTP server, you should use [sftpgo](htt
  * Active socket connections (PORT and EPRT commands)
  * IPv6 support (EPSV + EPRT)
  * Small memory footprint
- * Clean code: No sleep, no panic, no global sync (only around control/transfer connection per client) 
+ * Clean code: No sleep, no panic, no global sync (only around control/transfer connection per client)
  * Uses only the standard library except for:
    * [afero](https://github.com/spf13/afero) for generic file systems handling
    * [go-kit log](https://github.com/go-kit/kit/tree/master/log) (optional) for logging
@@ -48,7 +48,7 @@ If you're interested in a fully featured FTP server, you should use [sftpgo](htt
 The easiest way to test this library is to use [ftpserver](https://github.com/fclairamb/ftpserver).
 
 ## The driver
-The simplest way to get a good understanding of how the driver shall be implemented, you can have a look at the [tests driver](https://github.com/fclairamb/ftpserverlib/blob/master/driver_test.go). 
+The simplest way to get a good understanding of how the driver shall be implemented, you can have a look at the [tests driver](https://github.com/fclairamb/ftpserverlib/blob/master/driver_test.go).
 
 ### The base API
 
@@ -142,6 +142,13 @@ type Settings struct {
 	DisableSYST              bool             // Disable SYST
 	EnableCOMB               bool             // Enable COMB support
 	DefaultTransferType      TransferType     // Transfer type to use if the client don't send the TYPE command
+	// ActiveConnectionsCheck defines the security requirements for active connections
+	ActiveConnectionsCheck DataConnectionRequirement
+	// PasvConnectionsCheck defines the security requirements for passive connections
+	PasvConnectionsCheck DataConnectionRequirement
+	// DataConnectionTrustedNetworks defines trusted networks for IPMatchRelaxed and
+	// IPMatchTrusted security requirements
+	DataConnectionTrustedNetworks []*net.IPNet
 }
 ```
 
@@ -193,7 +200,7 @@ type ClientDriverExtensionHasher interface {
 
 I wanted to make a system which would accept files through FTP and redirect them to something else. Go seemed like the obvious choice and it seemed there was a lot of libraries available but it turns out none of them were in a useable state.
 
-* [micahhausler/go-ftp](https://github.com/micahhausler/go-ftp) is a  minimalistic implementation 
+* [micahhausler/go-ftp](https://github.com/micahhausler/go-ftp) is a  minimalistic implementation
 * [shenfeng/ftpd.go](https://github.com/shenfeng/ftpd.go) is very basic and 4 years old.
 * [yob/graval](https://github.com/yob/graval) is 3 years old and “experimental”.
 * [goftp/server](https://github.com/goftp/server) seemed OK but I couldn't use it on both Filezilla and the MacOs ftp client.

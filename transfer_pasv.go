@@ -35,6 +35,8 @@ type passiveTransferHandler struct {
 	settings    *Settings        // Settings
 	info        string           // transfer info
 	logger      log.Logger       // Logger
+	// data connection requirement checker
+	checkDataConn func(dataConnIP net.IP, channelType DataChannel) error
 }
 
 type ipValidationError struct {
@@ -155,11 +157,12 @@ func (c *clientHandler) handlePASV(param string) error {
 	}
 
 	p := &passiveTransferHandler{
-		tcpListener: tcpListener,
-		listener:    listener,
-		Port:        tcpListener.Addr().(*net.TCPAddr).Port,
-		settings:    c.server.settings,
-		logger:      c.logger,
+		tcpListener:   tcpListener,
+		listener:      listener,
+		Port:          tcpListener.Addr().(*net.TCPAddr).Port,
+		settings:      c.server.settings,
+		logger:        c.logger,
+		checkDataConn: c.checkDataConnectionRequirement,
 	}
 
 	// We should rewrite this part
@@ -200,6 +203,20 @@ func (p *passiveTransferHandler) ConnectionWait(wait time.Duration) (net.Conn, e
 
 		if err != nil {
 			return nil, err
+		}
+
+		ip, err := getIPFromRemoteAddr(p.connection.RemoteAddr())
+		if err != nil {
+			p.logger.Warn("Could get remote passive IP address", "err", err)
+
+			return nil, err
+		}
+
+		if err := p.checkDataConn(ip, DataChannelPassive); err != nil {
+			// we don't want to expose the full error to the client, we just log it
+			p.logger.Warn("Could not validate passive data connection requirement", "err", err)
+
+			return nil, &ipValidationError{error: "data connection security requirements not met"}
 		}
 	}
 

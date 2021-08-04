@@ -185,6 +185,24 @@ const (
 	ImplicitEncryption
 )
 
+// DataConnectionRequirement is the enumerable that represents the supported
+// protection mode for data channels
+type DataConnectionRequirement int
+
+// Supported data connection requirements
+const (
+	// IPMatchRequired requires matching peer IP addresses of control and data connection
+	IPMatchRequired DataConnectionRequirement = iota
+	// IPMatchRelaxed requires matching peer IP addresses of control and data connection
+	// or the data connection IP address within the configured trusted networks, if any
+	IPMatchRelaxed
+	// IPMatchTrusted requires data connection IP address within the configured trusted
+	// networks
+	IPMatchTrusted
+	// IPMatchDisabled disables checking peer IP addresses of control and data connection
+	IPMatchDisabled
+)
+
 // Settings defines all the server settings
 // nolint: maligned
 type Settings struct {
@@ -209,4 +227,11 @@ type Settings struct {
 	DisableSYST              bool             // Disable SYST
 	EnableCOMB               bool             // Enable COMB support
 	DefaultTransferType      TransferType     // Transfer type to use if the client don't send the TYPE command
+	// ActiveConnectionsCheck defines the security requirements for active connections
+	ActiveConnectionsCheck DataConnectionRequirement
+	// PasvConnectionsCheck defines the security requirements for passive connections
+	PasvConnectionsCheck DataConnectionRequirement
+	// DataConnectionTrustedNetworks defines trusted networks for IPMatchRelaxed and
+	// IPMatchTrusted security requirements
+	DataConnectionTrustedNetworks []*net.IPNet
 }
