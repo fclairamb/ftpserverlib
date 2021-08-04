@@ -987,7 +987,7 @@ func TestPASVIPMatch(t *testing.T) {
 		if mode == IPMatchRequired {
 			require.Equal(t, "425 data connection security requirements not met", strings.TrimSpace(resp))
 		} else {
-			require.Equal(t, "150 Using transfer connection", strings.TrimSpace(resp))
+			require.True(t, strings.HasPrefix(resp, "150 Using transfer connection"))
 		}
 	}
 }
