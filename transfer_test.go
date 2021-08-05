@@ -836,6 +836,26 @@ func TestASCIITransfersInvalidFiles(t *testing.T) {
 	require.Equal(t, localHash, remoteHash)
 }
 
+func TestPASVWrappedListenerError(t *testing.T) {
+	s := NewTestServerWithDriver(t, &TestServerDriver{
+		Debug:              true,
+		errPassiveListener: net.ErrClosed,
+	})
+	conf := goftp.Config{
+		User:     authUser,
+		Password: authPass,
+	}
+	c, err := goftp.DialConfig(conf, s.Addr())
+	require.NoError(t, err, "Couldn't connect")
+
+	defer func() { require.NoError(t, c.Close()) }()
+
+	_, err = c.ReadDir("/")
+	if assert.Error(t, err) {
+		assert.Contains(t, err.Error(), "421-Could not listen for passive connection")
+	}
+}
+
 func TestPASVInvalidPublicHost(t *testing.T) {
 	s := NewTestServer(t, true)
 	s.settings.PublicHost = "not an IP"

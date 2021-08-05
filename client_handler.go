@@ -635,16 +635,6 @@ func (c *clientHandler) TransferClose(err error) {
 	}
 }
 
-func (c *clientHandler) isDataConnectionIPTrusted(dataConnIP net.IP) bool {
-	for _, cidrNet := range c.server.settings.DataConnectionTrustedNetworks {
-		if cidrNet.Contains(dataConnIP) {
-			return true
-		}
-	}
-
-	return false
-}
-
 func (c *clientHandler) checkDataConnectionRequirement(dataConnIP net.IP, channelType DataChannel) error {
 	var requirement DataConnectionRequirement
 
@@ -656,13 +646,7 @@ func (c *clientHandler) checkDataConnectionRequirement(dataConnIP net.IP, channe
 	}
 
 	switch requirement {
-	case IPMatchRequired, IPMatchRelaxed:
-		if requirement == IPMatchRelaxed {
-			if c.isDataConnectionIPTrusted(dataConnIP) {
-				return nil
-			}
-		}
-
+	case IPMatchRequired:
 		controlConnIP, err := getIPFromRemoteAddr(c.RemoteAddr())
 		if err != nil {
 			return err
@@ -672,15 +656,6 @@ func (c *clientHandler) checkDataConnectionRequirement(dataConnIP net.IP, channe
 			return &ipValidationError{error: fmt.Sprintf("data connection ip address %v "+
 				"does not match control connection ip address %v",
 				dataConnIP, controlConnIP)}
-		}
-
-		return nil
-
-	case IPMatchTrusted:
-		if !c.isDataConnectionIPTrusted(dataConnIP) {
-			return &ipValidationError{error: fmt.Sprintf("data connection ip address %v "+
-				"is not trusted and strict checking is configured",
-				dataConnIP)}
 		}
 
 		return nil

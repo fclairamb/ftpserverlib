@@ -144,16 +144,26 @@ func (c *clientHandler) handlePASV(param string) error {
 	// The listener will either be plain TCP or TLS
 	var listener net.Listener
 
+	listener = tcpListener
+
+	if wrapper, ok := c.server.driver.(MainDriverExtensionPassiveWrapper); ok {
+		listener, err = wrapper.WrapPassiveListener(listener)
+		if err != nil {
+			c.logger.Error("Could not wrap passive connection", "err", err)
+			c.writeMessage(StatusServiceNotAvailable, fmt.Sprintf("Could not listen for passive connection: %v", err))
+
+			return nil
+		}
+	}
+
 	if c.HasTLSForTransfers() || c.server.settings.TLSRequired == ImplicitEncryption {
 		if tlsConfig, err := c.server.driver.GetTLSConfig(); err == nil {
-			listener = tls.NewListener(tcpListener, tlsConfig)
+			listener = tls.NewListener(listener, tlsConfig)
 		} else {
 			c.writeMessage(StatusServiceNotAvailable, fmt.Sprintf("Cannot get a TLS config: %v", err))
 
 			return nil
 		}
-	} else {
-		listener = tcpListener
 	}
 
 	p := &passiveTransferHandler{

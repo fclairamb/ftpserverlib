@@ -404,9 +404,6 @@ func (*testNetListener) Addr() net.Addr {
 }
 
 func TestDataConnectionRequirements(t *testing.T) {
-	_, trustedCIDR, err := net.ParseCIDR("192.168.1.0/24")
-	require.NoError(t, err)
-
 	controlConnIP := net.ParseIP("192.168.1.1")
 
 	c := clientHandler{
@@ -415,37 +412,19 @@ func TestDataConnectionRequirements(t *testing.T) {
 		},
 		server: &FtpServer{
 			settings: &Settings{
-				PasvConnectionsCheck:          IPMatchRequired,
-				ActiveConnectionsCheck:        IPMatchRequired,
-				DataConnectionTrustedNetworks: []*net.IPNet{trustedCIDR},
+				PasvConnectionsCheck:   IPMatchRequired,
+				ActiveConnectionsCheck: IPMatchRequired,
 			},
 		},
 	}
 
-	err = c.checkDataConnectionRequirement(controlConnIP, DataChannelPassive)
+	err := c.checkDataConnectionRequirement(controlConnIP, DataChannelPassive)
 	assert.NoError(t, err) // ip match
 
 	err = c.checkDataConnectionRequirement(net.ParseIP("192.168.1.2"), DataChannelActive)
 	if assert.Error(t, err) {
 		assert.Contains(t, err.Error(), "does not match control connection ip address")
 	}
-
-	err = c.checkDataConnectionRequirement(net.ParseIP("192.168.1.2"), DataChannelPassive)
-	assert.Error(t, err) // the IP is in a trusted network but we configured IPMatchRequired
-
-	c.server.settings.PasvConnectionsCheck = IPMatchRelaxed
-	err = c.checkDataConnectionRequirement(net.ParseIP("192.168.1.2"), DataChannelPassive)
-	assert.NoError(t, err)
-
-	c.server.settings.PasvConnectionsCheck = IPMatchTrusted
-	err = c.checkDataConnectionRequirement(net.ParseIP("192.168.1.2"), DataChannelPassive)
-	assert.NoError(t, err)
-
-	err = c.checkDataConnectionRequirement(net.ParseIP("192.168.0.2"), DataChannelPassive)
-	assert.Error(t, err) // IP is not trusted
-
-	c.server.settings.DataConnectionTrustedNetworks = nil
-	c.server.settings.PasvConnectionsCheck = IPMatchRequired
 
 	c.conn = &testNetConn{
 		remoteAddr: &net.IPAddr{IP: controlConnIP},
@@ -477,64 +456,3 @@ func TestDataConnectionRequirements(t *testing.T) {
 		assert.Contains(t, err.Error(), "unhandled data connection requirement")
 	}
 }
-
-/*func TestDataConnectionRequirements(t *testing.T) {
-	_, trustedCIDR, err := net.ParseCIDR("192.168.1.0/24")
-	require.NoError(t, err)
-
-	c := clientHandler{
-		conn: &testNetConn{
-			remoteAddr: &net.TCPAddr{IP: net.ParseIP("192.168.1.1"), Port: 21},
-		},
-		server: &FtpServer{
-			settings: &Settings{
-				DataConnectionCheck:           IPMatchRequired,
-				DataConnectionTrustedNetworks: []*net.IPNet{trustedCIDR},
-			},
-		},
-	}
-
-	err = c.checkDataConnectionRequirement(net.ParseIP("192.168.1.2"))
-	assert.NoError(t, err) // trusted network
-
-	c.server.settings.DataConnectionTrustedNetworks = nil
-	err = c.checkDataConnectionRequirement(net.ParseIP("192.168.1.2")) // wrong ip
-
-	if assert.Error(t, err) {
-		assert.Contains(t, err.Error(), "does not match control connection ip address")
-	}
-
-	err = c.checkDataConnectionRequirement(net.ParseIP("192.168.1.1"))
-	assert.NoError(t, err)
-
-	// missing address in remote addr
-	c.conn = &testNetConn{
-		remoteAddr: &net.IPAddr{IP: net.ParseIP("192.168.1.1")},
-	}
-
-	err = c.checkDataConnectionRequirement(net.ParseIP("192.168.1.2"))
-	assert.Error(t, err)
-
-	// nil remote address
-	c.conn = &testNetConn{}
-	err = c.checkDataConnectionRequirement(net.ParseIP("192.168.1.1"))
-	assert.Error(t, err)
-
-	// invalid IP
-	c.conn = &testNetConn{
-		remoteAddr: &net.TCPAddr{IP: nil, Port: 21},
-	}
-
-	err = c.checkDataConnectionRequirement(net.ParseIP("2001:db8::69"))
-	if assert.Error(t, err) {
-		assert.Contains(t, err.Error(), "invalid remote IP")
-	}
-
-	// invalid setting
-	c.server.settings.DataConnectionCheck = 100
-	err = c.checkDataConnectionRequirement(net.ParseIP("192.168.1.1"))
-
-	if assert.Error(t, err) {
-		assert.Contains(t, err.Error(), "unhandled data connection requirement")
-	}
-}*/
