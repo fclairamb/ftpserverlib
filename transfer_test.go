@@ -839,7 +839,7 @@ func TestASCIITransfersInvalidFiles(t *testing.T) {
 func TestPASVWrappedListenerError(t *testing.T) {
 	s := NewTestServerWithDriver(t, &TestServerDriver{
 		Debug:              true,
-		errPassiveListener: net.ErrClosed,
+		errPassiveListener: os.ErrClosed,
 	})
 	conf := goftp.Config{
 		User:     authUser,
