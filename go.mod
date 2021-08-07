@@ -1,4 +1,4 @@
-module github.com/fclairamb/ftpserver
+module github.com/r0123r/ftpserver
 
 require (
 	github.com/go-kit/kit v0.8.0
