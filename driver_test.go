@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 	"io/ioutil"
+	"net"
 	"os"
 	"strings"
 	"sync"
@@ -101,6 +102,7 @@ type TestServerDriver struct {
 	clientMU             sync.Mutex
 	Clients              []ClientContext
 	TLSVerificationReply tlsVerificationReply
+	errPassiveListener   error
 }
 
 // TestClientDriver defines a minimal serverftp client driver
@@ -324,6 +326,14 @@ func (driver *TestServerDriver) VerifyConnection(cc ClientContext, user string,
 	}
 
 	return nil, nil
+}
+
+func (driver *TestServerDriver) WrapPassiveListener(listener net.Listener) (net.Listener, error) {
+	if driver.errPassiveListener != nil {
+		return nil, driver.errPassiveListener
+	}
+
+	return listener, nil
 }
 
 // OpenFile opens a file in 3 possible modes: read, write, appending write (use appropriate flags)

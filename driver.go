@@ -33,12 +33,21 @@ type MainDriver interface {
 // MainDriverExtensionTLSVerifier is an extension that allows to verify the TLS connection
 // estabilished on the control channel
 type MainDriverExtensionTLSVerifier interface {
-
 	// VerifyConnection is called when receiving the "USER" command.
 	// If it returns a non-nil error, the client will receive a 530 error and it will be disconnected.
 	// If it returns a non-nil ClientDriver and a nil error the client will be authenticated.
 	// If it returns a nil ClientDriver and a nil error the user password is required
 	VerifyConnection(cc ClientContext, user string, tlsConn *tls.Conn) (ClientDriver, error)
+}
+
+// MainDriverExtensionPassiveWrapper is an extension that allows to wrap the listener
+// used for passive connection
+type MainDriverExtensionPassiveWrapper interface {
+	// WrapPassiveListener is called after creating the listener for passive
+	// data connections.
+	// You can wrap the passed listener or just return it unmodified.
+	// Returning an error will cause the passive connection to fail
+	WrapPassiveListener(listener net.Listener) (net.Listener, error)
 }
 
 // ClientDriver is the base FS implementation that allows to manipulate files
@@ -185,6 +194,18 @@ const (
 	ImplicitEncryption
 )
 
+// DataConnectionRequirement is the enumerable that represents the supported
+// protection mode for data channels
+type DataConnectionRequirement int
+
+// Supported data connection requirements
+const (
+	// IPMatchRequired requires matching peer IP addresses of control and data connection
+	IPMatchRequired DataConnectionRequirement = iota
+	// IPMatchDisabled disables checking peer IP addresses of control and data connection
+	IPMatchDisabled
+)
+
 // Settings defines all the server settings
 // nolint: maligned
 type Settings struct {
@@ -209,4 +230,8 @@ type Settings struct {
 	DisableSYST              bool             // Disable SYST
 	EnableCOMB               bool             // Enable COMB support
 	DefaultTransferType      TransferType     // Transfer type to use if the client don't send the TYPE command
+	// ActiveConnectionsCheck defines the security requirements for active connections
+	ActiveConnectionsCheck DataConnectionRequirement
+	// PasvConnectionsCheck defines the security requirements for passive connections
+	PasvConnectionsCheck DataConnectionRequirement
 }

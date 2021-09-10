@@ -344,3 +344,115 @@ func TestUnknownCommand(t *testing.T) {
 	require.Equal(t, StatusSyntaxErrorNotRecognised, rc)
 	require.Equal(t, fmt.Sprintf("Unknown command %#v", cmd), response)
 }
+
+// testNetConn implements net.Conn interface
+type testNetConn struct {
+	remoteAddr net.Addr
+}
+
+func (*testNetConn) Read(b []byte) (n int, err error) {
+	return
+}
+
+func (*testNetConn) Write(b []byte) (n int, err error) {
+	return
+}
+
+func (*testNetConn) Close() error {
+	return nil
+}
+
+func (*testNetConn) LocalAddr() net.Addr {
+	return nil
+}
+
+func (c *testNetConn) RemoteAddr() net.Addr {
+	return c.remoteAddr
+}
+
+func (*testNetConn) SetDeadline(t time.Time) error {
+	return nil
+}
+
+func (*testNetConn) SetReadDeadline(t time.Time) error {
+	return nil
+}
+
+func (*testNetConn) SetWriteDeadline(t time.Time) error {
+	return nil
+}
+
+// testNetListener implements net.Listener interface
+type testNetListener struct {
+	conn net.Conn
+}
+
+func (l *testNetListener) Accept() (net.Conn, error) {
+	if l.conn != nil {
+		return l.conn, nil
+	}
+
+	return nil, &net.AddrError{}
+}
+
+func (*testNetListener) Close() error {
+	return nil
+}
+
+func (*testNetListener) Addr() net.Addr {
+	return nil
+}
+
+func TestDataConnectionRequirements(t *testing.T) {
+	controlConnIP := net.ParseIP("192.168.1.1")
+
+	c := clientHandler{
+		conn: &testNetConn{
+			remoteAddr: &net.TCPAddr{IP: controlConnIP, Port: 21},
+		},
+		server: &FtpServer{
+			settings: &Settings{
+				PasvConnectionsCheck:   IPMatchRequired,
+				ActiveConnectionsCheck: IPMatchRequired,
+			},
+		},
+	}
+
+	err := c.checkDataConnectionRequirement(controlConnIP, DataChannelPassive)
+	assert.NoError(t, err) // ip match
+
+	err = c.checkDataConnectionRequirement(net.ParseIP("192.168.1.2"), DataChannelActive)
+	if assert.Error(t, err) {
+		assert.Contains(t, err.Error(), "does not match control connection ip address")
+	}
+
+	c.conn = &testNetConn{
+		remoteAddr: &net.IPAddr{IP: controlConnIP},
+	}
+
+	err = c.checkDataConnectionRequirement(controlConnIP, DataChannelPassive)
+	assert.Error(t, err)
+
+	// nil remote address
+	c.conn = &testNetConn{}
+	err = c.checkDataConnectionRequirement(controlConnIP, DataChannelActive)
+	assert.Error(t, err)
+
+	// invalid IP
+	c.conn = &testNetConn{
+		remoteAddr: &net.TCPAddr{IP: nil, Port: 21},
+	}
+
+	err = c.checkDataConnectionRequirement(controlConnIP, DataChannelPassive)
+	if assert.Error(t, err) {
+		assert.Contains(t, err.Error(), "invalid remote IP")
+	}
+
+	// invalid setting
+	c.server.settings.PasvConnectionsCheck = 100
+	err = c.checkDataConnectionRequirement(controlConnIP, DataChannelPassive)
+
+	if assert.Error(t, err) {
+		assert.Contains(t, err.Error(), "unhandled data connection requirement")
+	}
+}

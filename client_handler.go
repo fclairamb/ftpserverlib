@@ -635,6 +635,56 @@ func (c *clientHandler) TransferClose(err error) {
 	}
 }
 
+func (c *clientHandler) checkDataConnectionRequirement(dataConnIP net.IP, channelType DataChannel) error {
+	var requirement DataConnectionRequirement
+
+	switch channelType {
+	case DataChannelActive:
+		requirement = c.server.settings.ActiveConnectionsCheck
+	case DataChannelPassive:
+		requirement = c.server.settings.PasvConnectionsCheck
+	}
+
+	switch requirement {
+	case IPMatchRequired:
+		controlConnIP, err := getIPFromRemoteAddr(c.RemoteAddr())
+		if err != nil {
+			return err
+		}
+
+		if !controlConnIP.Equal(dataConnIP) {
+			return &ipValidationError{error: fmt.Sprintf("data connection ip address %v "+
+				"does not match control connection ip address %v",
+				dataConnIP, controlConnIP)}
+		}
+
+		return nil
+	case IPMatchDisabled:
+		return nil
+	default:
+		return &ipValidationError{error: fmt.Sprintf("unhandled data connection requirement: %v",
+			requirement)}
+	}
+}
+
+func getIPFromRemoteAddr(remoteAddr net.Addr) (net.IP, error) {
+	if remoteAddr == nil {
+		return nil, &ipValidationError{error: "nil remote address"}
+	}
+
+	ip, _, err := net.SplitHostPort(remoteAddr.String())
+	if err != nil {
+		return nil, err
+	}
+
+	remoteIP := net.ParseIP(ip)
+	if remoteIP == nil {
+		return nil, &ipValidationError{error: fmt.Sprintf("invalid remote IP: %v", ip)}
+	}
+
+	return remoteIP, nil
+}
+
 func parseLine(line string) (string, string) {
 	params := strings.SplitN(line, " ", 2)
 	if len(params) == 1 {

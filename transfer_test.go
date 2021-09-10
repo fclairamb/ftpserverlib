@@ -9,11 +9,15 @@ import (
 	"io"
 	"io/ioutil"
 	"math/rand"
+	"net"
 	"os"
 	"runtime"
+	"strconv"
 	"strings"
 	"testing"
+	"time"
 
+	lognoop "github.com/fclairamb/go-log/noop"
 	"github.com/secsy/goftp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -325,32 +329,41 @@ func TestBogusTransferStart(t *testing.T) {
 	{ // Completely bogus port declaration
 		status, resp, err := rc.SendCommand("PORT something")
 		require.NoError(t, err)
-		require.Equal(t, StatusSyntaxErrorNotRecognised, status, resp)
+		require.Equal(t, StatusSyntaxErrorParameters, status, resp)
 	}
 
 	{ // Completely bogus port declaration
 		status, resp, err := rc.SendCommand("EPRT something")
 		require.NoError(t, err)
-		require.Equal(t, StatusSyntaxErrorNotRecognised, status, resp)
+		require.Equal(t, StatusSyntaxErrorParameters, status, resp)
 	}
 
 	{ // Bad port number: 0
 		status, resp, err := rc.SendCommand("EPRT |2|::1|0|")
 		require.NoError(t, err)
-		require.Equal(t, StatusSyntaxErrorNotRecognised, status, resp)
+		require.Equal(t, StatusSyntaxErrorParameters, status, resp)
 	}
 
 	{ // Bad IP
 		status, resp, err := rc.SendCommand("EPRT |1|253.254.255.256|2000|")
 		require.NoError(t, err)
-		require.Equal(t, StatusSyntaxErrorNotRecognised, status, resp)
+		require.Equal(t, StatusSyntaxErrorParameters, status, resp)
 	}
 
 	{ // Bad protocol type: 3
 		status, resp, err := rc.SendCommand("EPRT |3|::1|2000|")
 		require.NoError(t, err)
-		require.Equal(t, StatusSyntaxErrorNotRecognised, status, resp)
+		require.Equal(t, StatusSyntaxErrorParameters, status, resp)
 	}
+
+	{ // good request but unacceptable ip address
+		status, resp, err := rc.SendCommand("EPRT |1|::1|2000|")
+		require.NoError(t, err)
+		require.Equal(t, StatusSyntaxErrorParameters, status, resp)
+		require.Contains(t, resp, "Your request does not meet the configured security requirements")
+	}
+
+	s.settings.ActiveConnectionsCheck = IPMatchDisabled
 
 	{ // We end-up on a positive note
 		status, resp, err := rc.SendCommand("EPRT |1|::1|2000|")
@@ -823,6 +836,26 @@ func TestASCIITransfersInvalidFiles(t *testing.T) {
 	require.Equal(t, localHash, remoteHash)
 }
 
+func TestPASVWrappedListenerError(t *testing.T) {
+	s := NewTestServerWithDriver(t, &TestServerDriver{
+		Debug:              true,
+		errPassiveListener: os.ErrClosed,
+	})
+	conf := goftp.Config{
+		User:     authUser,
+		Password: authPass,
+	}
+	c, err := goftp.DialConfig(conf, s.Addr())
+	require.NoError(t, err, "Couldn't connect")
+
+	defer func() { require.NoError(t, c.Close()) }()
+
+	_, err = c.ReadDir("/")
+	if assert.Error(t, err) {
+		assert.Contains(t, err.Error(), "421-Could not listen for passive connection")
+	}
+}
+
 func TestPASVInvalidPublicHost(t *testing.T) {
 	s := NewTestServer(t, true)
 	s.settings.PublicHost = "not an IP"
@@ -859,4 +892,162 @@ func TestPASVInvalidPublicHost(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, StatusServiceNotAvailable, rc)
 	require.Contains(t, resp, "invalid passive IP")
+}
+
+func TestPASVConnectionWait(t *testing.T) {
+	addr, err := net.ResolveTCPAddr("tcp", ":0")
+	require.NoError(t, err)
+
+	tcpListener, err := net.ListenTCP("tcp", addr)
+	require.NoError(t, err)
+
+	c := clientHandler{
+		conn: &testNetConn{
+			remoteAddr: &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: 21},
+		},
+		server: &FtpServer{
+			settings: &Settings{
+				PasvConnectionsCheck:   IPMatchRequired,
+				ActiveConnectionsCheck: IPMatchRequired,
+			},
+		},
+	}
+
+	p := passiveTransferHandler{
+		listener: &testNetListener{
+			conn: &testNetConn{
+				remoteAddr: &net.TCPAddr{IP: nil, Port: 21}, // invalid IP
+			},
+		},
+		tcpListener:   tcpListener,
+		Port:          tcpListener.Addr().(*net.TCPAddr).Port,
+		settings:      c.server.settings,
+		logger:        lognoop.NewNoOpLogger(),
+		checkDataConn: c.checkDataConnectionRequirement,
+	}
+
+	defer func() {
+		err = p.Close()
+		assert.NoError(t, err)
+	}()
+
+	_, err = p.ConnectionWait(1 * time.Second)
+	if assert.Error(t, err) {
+		assert.Contains(t, err.Error(), "invalid remote IP")
+	}
+
+	p.listener = &testNetListener{
+		conn: &testNetConn{
+			remoteAddr: &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: 21},
+		},
+	}
+
+	_, err = p.ConnectionWait(1 * time.Second)
+	assert.NoError(t, err)
+}
+
+func TestPASVIPMatch(t *testing.T) {
+	s := NewTestServer(t, true)
+
+	conn, err := net.DialTimeout("tcp", s.Addr(), 5*time.Second)
+	require.NoError(t, err)
+
+	defer func() {
+		err = conn.Close()
+		require.NoError(t, err)
+	}()
+
+	buf := make([]byte, 1024)
+	n, err := conn.Read(buf)
+	require.NoError(t, err)
+
+	resp := string(buf[:n])
+	require.Equal(t, "220 TEST Server\r\n", resp)
+
+	loginConnection(t, conn)
+
+	for _, mode := range []DataConnectionRequirement{IPMatchRequired, IPMatchDisabled} {
+		s.settings.PasvConnectionsCheck = mode
+
+		_, err = conn.Write([]byte("PASV\r\n"))
+		require.NoError(t, err)
+
+		n, err := conn.Read(buf)
+		require.NoError(t, err)
+
+		resp := string(buf[:n])
+		port := getPortFromPASVResponse(t, resp)
+		assert.NotEqual(t, 0, port)
+
+		_, err = conn.Write([]byte("LIST\r\n"))
+		require.NoError(t, err)
+
+		addr := net.JoinHostPort("127.0.0.1", strconv.Itoa(port))
+		// now dial from 127.0.1.1 instead of 127.0.0.1
+		d := net.Dialer{
+			LocalAddr: &net.TCPAddr{
+				IP:   net.ParseIP("127.0.1.1"),
+				Port: 0,
+			},
+			Timeout: 5 * time.Second,
+		}
+		dataConn, err := d.Dial("tcp", addr)
+		require.NoError(t, err)
+
+		defer func() {
+			err = dataConn.Close()
+			assert.NoError(t, err)
+		}()
+
+		n, err = conn.Read(buf)
+		require.NoError(t, err)
+
+		resp = string(buf[:n])
+
+		if mode == IPMatchRequired {
+			require.Equal(t, "425 data connection security requirements not met", strings.TrimSpace(resp))
+		} else {
+			require.True(t, strings.HasPrefix(resp, "150 Using transfer connection"))
+		}
+	}
+}
+
+func loginConnection(t *testing.T, conn net.Conn) {
+	buf := make([]byte, 1024)
+	_, err := conn.Write([]byte(fmt.Sprintf("USER %v\r\n", authUser)))
+	require.NoError(t, err)
+
+	n, err := conn.Read(buf)
+	require.NoError(t, err)
+
+	resp := string(buf[:n])
+	require.True(t, strings.HasPrefix(resp, "331"))
+
+	_, err = conn.Write([]byte(fmt.Sprintf("PASS %v\r\n", authPass)))
+	require.NoError(t, err)
+
+	n, err = conn.Read(buf)
+	require.NoError(t, err)
+
+	resp = string(buf[:n])
+	require.True(t, strings.HasPrefix(resp, "230"))
+}
+
+func getPortFromPASVResponse(t *testing.T, resp string) int {
+	port := 0
+	resp = strings.Replace(resp, "227 Entering Passive Mode", "", 1)
+	resp = strings.Replace(resp, "(", "", 1)
+	resp = strings.Replace(resp, ")", "", 1)
+	resp = strings.TrimSpace(resp)
+	respParts := strings.Split(resp, ",")
+	require.Len(t, respParts, 6)
+
+	for i, part := range respParts[4:6] {
+		portOctet, err := strconv.Atoi(part)
+		require.NoError(t, err)
+
+		port |= portOctet << (byte(1-i) * 8)
+	}
+
+	return port
 }
