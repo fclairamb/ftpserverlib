@@ -95,6 +95,7 @@ func (a *activeTransferHandler) Open() (net.Conn, error) {
 
 	if !a.settings.ActiveTransferPortNon20 {
 		dialer.LocalAddr, _ = net.ResolveTCPAddr("tcp", ":20")
+		dialer.Control = Control
 	}
 	// TODO(mgenov): support dialing with timeout
 	// Issues:
