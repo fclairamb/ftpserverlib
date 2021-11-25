@@ -115,6 +115,20 @@ func (server *FtpServer) loadSettings() error {
 		return err
 	}
 
+	if s.PublicHost != "" {
+		parsedIP := net.ParseIP(s.PublicHost)
+		if parsedIP == nil {
+			return &ipValidationError{error: fmt.Sprintf("invalid passive IP %#v", s.PublicHost)}
+		}
+
+		parsedIP = parsedIP.To4()
+		if parsedIP == nil {
+			return &ipValidationError{error: fmt.Sprintf("invalid IPv4 passive IP %#v", s.PublicHost)}
+		}
+
+		s.PublicHost = parsedIP.String()
+	}
+
 	if s.Listener == nil && s.ListenAddr == "" {
 		s.ListenAddr = "0.0.0.0:2121"
 	}
@@ -275,10 +289,10 @@ func (server *FtpServer) clientArrival(conn net.Conn) {
 	c := server.newClientHandler(conn, id, server.settings.DefaultTransferType)
 	go c.HandleCommands()
 
-	c.logger.Info("Client connected", "clientIp", conn.RemoteAddr())
+	c.logger.Debug("Client connected", "clientIp", conn.RemoteAddr())
 }
 
 // clientDeparture
 func (server *FtpServer) clientDeparture(c *clientHandler) {
-	c.logger.Info("Client disconnected", "clientIp", c.conn.RemoteAddr())
+	c.logger.Debug("Client disconnected", "clientIp", c.conn.RemoteAddr())
 }

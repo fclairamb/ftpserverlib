@@ -856,9 +856,8 @@ func TestPASVWrappedListenerError(t *testing.T) {
 	}
 }
 
-func TestPASVInvalidPublicHost(t *testing.T) {
+func TestPASVPublicIPResolver(t *testing.T) {
 	s := NewTestServer(t, true)
-	s.settings.PublicHost = "not an IP"
 
 	conf := goftp.Config{
 		User:     authUser,
@@ -873,25 +872,24 @@ func TestPASVInvalidPublicHost(t *testing.T) {
 	raw, err := c.OpenRawConn()
 	require.NoError(t, err, "Couldn't open raw connection")
 
+	s.settings.PublicHost = ""
+	s.settings.PublicIPResolver = func(cc ClientContext) (string, error) {
+		return "127.0.0", nil
+	}
+	// we crash if the PublicIPResolver returns an invalid IP, this must be fixed outside the lib
 	rc, resp, err := raw.SendCommand("PASV")
 	require.NoError(t, err)
 	require.Equal(t, StatusServiceNotAvailable, rc)
 	require.Contains(t, resp, "invalid passive IP")
 
-	s.settings.PublicHost = "::1"
-	rc, resp, err = raw.SendCommand("PASV")
-	require.NoError(t, err)
-	require.Equal(t, StatusServiceNotAvailable, rc)
-	require.Contains(t, resp, "invalid IPv4 passive IP")
-
-	s.settings.PublicHost = ""
 	s.settings.PublicIPResolver = func(cc ClientContext) (string, error) {
-		return "127.0.0", nil
+		return "", errConnectionNotAllowed
 	}
+
 	rc, resp, err = raw.SendCommand("PASV")
 	require.NoError(t, err)
 	require.Equal(t, StatusServiceNotAvailable, rc)
-	require.Contains(t, resp, "invalid passive IP")
+	require.Contains(t, resp, "couldn't fetch public IP")
 }
 
 func TestPASVConnectionWait(t *testing.T) {
