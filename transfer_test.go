@@ -1012,7 +1012,7 @@ func TestPASVIPMatch(t *testing.T) {
 
 func loginConnection(t *testing.T, conn net.Conn) {
 	buf := make([]byte, 1024)
-	_, err := conn.Write([]byte(fmt.Sprintf("USER %v\r\n", authUser)))
+	_, err := fmt.Fprintf(conn, "USER %v\r\n", authUser)
 	require.NoError(t, err)
 
 	n, err := conn.Read(buf)
@@ -1021,7 +1021,7 @@ func loginConnection(t *testing.T, conn net.Conn) {
 	resp := string(buf[:n])
 	require.True(t, strings.HasPrefix(resp, "331"))
 
-	_, err = conn.Write([]byte(fmt.Sprintf("PASS %v\r\n", authPass)))
+	_, err = fmt.Fprintf(conn, "PASS %v\r\n", authPass)
 	require.NoError(t, err)
 
 	n, err = conn.Read(buf)

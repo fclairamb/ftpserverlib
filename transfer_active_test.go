@@ -12,7 +12,7 @@ import (
 
 func testRegexMatch(t *testing.T, regexp *regexp.Regexp, strings []string, expectedMatch bool) {
 	for _, s := range strings {
-		if regexp.Match([]byte(s)) != expectedMatch {
+		if regexp.MatchString(s) != expectedMatch {
 			t.Errorf("Invalid match result: %s", s)
 		}
 	}

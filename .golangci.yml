@@ -42,6 +42,7 @@ linters-settings:
       # enable or disable analyzers by name
       enable:
         - atomicalign
+      #  - fieldalignment
       enable-all: false
       disable:
         - shadow
@@ -183,16 +184,17 @@ linters:
         - goerr113
         - gofmt
         - goimports
-        - golint
+        # - golint --> revive
+        - revive
         # - gomnd
         - goprintffuncname
         - gosec
         - gosimple
         - govet
         - ineffassign
-        - interfacer
+        # - interfacer --> (deprecated)
         - lll
-        - maligned
+        # - maligned --> govet:fieldalignment
         - megacheck
         - misspell
         - nakedret
@@ -201,7 +203,8 @@ linters:
         - prealloc
         - nolintlint
         - rowserrcheck
-        - scopelint
+        # - scopelint --> exportloopref
+        - exportloopref 
         - staticcheck
         - structcheck
         - stylecheck

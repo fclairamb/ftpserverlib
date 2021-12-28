@@ -1,7 +1,7 @@
 //go:build linux || freebsd || darwin || aix || dragonfly || netbsd || openbsd || solaris
 // +build linux freebsd darwin aix dragonfly netbsd openbsd solaris
 
-package ftpserver // nolint
+package ftpserver
 
 import (
 	"syscall"

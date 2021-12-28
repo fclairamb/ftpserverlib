@@ -1,4 +1,4 @@
-package ftpserver // nolint
+package ftpserver
 
 import "errors"
 
