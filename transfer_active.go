@@ -95,6 +95,7 @@ func (a *activeTransferHandler) Open() (net.Conn, error) {
 
 	if !a.settings.ActiveTransferPortNon20 {
 		dialer.LocalAddr, _ = net.ResolveTCPAddr("tcp", ":20")
+		dialer.Control = Control
 	}
 	// TODO(mgenov): support dialing with timeout
 	// Issues:
@@ -137,7 +138,7 @@ var ErrRemoteAddrFormat = errors.New("remote address has a bad format")
 // Host: 192.168.150.80
 // Port: (14 * 256) + 148
 func parsePORTAddr(param string) (*net.TCPAddr, error) {
-	if !remoteAddrRegex.Match([]byte(param)) {
+	if !remoteAddrRegex.MatchString(param) {
 		return nil, fmt.Errorf("could not parse %s: %w", param, ErrRemoteAddrFormat)
 	}
 
