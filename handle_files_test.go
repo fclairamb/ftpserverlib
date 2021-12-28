@@ -555,7 +555,7 @@ func TestCustomHASHCommands(t *testing.T) {
 
 	tempFile, err := ioutil.TempFile("", "ftpserver")
 	require.NoError(t, err)
-	_, err = tempFile.Write([]byte("sample data with know checksum/hash\n"))
+	_, err = tempFile.WriteString("sample data with know checksum/hash\n")
 	require.NoError(t, err)
 
 	ftpUpload(t, c, tempFile, "file.txt")
