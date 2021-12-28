@@ -134,3 +134,35 @@ func TestQuoteDoubling(t *testing.T) {
 		})
 	}
 }
+
+func TestServerSettings(t *testing.T) {
+	server := FtpServer{
+		Logger: lognoop.NewNoOpLogger(),
+		driver: &TestServerDriver{
+			Settings: &Settings{
+				PublicHost: "127.0.0",
+			},
+		},
+	}
+	err := server.loadSettings()
+	_, ok := err.(*ipValidationError)
+	require.True(t, ok)
+
+	server.driver = &TestServerDriver{
+		Settings: &Settings{
+			PublicHost: "::1",
+		},
+	}
+	err = server.loadSettings()
+	_, ok = err.(*ipValidationError)
+	require.True(t, ok)
+
+	server.driver = &TestServerDriver{
+		Settings: &Settings{
+			PublicHost: "::ffff:192.168.1.1",
+		},
+	}
+	err = server.loadSettings()
+	require.NoError(t, err)
+	require.Equal(t, "192.168.1.1", server.settings.PublicHost)
+}
