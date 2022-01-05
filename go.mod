@@ -3,7 +3,7 @@ module github.com/fclairamb/ftpserverlib
 go 1.17
 
 require (
-	github.com/fclairamb/go-log v0.1.0
+	github.com/fclairamb/go-log v0.2.0
 	github.com/go-kit/kit v0.11.0
 	github.com/secsy/goftp v0.0.0-20200609142545-aa2de14babf4
 	github.com/spf13/afero v1.8.0
@@ -15,7 +15,7 @@ require (
 	cloud.google.com/go v0.75.0 // indirect
 	cloud.google.com/go/storage v1.14.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
-	github.com/go-logfmt/logfmt v0.5.0 // indirect
+	github.com/go-logfmt/logfmt v0.5.1 // indirect
 	github.com/golang/groupcache v0.0.0-20200121045136-8c9f03a8e57e // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/googleapis/gax-go/v2 v2.0.5 // indirect
