@@ -55,6 +55,8 @@ func (c *clientHandler) transferFile(write bool, append bool, param, info string
 		fileFlag = os.O_WRONLY
 		if append {
 			fileFlag |= os.O_APPEND
+			// ignore the seek position for append mode
+			c.ctxRest = 0
 		} else {
 			fileFlag |= os.O_CREATE
 			// if this isn't a resume we add the truncate flag
