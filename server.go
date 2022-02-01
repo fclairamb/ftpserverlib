@@ -117,13 +117,8 @@ func (server *FtpServer) loadSettings() error {
 
 	if s.PublicHost != "" {
 		parsedIP := net.ParseIP(s.PublicHost)
-		if parsedIP == nil {
+		if parsedIP == nil || parsedIP.To4() == nil && parsedIP.To16() == nil {
 			return &ipValidationError{error: fmt.Sprintf("invalid passive IP %#v", s.PublicHost)}
-		}
-
-		parsedIP = parsedIP.To4()
-		if parsedIP == nil {
-			return &ipValidationError{error: fmt.Sprintf("invalid IPv4 passive IP %#v", s.PublicHost)}
 		}
 
 		s.PublicHost = parsedIP.String()
