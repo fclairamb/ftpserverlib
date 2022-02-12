@@ -522,8 +522,5 @@ func TestMLSDAndNLSTFilePathError(t *testing.T) {
 
 	rc, response, err := raw.SendCommand("NLST /" + fileName)
 	require.NoError(t, err)
-	require.Equal(t, StatusFileActionNotTaken, rc, response)
-
-	_, _, err = raw.ReadResponse()
-	require.Error(t, err, "NLST for filePath must fail")
+	require.Equal(t, StatusFileStatusOK, rc, response)
 }

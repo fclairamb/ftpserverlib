@@ -11,6 +11,7 @@ import (
 	"math/rand"
 	"net"
 	"os"
+	"path/filepath"
 	"runtime"
 	"strconv"
 	"strings"
@@ -131,11 +132,16 @@ func ftpDownloadAndHashWithRawConnection(t *testing.T, raw goftp.RawConn, fileNa
 	return hex.EncodeToString(hasher.Sum(nil))
 }
 
-func ftpUploadWithRawConnection(t *testing.T, raw goftp.RawConn, file io.Reader, fileName string) {
+func ftpUploadWithRawConnection(t *testing.T, raw goftp.RawConn, file io.Reader, fileName string, append bool) {
 	dcGetter, err := raw.PrepareDataConn()
 	assert.NoError(t, err)
 
-	rc, response, err := raw.SendCommand(fmt.Sprintf("STOR %v", fileName))
+	cmd := "STOR"
+	if append {
+		cmd = "APPE"
+	}
+
+	rc, response, err := raw.SendCommand(fmt.Sprintf("%v %v", cmd, fileName))
 	require.NoError(t, err)
 	require.Equal(t, StatusFileStatusOK, rc, response)
 
@@ -434,6 +440,55 @@ func TestFailingFileTransfer(t *testing.T) {
 	t.Run("check for sync", func(t *testing.T) {
 		require.NoError(t, c.Store("ok", file))
 	})
+}
+
+func TestAPPE(t *testing.T) {
+	driver := &TestServerDriver{
+		Debug: true,
+	}
+	s := NewTestServerWithDriver(t, driver)
+	conf := goftp.Config{
+		User:     authUser,
+		Password: authPass,
+	}
+	file := createTemporaryFile(t, 1*1024)
+	c, err := goftp.DialConfig(conf, s.Addr())
+	require.NoError(t, err)
+
+	defer func() { require.NoError(t, c.Close()) }()
+
+	raw, err := c.OpenRawConn()
+	require.NoError(t, err)
+
+	defer func() { require.NoError(t, raw.Close()) }()
+
+	_, err = file.Seek(0, io.SeekStart)
+	require.NoError(t, err)
+
+	fileName := filepath.Base(file.Name())
+
+	err = c.Store(fileName, file)
+	require.NoError(t, err)
+
+	_, err = file.Seek(0, io.SeekEnd)
+	require.NoError(t, err)
+
+	data := []byte("some more data")
+	_, err = file.Write(data)
+	require.NoError(t, err)
+
+	_, err = file.Seek(1024, io.SeekStart)
+	require.NoError(t, err)
+
+	ftpUploadWithRawConnection(t, raw, file, fileName, true)
+
+	info, err := c.Stat(fileName)
+	require.NoError(t, err)
+	require.Equal(t, int64(1024+len(data)), info.Size())
+
+	localHash := hashFile(t, file)
+	remoteHash := ftpDownloadAndHash(t, c, fileName)
+	require.Equal(t, localHash, remoteHash)
 }
 
 func TestTransfersFromOffset(t *testing.T) {
@@ -778,7 +833,7 @@ func TestASCIITransfers(t *testing.T) {
 	_, err = file.Seek(0, io.SeekStart)
 	require.NoError(t, err)
 
-	ftpUploadWithRawConnection(t, raw, file, "file.txt")
+	ftpUploadWithRawConnection(t, raw, file, "file.txt", false)
 
 	files, err := c.ReadDir("/")
 	require.NoError(t, err)
@@ -830,7 +885,7 @@ func TestASCIITransfersInvalidFiles(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, StatusOK, rc, response)
 
-	ftpUploadWithRawConnection(t, raw, file, "file.bin")
+	ftpUploadWithRawConnection(t, raw, file, "file.bin", false)
 
 	remoteHash := ftpDownloadAndHashWithRawConnection(t, raw, "file.bin")
 	require.Equal(t, localHash, remoteHash)
