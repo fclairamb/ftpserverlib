@@ -87,20 +87,14 @@ func TestDirListingPathArg(t *testing.T) {
 
 func TestDirHandling(t *testing.T) {
 	s := NewTestServer(t, true)
-	conf := goftp.Config{
+
+	c, err := goftp.DialConfig(goftp.Config{
 		User:     authUser,
 		Password: authPass,
-	}
-
-	c, err := goftp.DialConfig(conf, s.Addr())
+	}, s.Addr())
 	require.NoError(t, err, "Couldn't connect")
 
 	defer func() { panicOnError(c.Close()) }()
-
-	// Getwd will send a PWD command
-	p, err := c.Getwd()
-	require.NoError(t, err)
-	require.Equal(t, "/", p, "Bad path")
 
 	raw, err := c.OpenRawConn()
 	require.NoError(t, err, "Couldn't open raw connection")
@@ -122,7 +116,7 @@ func TestDirHandling(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, StatusFileOK, rc)
 
-	testSubdir := " strange\\ sub dìr"
+	testSubdir := ` strange\\ sub" dìr`
 	rc, _, err = raw.SendCommand(fmt.Sprintf("MKD %v", testSubdir))
 	require.NoError(t, err)
 	require.Equal(t, StatusPathCreated, rc)
@@ -130,6 +124,11 @@ func TestDirHandling(t *testing.T) {
 	rc, response, err := raw.SendCommand(fmt.Sprintf("CWD %v", testSubdir))
 	require.NoError(t, err)
 	require.Equal(t, StatusFileOK, rc, response)
+
+	rc, response, err = raw.SendCommand(fmt.Sprintf("PWD %v", testSubdir))
+	require.NoError(t, err)
+	require.Equal(t, StatusPathCreated, rc, response)
+	require.Equal(t, `"/known/ strange\\ sub"" dìr" is the current directory`, response)
 
 	rc, response, err = raw.SendCommand("CDUP")
 	require.NoError(t, err)
@@ -141,7 +140,7 @@ func TestDirHandling(t *testing.T) {
 	err = c.Rmdir(path.Join("/", DirKnown))
 	require.NoError(t, err)
 
-	err = c.Rmdir("/" + DirKnown)
+	err = c.Rmdir(path.Join("/", DirKnown))
 	require.Error(t, err, "We shouldn't have been able to ftpDelete known again")
 }
 

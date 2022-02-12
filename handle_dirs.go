@@ -46,7 +46,7 @@ func (c *clientHandler) handleCWD(param string) error {
 func (c *clientHandler) handleMKD(param string) error {
 	p := c.absPath(param)
 	if err := c.driver.Mkdir(p, 0755); err == nil {
-		// handleMKD confirms to "qoute-doubling"
+		// handleMKD confirms to "quote-doubling"
 		// https://tools.ietf.org/html/rfc959 , page 63
 		c.writeMessage(StatusPathCreated, fmt.Sprintf(`Created dir "%s"`, quoteDoubling(p)))
 	} else {
@@ -125,7 +125,7 @@ func (c *clientHandler) handleCDUP(param string) error {
 }
 
 func (c *clientHandler) handlePWD(param string) error {
-	c.writeMessage(StatusPathCreated, "\""+c.Path()+"\" is the current directory")
+	c.writeMessage(StatusPathCreated, fmt.Sprintf(`"%s" is the current directory`, quoteDoubling(c.Path())))
 
 	return nil
 }
