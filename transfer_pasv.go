@@ -68,7 +68,7 @@ func (c *clientHandler) getCurrentIP() ([]string, error) {
 
 	quads := strings.Split(ip, ".")
 	if len(quads) != 4 {
-		c.logger.Warn("Invalid passive IP", ip)
+		c.logger.Warn("Invalid passive IP", "IP", ip)
 
 		return nil, &ipValidationError{error: fmt.Sprintf("invalid passive IP %#v", ip)}
 	}
