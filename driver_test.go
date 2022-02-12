@@ -13,7 +13,7 @@ import (
 	"time"
 
 	"github.com/fclairamb/go-log/gokit"
-	gklog "github.com/go-kit/kit/log"
+	gklog "github.com/go-kit/log"
 	"github.com/spf13/afero"
 )
 

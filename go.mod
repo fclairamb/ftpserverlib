@@ -4,7 +4,7 @@ go 1.17
 
 require (
 	github.com/fclairamb/go-log v0.2.0
-	github.com/go-kit/kit v0.11.0
+	github.com/go-kit/log v0.2.0
 	github.com/secsy/goftp v0.0.0-20200609142545-aa2de14babf4
 	github.com/spf13/afero v1.8.1
 	github.com/stretchr/testify v1.7.0
@@ -13,10 +13,9 @@ require (
 
 require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
-	github.com/go-kit/log v0.2.0 // indirect
 	github.com/go-logfmt/logfmt v0.5.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
-	golang.org/x/text v0.3.5 // indirect
+	golang.org/x/text v0.3.7 // indirect
 	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b // indirect
 )
 
