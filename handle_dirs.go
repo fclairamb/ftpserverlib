@@ -175,7 +175,7 @@ func (c *clientHandler) handleLIST(param string) error {
 func (c *clientHandler) handleNLST(param string) error {
 	info := fmt.Sprintf("NLST %v", param)
 
-	if files, err := c.getFileList(param, false); err == nil || err == io.EOF {
+	if files, err := c.getFileList(param, true); err == nil || err == io.EOF {
 		if tr, errTrOpen := c.TransferOpen(info); errTrOpen == nil {
 			err = c.dirTransferNLST(tr, files)
 			c.TransferClose(err)
