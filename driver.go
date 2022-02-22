@@ -127,6 +127,12 @@ type ClientContext interface {
 	// Path provides the path of the current connection
 	Path() string
 
+	// SetPath sets the path of the current connection.
+	// This method is useful to set a start directory, you should use it before returning a successful
+	// authentication response from your driver implementation.
+	// Calling this method after the authentication step could lead to undefined behavior
+	SetPath(value string)
+
 	// SetDebug activates the debugging of this connection commands
 	SetDebug(debug bool)
 
