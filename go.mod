@@ -8,7 +8,7 @@ require (
 	github.com/secsy/goftp v0.0.0-20200609142545-aa2de14babf4
 	github.com/spf13/afero v1.8.2
 	github.com/stretchr/testify v1.7.1
-	golang.org/x/sys v0.0.0-20220317022123-2c4bbad7e934
+	golang.org/x/sys v0.0.0-20220317061510-51cd9980dadf
 )
 
 require (
