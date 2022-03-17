@@ -208,6 +208,7 @@ func (server *FtpServer) Serve() error {
 				}
 			}
 
+			// see https://github.com/golang/go/blob/4aa1efed4853ea067d665a952eee77c52faac774/src/net/http/server.go#L3046
 			if ne, ok := err.(net.Error); ok && ne.Temporary() {
 				if tempDelay == 0 {
 					tempDelay = 5 * time.Millisecond
@@ -231,6 +232,8 @@ func (server *FtpServer) Serve() error {
 
 			return err
 		}
+
+		tempDelay = 0
 
 		server.clientArrival(connection)
 	}
