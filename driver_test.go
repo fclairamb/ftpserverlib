@@ -68,7 +68,7 @@ func NewTestServerWithDriver(t *testing.T, driver *TestServerDriver) *FtpServer 
 
 	// If we are in debug mode, we should log things
 	if driver.Debug {
-		s.Logger = gokit.NewGKLogger(gklog.NewLogfmtLogger(gklog.NewSyncWriter(os.Stdout))).With(
+		s.Logger = gokit.NewWrap(gklog.NewLogfmtLogger(gklog.NewSyncWriter(os.Stdout))).With(
 			"ts", gokit.GKDefaultTimestampUTC,
 			"caller", gokit.GKDefaultCaller,
 		)
