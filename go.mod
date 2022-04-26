@@ -3,7 +3,7 @@ module github.com/fclairamb/ftpserverlib
 go 1.18
 
 require (
-	github.com/fclairamb/go-log v0.2.0
+	github.com/fclairamb/go-log v0.3.0
 	github.com/go-kit/log v0.2.0
 	github.com/secsy/goftp v0.0.0-20200609142545-aa2de14babf4
 	github.com/spf13/afero v1.8.2
