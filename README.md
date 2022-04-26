@@ -29,7 +29,7 @@ If you're interested in a fully featured FTP server, you should use [sftpgo](htt
  * Clean code: No sleep, no panic, no global sync (only around control/transfer connection per client)
  * Uses only the standard library except for:
    * [afero](https://github.com/spf13/afero) for generic file systems handling
-   * [go-kit log](https://github.com/go-kit/kit/tree/master/log) (optional) for logging
+   * [fclairamb/go-log](https://github.com/fclairamb/go-log) for logging through your existing libraries [go-kit/log](https://github.com/go-kit/log), [log15](https://github.com/inconshreveable/log15), [zap](https://github.com/uber-go/zap), [zerolog](https://github.com/rs/zerolog/), [logrus](https://github.com/sirupsen/logrus)
  * Supported extensions:
    * [AUTH](https://tools.ietf.org/html/rfc2228#page-6) - Control session protection
    * [AUTH TLS](https://tools.ietf.org/html/rfc4217#section-4.1) - TLS session
