@@ -13,6 +13,24 @@ func (c *clientHandler) handleUSER(param string) error {
 		return nil
 	}
 
+	if preAuthCheck, ok := c.server.driver.(MainDriverExtensionPreAuth); ok {
+		result, err := preAuthCheck.PreAuthUser(c, param)
+
+		if err != nil {
+			c.writeMessage(StatusNotLoggedIn, fmt.Sprintf("Authentication problem: %v", err))
+			c.disconnect()
+
+			return nil
+		}
+
+		if !result {
+			c.writeMessage(StatusNotLoggedIn, "Authentication problem")
+			c.disconnect()
+
+			return nil
+		}
+	}
+
 	if c.HasTLSForControl() {
 		if verifier, ok := c.server.driver.(MainDriverExtensionTLSVerifier); ok {
 			if tlsConn, ok := c.conn.(*tls.Conn); ok {

@@ -50,6 +50,14 @@ type MainDriverExtensionPassiveWrapper interface {
 	WrapPassiveListener(listener net.Listener) (net.Listener, error)
 }
 
+// MainDriverExtensionPreAuth is an extension that allows to control user access pre-auth (once username is known)
+type MainDriverExtensionPreAuth interface {
+	// PreAuthUser is called when receiving the "USER" command before proceeding with any other checks
+	// If it returns true, the user is allowed to proceed to authentication assuming it passes other checks
+	// If it returns false or a non-nil error, the client will receive a 530 error and be disconnected.
+	PreAuthUser(cc ClientContext, user string) (bool, error)
+}
+
 // ClientDriver is the base FS implementation that allows to manipulate files
 type ClientDriver interface {
 	afero.Fs

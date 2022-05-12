@@ -236,3 +236,75 @@ func TestAuthTLSCertificate(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, StatusSystemStatus, rc)
 }
+
+func TestPreAuthFailed(t *testing.T) {
+	s := NewTestServerWithDriver(t, &TestServerDriver{
+		Debug:        true,
+		TLS:          true,
+		PreAuthReply: preAuthFailed,
+	})
+
+	conf := goftp.Config{
+		User:     authUser,
+		Password: authPass,
+	}
+
+	c, err := goftp.DialConfig(conf, s.Addr())
+	require.NoError(t, err, "Couldn't connect")
+
+	defer func() { panicOnError(c.Close()) }()
+
+	_, err = c.OpenRawConn()
+	require.Error(t, err, "Connection should fail")
+}
+
+func TestPreAuthWithTLSAllowsLogin(t *testing.T) {
+	s := NewTestServerWithDriver(t, &TestServerDriver{
+		Debug:        true,
+		TLS:          true,
+		PreAuthReply: preAuthRequireSecure,
+	})
+
+	conf := goftp.Config{
+		User:     authUser,
+		Password: authPass,
+		TLSConfig: &tls.Config{
+			// nolint:gosec
+			InsecureSkipVerify: true,
+		},
+		TLSMode: goftp.TLSExplicit,
+	}
+
+	c, err := goftp.DialConfig(conf, s.Addr())
+	require.NoError(t, err, "Couldn't connect")
+
+	raw, err := c.OpenRawConn()
+	require.NoError(t, err, "Couldn't open raw connection")
+
+	defer func() { require.NoError(t, raw.Close()) }()
+
+	rc, _, err := raw.SendCommand("STAT")
+	require.NoError(t, err)
+	require.Equal(t, StatusSystemStatus, rc)
+}
+
+func TestPreAuthWithoutTLSFails(t *testing.T) {
+	s := NewTestServerWithDriver(t, &TestServerDriver{
+		Debug:        true,
+		TLS:          true,
+		PreAuthReply: preAuthRequireSecure,
+	})
+
+	conf := goftp.Config{
+		User:     authUser,
+		Password: authPass,
+	}
+
+	c, err := goftp.DialConfig(conf, s.Addr())
+	require.NoError(t, err, "Couldn't connect")
+
+	defer func() { panicOnError(c.Close()) }()
+
+	_, err = c.OpenRawConn()
+	require.Error(t, err, "Connection should fail")
+}

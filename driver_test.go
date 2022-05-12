@@ -17,6 +17,7 @@ import (
 	"github.com/spf13/afero"
 )
 
+type preAuthReply int
 type tlsVerificationReply int
 
 const (
@@ -26,6 +27,15 @@ const (
 	tlsVerificationFailed
 	// tls certificate is ok and no password is required
 	tlsVerificationAuthenticated
+)
+
+const (
+	// pre-auth is OK, the client can continue
+	preAuthOK preAuthReply = iota
+	// pre-auth explicitly fails, the client will be disconnected
+	preAuthFailed
+	// pre-auth returns error, the client will be disconnected
+	preAuthRequireSecure
 )
 
 const (
@@ -103,6 +113,7 @@ type TestServerDriver struct {
 	Clients              []ClientContext
 	TLSVerificationReply tlsVerificationReply
 	errPassiveListener   error
+	PreAuthReply         preAuthReply
 }
 
 // TestClientDriver defines a minimal serverftp client driver
@@ -310,6 +321,21 @@ func (driver *TestServerDriver) GetTLSConfig() (*tls.Config, error) {
 	}
 
 	return nil, errNoTLS
+}
+
+func (driver *TestServerDriver) PreAuthUser(cc ClientContext, user string) (bool, error) {
+	switch driver.PreAuthReply {
+	case preAuthFailed:
+		return false, nil
+	case preAuthRequireSecure:
+		if cc.HasTLSForControl() {
+			return true, nil
+		}
+		return false, errors.New("Connection must be secure")
+	}
+
+	// Default OK
+	return true, nil
 }
 
 func (driver *TestServerDriver) VerifyConnection(cc ClientContext, user string,
