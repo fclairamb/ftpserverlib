@@ -1,5 +1,5 @@
-//go:build !linux && !freebsd && !darwin && !aix && !dragonfly && !netbsd && !openbsd && !solaris && !windows
-// +build !linux,!freebsd,!darwin,!aix,!dragonfly,!netbsd,!openbsd,!solaris,!windows
+//go:build !linux && !freebsd && !darwin && !aix && !dragonfly && !netbsd && !openbsd && !windows
+// +build !linux,!freebsd,!darwin,!aix,!dragonfly,!netbsd,!openbsd,!windows
 
 package ftpserver // nolint
 
