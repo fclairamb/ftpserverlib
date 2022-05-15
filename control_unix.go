@@ -1,5 +1,5 @@
-//go:build linux || freebsd || darwin || aix || dragonfly || netbsd || openbsd || solaris
-// +build linux freebsd darwin aix dragonfly netbsd openbsd solaris
+//go:build linux || freebsd || darwin || aix || dragonfly || netbsd || openbsd
+// +build linux freebsd darwin aix dragonfly netbsd openbsd
 
 package ftpserver
 
