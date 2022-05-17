@@ -528,6 +528,9 @@ func TestDataConnectionWithoutTLSFails(t *testing.T) {
 		Debug:                true,
 		TLS:                  true,
 		ConnectionCheckReply: connectionCheckDataSecure,
+		Settings: &Settings{
+			ActiveConnectionsCheck: IPMatchDisabled,
+		},
 	})
 
 	conf := goftp.Config{
@@ -545,7 +548,14 @@ func TestDataConnectionWithoutTLSFails(t *testing.T) {
 
 	defer func() { require.NoError(t, raw.Close()) }()
 
+	// passive connection
 	rc, resp, err := raw.SendCommand("EPSV")
+	require.NoError(t, err)
+	require.Equal(t, StatusServiceNotAvailable, rc)
+	require.Contains(t, resp, "connection must be secure")
+
+	// active connection
+	rc, resp, err = raw.SendCommand("EPRT |1|::1|2000|")
 	require.NoError(t, err)
 	require.Equal(t, StatusServiceNotAvailable, rc)
 	require.Contains(t, resp, "connection must be secure")
