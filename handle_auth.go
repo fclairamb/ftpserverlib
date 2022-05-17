@@ -14,17 +14,10 @@ func (c *clientHandler) handleUSER(param string) error {
 	}
 
 	if preAuthCheck, ok := c.server.driver.(MainDriverExtensionPreAuth); ok {
-		result, err := preAuthCheck.PreAuthUser(c, param)
+		err := preAuthCheck.PreAuthUser(c, param)
 
 		if err != nil {
 			c.writeMessage(StatusNotLoggedIn, fmt.Sprintf("Authentication problem: %v", err))
-			c.disconnect()
-
-			return nil
-		}
-
-		if !result {
-			c.writeMessage(StatusNotLoggedIn, "Authentication problem")
 			c.disconnect()
 
 			return nil

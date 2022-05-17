@@ -237,27 +237,6 @@ func TestAuthTLSCertificate(t *testing.T) {
 	require.Equal(t, StatusSystemStatus, rc)
 }
 
-func TestPreAuthFailed(t *testing.T) {
-	s := NewTestServerWithDriver(t, &TestServerDriver{
-		Debug:        true,
-		TLS:          true,
-		PreAuthReply: preAuthFailed,
-	})
-
-	conf := goftp.Config{
-		User:     authUser,
-		Password: authPass,
-	}
-
-	c, err := goftp.DialConfig(conf, s.Addr())
-	require.NoError(t, err, "Couldn't connect")
-
-	defer func() { panicOnError(c.Close()) }()
-
-	_, err = c.OpenRawConn()
-	require.Error(t, err, "Connection should fail")
-}
-
 func TestPreAuthWithTLSAllowsLogin(t *testing.T) {
 	s := NewTestServerWithDriver(t, &TestServerDriver{
 		Debug:        true,

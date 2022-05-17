@@ -32,8 +32,6 @@ const (
 const (
 	// pre-auth is OK, the client can continue
 	preAuthOK preAuthReply = iota
-	// pre-auth explicitly fails, the client will be disconnected
-	preAuthFailed
 	// pre-auth returns error, the client will be disconnected
 	preAuthRequireSecure
 )
@@ -323,19 +321,18 @@ func (driver *TestServerDriver) GetTLSConfig() (*tls.Config, error) {
 	return nil, errNoTLS
 }
 
-func (driver *TestServerDriver) PreAuthUser(cc ClientContext, user string) (bool, error) {
+func (driver *TestServerDriver) PreAuthUser(cc ClientContext, user string) error {
 	switch driver.PreAuthReply {
-	case preAuthFailed:
-		return false, nil
 	case preAuthRequireSecure:
 		if cc.HasTLSForControl() {
-			return true, nil
+			return nil
 		}
-		return false, errors.New("Connection must be secure")
+		return errors.New("connection must be secure")
+	case preAuthOK:
+		return nil
 	}
 
-	// Default OK
-	return true, nil
+	return nil
 }
 
 func (driver *TestServerDriver) VerifyConnection(cc ClientContext, user string,
