@@ -56,6 +56,9 @@ type MainDriverExtensionConnectionControls interface {
 	// CommandConnectionAllowed is called when receiving the "USER" command before proceeding with any other checks
 	// The login attempt is rejected if an error is returned, for example if you want to enforce TLS for a specific user.
 	CommandConnectionAllowed(cc ClientContext, user string) error
+	// DataConnectionAllowed is called before establishing a data connection, it can be used to reject the data
+	// connection by returning an error, for example if you want to enforce TLS for a specific user.
+	DataConnectionAllowed(cc ClientContext) error
 }
 
 // ClientDriver is the base FS implementation that allows to manipulate files

@@ -56,6 +56,13 @@ func (c *clientHandler) handlePORT(param string) error {
 		}
 	}
 
+	err = c.checkDataConnectionHook()
+	if err != nil {
+		c.writeMessage(StatusServiceNotAvailable, err.Error())
+
+		return nil
+	}
+
 	c.transferMu.Lock()
 
 	c.transfer = &activeTransferHandler{

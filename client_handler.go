@@ -667,6 +667,14 @@ func (c *clientHandler) checkDataConnectionRequirement(dataConnIP net.IP, channe
 	}
 }
 
+func (c *clientHandler) checkDataConnectionHook() error {
+	if connectionCheck, ok := c.server.driver.(MainDriverExtensionConnectionControls); ok {
+		return connectionCheck.DataConnectionAllowed(c)
+	}
+
+	return nil
+}
+
 func getIPFromRemoteAddr(remoteAddr net.Addr) (net.IP, error) {
 	if remoteAddr == nil {
 		return nil, &ipValidationError{error: "nil remote address"}

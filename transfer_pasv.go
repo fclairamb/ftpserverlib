@@ -163,6 +163,13 @@ func (c *clientHandler) handlePASV(param string) error {
 		}
 	}
 
+	err = c.checkDataConnectionHook()
+	if err != nil {
+		c.writeMessage(StatusServiceNotAvailable, err.Error())
+
+		return nil
+	}
+
 	p := &passiveTransferHandler{
 		tcpListener:   tcpListener,
 		listener:      listener,

@@ -34,6 +34,8 @@ const (
 	connectionCheckOK connectionCheckReply = iota
 	// connection check returns error, the client will be disconnected (if command) / connection rejected (if data)
 	connectionCheckRequiresSecure
+	// connection check returns error only for insecure data connection, command connection check is ignored
+	connectionCheckDataSecure
 )
 
 const (
@@ -328,6 +330,23 @@ func (driver *TestServerDriver) CommandConnectionAllowed(cc ClientContext, user 
 			return nil
 		}
 		
+		return errors.New("connection must be secure")
+	case connectionCheckOK:
+	case connectionCheckDataSecure:
+		return nil
+	}
+
+	return nil
+}
+
+func (driver *TestServerDriver) DataConnectionAllowed(cc ClientContext) error {
+	switch driver.ConnectionCheckReply {
+	case connectionCheckRequiresSecure:
+	case connectionCheckDataSecure:
+		if cc.HasTLSForTransfers() {
+			return nil
+		}
+
 		return errors.New("connection must be secure")
 	case connectionCheckOK:
 		return nil
