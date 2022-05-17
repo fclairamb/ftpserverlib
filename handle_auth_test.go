@@ -237,11 +237,11 @@ func TestAuthTLSCertificate(t *testing.T) {
 	require.Equal(t, StatusSystemStatus, rc)
 }
 
-func TestPreAuthWithTLSAllowsLogin(t *testing.T) {
+func TestConnectionCheckWithTLSAllowsLogin(t *testing.T) {
 	s := NewTestServerWithDriver(t, &TestServerDriver{
-		Debug:        true,
-		TLS:          true,
-		PreAuthReply: preAuthRequireSecure,
+		Debug:                true,
+		TLS:                  true,
+		ConnectionCheckReply: connectionCheckRequiresSecure,
 	})
 
 	conf := goftp.Config{
@@ -267,11 +267,11 @@ func TestPreAuthWithTLSAllowsLogin(t *testing.T) {
 	require.Equal(t, StatusSystemStatus, rc)
 }
 
-func TestPreAuthWithoutTLSFails(t *testing.T) {
+func TestConnectionCheckWithoutTLSFails(t *testing.T) {
 	s := NewTestServerWithDriver(t, &TestServerDriver{
-		Debug:        true,
-		TLS:          true,
-		PreAuthReply: preAuthRequireSecure,
+		Debug:                true,
+		TLS:                  true,
+		ConnectionCheckReply: connectionCheckRequiresSecure,
 	})
 
 	conf := goftp.Config{
