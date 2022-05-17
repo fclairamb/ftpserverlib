@@ -327,6 +327,7 @@ func (driver *TestServerDriver) CommandConnectionAllowed(cc ClientContext, user 
 		if cc.HasTLSForControl() {
 			return nil
 		}
+		
 		return errors.New("connection must be secure")
 	case connectionCheckOK:
 		return nil
