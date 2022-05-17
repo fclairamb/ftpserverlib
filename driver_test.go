@@ -323,14 +323,16 @@ func (driver *TestServerDriver) GetTLSConfig() (*tls.Config, error) {
 	return nil, errNoTLS
 }
 
+var errConnectionNotSecure = errors.New("connection must be secure")
+
 func (driver *TestServerDriver) CommandConnectionAllowed(cc ClientContext, user string) error {
 	switch driver.ConnectionCheckReply {
 	case connectionCheckRequiresSecure:
 		if cc.HasTLSForControl() {
 			return nil
 		}
-		
-		return errors.New("connection must be secure")
+
+		return errConnectionNotSecure
 	case connectionCheckOK:
 	case connectionCheckDataSecure:
 		return nil
@@ -347,7 +349,7 @@ func (driver *TestServerDriver) DataConnectionAllowed(cc ClientContext) error {
 			return nil
 		}
 
-		return errors.New("connection must be secure")
+		return errConnectionNotSecure
 	case connectionCheckOK:
 		return nil
 	}
