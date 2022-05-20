@@ -506,12 +506,12 @@ func TestDataConnectionWithTLSInitiallyThenPlainTextFails(t *testing.T) {
 
 	defer func() { require.NoError(t, raw.Close()) }()
 
-	rc, response, err := raw.SendCommand("PROT C")
+	rc, resp, err := raw.SendCommand("PROT C")
 	require.NoError(t, err)
 	require.Equal(t, StatusOK, rc)
-	require.Equal(t, "OK", response)
+	require.Equal(t, "OK", resp)
 
-	rc, resp, err := raw.SendCommand("EPSV")
+	rc, _, err = raw.SendCommand("EPSV")
 	require.NoError(t, err)
 	require.Equal(t, StatusEnteringEPSV, rc)
 
@@ -547,17 +547,17 @@ func TestDataConnectionWithoutTLSFails(t *testing.T) {
 	defer func() { require.NoError(t, raw.Close()) }()
 
 	// passive connection
-	rc, resp, err := raw.SendCommand("EPSV")
+	rc, _, err := raw.SendCommand("EPSV")
 	require.NoError(t, err)
 	require.Equal(t, StatusEnteringEPSV, rc)
 
-	rc, resp, err = raw.SendCommand("LIST")
+	rc, resp, err := raw.SendCommand("LIST")
 	require.NoError(t, err)
 	require.Equal(t, StatusServiceNotAvailable, rc)
 	require.Contains(t, resp, "connection must be secure")
 
 	// active connection
-	rc, resp, err = raw.SendCommand("EPRT |1|::1|2000|")
+	rc, _, err = raw.SendCommand("EPRT |1|::1|2000|")
 	require.NoError(t, err)
 	require.Equal(t, StatusOK, rc)
 
