@@ -580,6 +580,13 @@ func (c *clientHandler) TransferOpen(info string) (net.Conn, error) {
 		return nil, errTLSRequired
 	}
 
+	err := c.checkDataConnectionHook()
+	if err != nil {
+		c.writeMessage(StatusServiceNotAvailable, err.Error())
+
+		return nil, err
+	}
+
 	conn, err := c.transfer.Open()
 	if err != nil {
 		c.logger.Warn(

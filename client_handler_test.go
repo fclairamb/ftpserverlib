@@ -480,14 +480,8 @@ func TestDataConnectionWithTLSAllowed(t *testing.T) {
 
 	defer func() { panicOnError(c.Close()) }()
 
-	raw, err := c.OpenRawConn()
-	require.NoError(t, err, "Couldn't open raw connection")
-
-	defer func() { require.NoError(t, raw.Close()) }()
-
-	rc, _, err := raw.SendCommand("EPSV")
+	_, err = c.ReadDir("/")
 	require.NoError(t, err)
-	require.Equal(t, StatusEnteringEPSV, rc)
 }
 
 func TestDataConnectionWithTLSInitiallyThenPlainTextFails(t *testing.T) {
@@ -518,6 +512,10 @@ func TestDataConnectionWithTLSInitiallyThenPlainTextFails(t *testing.T) {
 	require.Equal(t, "OK", response)
 
 	rc, resp, err := raw.SendCommand("EPSV")
+	require.NoError(t, err)
+	require.Equal(t, StatusEnteringEPSV, rc)
+
+	rc, resp, err = raw.SendCommand("LIST")
 	require.NoError(t, err)
 	require.Equal(t, StatusServiceNotAvailable, rc)
 	require.Contains(t, resp, "connection must be secure")
@@ -551,11 +549,19 @@ func TestDataConnectionWithoutTLSFails(t *testing.T) {
 	// passive connection
 	rc, resp, err := raw.SendCommand("EPSV")
 	require.NoError(t, err)
+	require.Equal(t, StatusEnteringEPSV, rc)
+
+	rc, resp, err = raw.SendCommand("LIST")
+	require.NoError(t, err)
 	require.Equal(t, StatusServiceNotAvailable, rc)
 	require.Contains(t, resp, "connection must be secure")
 
 	// active connection
 	rc, resp, err = raw.SendCommand("EPRT |1|::1|2000|")
+	require.NoError(t, err)
+	require.Equal(t, StatusOK, rc)
+
+	rc, resp, err = raw.SendCommand("LIST")
 	require.NoError(t, err)
 	require.Equal(t, StatusServiceNotAvailable, rc)
 	require.Contains(t, resp, "connection must be secure")
