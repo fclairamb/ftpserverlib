@@ -154,8 +154,7 @@ func (c *clientHandler) handlePASV(param string) error {
 	}
 
 	if c.HasTLSForTransfers() || c.server.settings.TLSRequired == ImplicitEncryption {
-		var tlsConfig *tls.Config
-		if tlsConfig, err = c.server.driver.GetTLSConfig(); err == nil {
+		if tlsConfig, err := c.server.driver.GetTLSConfig(); err == nil {
 			listener = tls.NewListener(listener, tlsConfig)
 		} else {
 			c.writeMessage(StatusServiceNotAvailable, fmt.Sprintf("Cannot get a TLS config: %v", err))
