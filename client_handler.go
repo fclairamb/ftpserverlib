@@ -120,8 +120,17 @@ func (server *FtpServer) newClientHandler(connection net.Conn, id uint32, transf
 		currentTransferType: transferType,
 		logger:              server.Logger.With("clientId", id),
 	}
-
+	server.addClientConn(p)
 	return p
+}
+
+func (server *FtpServer) addClientConn(c *clientHandler) {
+	server.clientConnMapLocker.Lock()
+	defer server.clientConnMapLocker.Unlock()
+	if server.clientConnMap == nil {
+		server.clientConnMap = map[*clientHandler]struct{}{}
+	}
+	server.clientConnMap[c] = struct{}{}
 }
 
 func (c *clientHandler) disconnect() {
@@ -307,6 +316,10 @@ func (c *clientHandler) Close() error {
 func (c *clientHandler) end() {
 	c.server.driver.ClientDisconnected(c)
 	c.server.clientDeparture(c)
+
+	c.server.clientConnMapLocker.Lock()
+	delete(c.server.clientConnMap, c)
+	c.server.clientConnMapLocker.Unlock()
 
 	if err := c.conn.Close(); err != nil {
 		c.logger.Debug(

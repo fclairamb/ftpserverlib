@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"sync"
 	"time"
 
 	log "github.com/fclairamb/go-log"
@@ -101,11 +102,13 @@ var (
 // FtpServer is where everything is stored
 // We want to keep it as simple as possible
 type FtpServer struct {
-	Logger        log.Logger   // Go-Kit logger
-	settings      *Settings    // General settings
-	listener      net.Listener // listener used to receive files
-	clientCounter uint32       // Clients counter
-	driver        MainDriver   // Driver to handle the client authentication and the file access driver selection
+	Logger              log.Logger                  // Go-Kit logger
+	settings            *Settings                   // General settings
+	listener            net.Listener                // listener used to receive files
+	clientCounter       uint32                      // Clients counter
+	driver              MainDriver                  // Driver to handle the client authentication and the file access driver selection
+	clientConnMap       map[*clientHandler]struct{} // active client list, When stop the server, close and remove all active client
+	clientConnMapLocker sync.Mutex
 }
 
 func (server *FtpServer) loadSettings() error {
@@ -280,7 +283,15 @@ func (server *FtpServer) Stop() error {
 			"err", err,
 		)
 	}
-
+	var connList []*clientHandler
+	server.clientConnMapLocker.Lock()
+	for c := range server.clientConnMap {
+		connList = append(connList, c)
+	}
+	server.clientConnMapLocker.Unlock()
+	for _, c := range connList {
+		c.end()
+	}
 	return err
 }
 
