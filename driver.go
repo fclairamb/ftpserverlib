@@ -50,6 +50,14 @@ type MainDriverExtensionPassiveWrapper interface {
 	WrapPassiveListener(listener net.Listener) (net.Listener, error)
 }
 
+// MainDriverExtensionUserVerifier is an extension that allows to control user access
+// once username is known, before the authentication
+type MainDriverExtensionUserVerifier interface {
+	// PreAuthUser is called when receiving the "USER" command before proceeding with any other checks
+	// If it returns a non-nil error, the client will receive a 530 error and be disconnected.
+	PreAuthUser(cc ClientContext, user string) error
+}
+
 // ClientDriver is the base FS implementation that allows to manipulate files
 type ClientDriver interface {
 	afero.Fs
@@ -165,6 +173,15 @@ type ClientContext interface {
 
 	// GetLastDataChannel returns the last data channel mode
 	GetLastDataChannel() DataChannel
+
+	// SetTLSRequirement sets the TLS requirement to respect on a per-client basis.
+	// The requirement is checked when the client issues the "USER" command,
+	// after executing the MainDriverExtensionUserVerifier extension, and
+	// before opening transfer connections.
+	// Supported values: ClearOrEncrypted, MandatoryEncryption.
+	// If you want to enforce the same requirement for all
+	// clients, use the TLSRequired parameter defined in server settings instead
+	SetTLSRequirement(requirement TLSRequirement) error
 }
 
 // FileTransfer defines the inferface for file transfers.

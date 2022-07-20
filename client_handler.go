@@ -48,8 +48,9 @@ const (
 )
 
 var (
-	errNoTransferConnection = errors.New("unable to open transfer: no transfer connection")
-	errTLSRequired          = errors.New("unable to open transfer: TLS is required")
+	errNoTransferConnection  = errors.New("unable to open transfer: no transfer connection")
+	errTLSRequired           = errors.New("unable to open transfer: TLS is required")
+	errInvalidTLSRequirement = errors.New("invalid TLS requirement")
 )
 
 func getHashMapping() map[string]HASHAlgo {
@@ -103,6 +104,7 @@ type clientHandler struct {
 	lastDataChannel     DataChannel     // Last data channel mode (passive or active)
 	isTransferOpen      bool            // indicate if the transfer connection is opened
 	isTransferAborted   bool            // indicate if the transfer was aborted
+	tlsRequirement      TLSRequirement  // TLS requirement to respect
 	paramsMutex         sync.RWMutex    // mutex to protect the parameters exposed to the library users
 }
 
@@ -231,6 +233,31 @@ func (c *clientHandler) setTLSForTransfer(value bool) {
 	defer c.paramsMutex.Unlock()
 
 	c.transferTLS = value
+}
+
+// SetTLSRequirement sets the TLS requirement to respect for this connection
+func (c *clientHandler) SetTLSRequirement(requirement TLSRequirement) error {
+	if requirement < ClearOrEncrypted || requirement > MandatoryEncryption {
+		return errInvalidTLSRequirement
+	}
+
+	c.paramsMutex.Lock()
+	defer c.paramsMutex.Unlock()
+
+	c.tlsRequirement = requirement
+
+	return nil
+}
+
+func (c *clientHandler) isTLSRequired() bool {
+	if c.server.settings.TLSRequired == MandatoryEncryption {
+		return true
+	}
+
+	c.paramsMutex.RLock()
+	defer c.paramsMutex.RUnlock()
+
+	return c.tlsRequirement == MandatoryEncryption
 }
 
 // GetLastCommand returns the last received command
@@ -574,7 +601,7 @@ func (c *clientHandler) TransferOpen(info string) (net.Conn, error) {
 		return nil, errNoTransferConnection
 	}
 
-	if c.server.settings.TLSRequired == MandatoryEncryption && !c.HasTLSForTransfers() {
+	if c.isTLSRequired() && !c.HasTLSForTransfers() {
 		c.writeMessage(StatusServiceNotAvailable, errTLSRequired.Error())
 
 		return nil, errTLSRequired
