@@ -103,6 +103,7 @@ type TestServerDriver struct {
 	Clients              []ClientContext
 	TLSVerificationReply tlsVerificationReply
 	errPassiveListener   error
+	TLSRequirement       TLSRequirement
 }
 
 // TestClientDriver defines a minimal serverftp client driver
@@ -310,6 +311,10 @@ func (driver *TestServerDriver) GetTLSConfig() (*tls.Config, error) {
 	}
 
 	return nil, errNoTLS
+}
+
+func (driver *TestServerDriver) PreAuthUser(cc ClientContext, user string) error {
+	return cc.SetTLSRequirement(driver.TLSRequirement)
 }
 
 func (driver *TestServerDriver) VerifyConnection(cc ClientContext, user string,

@@ -7,8 +7,20 @@ import (
 
 // Handle the "USER" command
 func (c *clientHandler) handleUSER(param string) error {
-	if c.server.settings.TLSRequired == MandatoryEncryption && !c.HasTLSForControl() {
+	if verifier, ok := c.server.driver.(MainDriverExtensionUserVerifier); ok {
+		err := verifier.PreAuthUser(c, param)
+
+		if err != nil {
+			c.writeMessage(StatusNotLoggedIn, fmt.Sprintf("User rejected: %v", err))
+			c.disconnect()
+
+			return nil
+		}
+	}
+
+	if c.isTLSRequired() && !c.HasTLSForControl() {
 		c.writeMessage(StatusServiceNotAvailable, "TLS is required")
+		c.disconnect()
 
 		return nil
 	}
