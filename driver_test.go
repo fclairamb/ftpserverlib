@@ -17,7 +17,7 @@ import (
 	"github.com/spf13/afero"
 )
 
-type tlsVerificationReply int
+type tlsVerificationReply int8
 
 const (
 	// tls certificate is ok but a password is required too

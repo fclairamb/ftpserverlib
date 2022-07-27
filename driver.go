@@ -208,7 +208,7 @@ type PortRange struct {
 type PublicIPResolver func(ClientContext) (string, error)
 
 // TLSRequirement is the enumerable that represents the supported TLS mode
-type TLSRequirement int
+type TLSRequirement int8
 
 // TLS modes
 const (
@@ -219,7 +219,7 @@ const (
 
 // DataConnectionRequirement is the enumerable that represents the supported
 // protection mode for data channels
-type DataConnectionRequirement int
+type DataConnectionRequirement int8
 
 // Supported data connection requirements
 const (
