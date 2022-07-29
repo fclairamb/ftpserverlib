@@ -14,7 +14,7 @@ import (
 )
 
 // HASHAlgo is the enumerable that represents the supported HASH algorithms
-type HASHAlgo int
+type HASHAlgo int8
 
 // Supported hash algorithms
 const (
@@ -26,7 +26,7 @@ const (
 )
 
 // TransferType is the enumerable that represents the supported transfer types
-type TransferType int
+type TransferType int8
 
 // Supported transfer type
 const (
@@ -35,7 +35,7 @@ const (
 )
 
 // DataChannel is the enumerable that represents the data channel (active or passive)
-type DataChannel int
+type DataChannel int8
 
 // Supported data channel types
 const (
