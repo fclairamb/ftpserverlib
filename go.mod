@@ -1,6 +1,6 @@
 module github.com/fclairamb/ftpserverlib
 
-go 1.18
+go 1.19
 
 require (
 	github.com/fclairamb/go-log v0.3.0
