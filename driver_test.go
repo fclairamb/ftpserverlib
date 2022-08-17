@@ -4,7 +4,6 @@ import (
 	"crypto/tls"
 	"errors"
 	"io"
-	"io/ioutil"
 	"net"
 	"os"
 	"strings"
@@ -57,7 +56,7 @@ func NewTestServerWithDriver(t *testing.T, driver *TestServerDriver) *FtpServer 
 	}
 
 	{
-		dir, _ := ioutil.TempDir("", "example")
+		dir, _ := os.MkdirTemp("", "example")
 		if err := os.MkdirAll(dir, 0750); err != nil {
 			panic(err)
 		}
@@ -433,11 +432,13 @@ func (driver *TestClientDriver) Symlink(oldname, newname string) error {
 // "127.0.0.1" and "[::1]", expiring at the last second of 2049 (the end
 // of ASN.1 time).
 // generated from src/crypto/tls:
-// go run "$(go env GOROOT)/src/crypto/tls/generate_cert.go" \
-//   --rsa-bits 2048 \
-//   --host 127.0.0.1,::1,example.com \
-//   --ca --start-date "Jan 1 00:00:00 1970" \
-//   --duration=1000000h
+//
+//	go run "$(go env GOROOT)/src/crypto/tls/generate_cert.go" \
+//	  --rsa-bits 2048 \
+//	  --host 127.0.0.1,::1,example.com \
+//	  --ca --start-date "Jan 1 00:00:00 1970" \
+//	  --duration=1000000h
+//
 // The initial 512 bits key caused this error:
 // "tls: failed to sign handshake: crypto/rsa: key size too small for PSS signature"
 var localhostCert = []byte(`-----BEGIN CERTIFICATE-----

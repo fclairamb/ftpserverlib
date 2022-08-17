@@ -7,7 +7,6 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"math/rand"
 	"net"
 	"os"
@@ -37,10 +36,10 @@ func createTemporaryFile(t *testing.T, targetSize int) *os.File {
 
 	var fileErr error
 
-	file, fileErr = ioutil.TempFile("", "ftpserver")
+	file, fileErr = os.CreateTemp("", "ftpserver")
 	require.NoError(t, fileErr, "Temporary file creation error")
 
-	// nolint: gosec
+	//nolint: gosec
 	src := rand.New(rand.NewSource(0))
 	_, err := io.CopyN(file, src, int64(targetSize))
 	require.NoError(t, err, "Couldn't copy")
@@ -241,7 +240,7 @@ func testTransferOnConnection(t *testing.T, server *FtpServer, active, enableTLS
 	}
 	if enableTLS {
 		conf.TLSConfig = &tls.Config{
-			// nolint:gosec
+			//nolint:gosec
 			InsecureSkipVerify: true,
 		}
 		if implicitTLS {
@@ -409,7 +408,7 @@ func TestFailingFileTransfer(t *testing.T) {
 
 	t.Run("on seek", func(t *testing.T) {
 		initialData := []byte("initial data")
-		appendFile, err := ioutil.TempFile("", "ftpserver")
+		appendFile, err := os.CreateTemp("", "ftpserver")
 		require.NoError(t, err)
 
 		_, err = appendFile.Write(initialData)
@@ -817,7 +816,7 @@ func TestASCIITransfers(t *testing.T) {
 
 	defer func() { require.NoError(t, raw.Close()) }()
 
-	file, err := ioutil.TempFile("", "ftpserver")
+	file, err := os.CreateTemp("", "ftpserver")
 	require.NoError(t, err)
 
 	contents := []byte("line1\r\n\r\nline3\r\n,line4")
@@ -866,7 +865,7 @@ func TestASCIITransfersInvalidFiles(t *testing.T) {
 
 	defer func() { require.NoError(t, raw.Close()) }()
 
-	file, err := ioutil.TempFile("", "ftpserver")
+	file, err := os.CreateTemp("", "ftpserver")
 	require.NoError(t, err)
 
 	defer func() { require.NoError(t, file.Close()) }()

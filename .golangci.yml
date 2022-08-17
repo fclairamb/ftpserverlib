@@ -163,6 +163,7 @@ linters-settings:
 linters:
     disable-all: true
     enable:
+        - asciicheck
         - bodyclose
         - deadcode
         - depguard
@@ -201,6 +202,7 @@ linters:
         # - nestif
         - nlreturn
         - prealloc
+        - nilerr
         - nolintlint
         - rowserrcheck
         # - scopelint --> exportloopref

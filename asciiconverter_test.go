@@ -3,7 +3,6 @@ package ftpserver
 import (
 	"bytes"
 	"io"
-	"io/ioutil"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -57,11 +56,11 @@ func BenchmarkASCIIConverter(b *testing.B) {
 
 	for i := 0; i < b.N; i++ {
 		c := newASCIIConverter(readerCRLF, convertModeToLF)
-		_, err := io.Copy(ioutil.Discard, c)
+		_, err := io.Copy(io.Discard, c)
 		panicOnError(err)
 
 		c = newASCIIConverter(readerLF, convertModeToCRLF)
-		_, err = io.Copy(ioutil.Discard, c)
+		_, err = io.Copy(io.Discard, c)
 		panicOnError(err)
 	}
 }

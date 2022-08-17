@@ -6,7 +6,6 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"regexp"
 	"strings"
@@ -125,7 +124,7 @@ func TestCHMOD(t *testing.T) {
 		User:     authUser,
 		Password: authPass,
 		TLSConfig: &tls.Config{
-			// nolint:gosec
+			//nolint:gosec
 			InsecureSkipVerify: true,
 		},
 		TLSMode: goftp.TLSExplicit,
@@ -209,7 +208,7 @@ func TestMFMT(t *testing.T) {
 		User:     authUser,
 		Password: authPass,
 		TLSConfig: &tls.Config{
-			// nolint:gosec
+			//nolint:gosec
 			InsecureSkipVerify: true,
 		},
 		TLSMode: goftp.TLSExplicit,
@@ -502,9 +501,9 @@ func TestHASHCommand(t *testing.T) {
 	dir, err := c.Mkdir("testdir")
 	require.NoError(t, err)
 
-	tempFile, err := ioutil.TempFile("", "ftpserver")
+	tempFile, err := os.CreateTemp("", "ftpserver")
 	require.NoError(t, err)
-	err = ioutil.WriteFile(tempFile.Name(), []byte("sample data with know checksum/hash\n"), os.ModePerm)
+	err = os.WriteFile(tempFile.Name(), []byte("sample data with know checksum/hash\n"), os.ModePerm)
 	require.NoError(t, err)
 
 	crc32Sum := "21b0f382"
@@ -553,7 +552,7 @@ func TestCustomHASHCommands(t *testing.T) {
 
 	defer func() { panicOnError(c.Close()) }()
 
-	tempFile, err := ioutil.TempFile("", "ftpserver")
+	tempFile, err := os.CreateTemp("", "ftpserver")
 	require.NoError(t, err)
 	_, err = tempFile.WriteString("sample data with know checksum/hash\n")
 	require.NoError(t, err)
