@@ -392,8 +392,7 @@ func TestPerClientTLSTransfer(t *testing.T) {
 		User:     authUser,
 		Password: authPass,
 		TLSConfig: &tls.Config{
-			// nolint:gosec
-			InsecureSkipVerify: true,
+			InsecureSkipVerify: true, //nolint:gosec
 		},
 		TLSMode: goftp.TLSExplicit,
 	}

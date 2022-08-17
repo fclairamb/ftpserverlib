@@ -259,8 +259,7 @@ func TestAuthPerClientTLSRequired(t *testing.T) {
 	require.EqualError(t, err, "unexpected response: 421-TLS is required")
 
 	conf.TLSConfig = &tls.Config{
-		// nolint:gosec
-		InsecureSkipVerify: true,
+		InsecureSkipVerify: true, //nolint:gosec
 	}
 	conf.TLSMode = goftp.TLSExplicit
 
@@ -290,8 +289,7 @@ func TestUserVerifierError(t *testing.T) {
 		User:     authUser,
 		Password: authPass,
 		TLSConfig: &tls.Config{
-			// nolint:gosec
-			InsecureSkipVerify: true,
+			InsecureSkipVerify: true, //nolint:gosec
 		},
 		TLSMode: goftp.TLSExplicit,
 	}

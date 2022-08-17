@@ -6,6 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"os"
+	"syscall"
 	"time"
 
 	log "github.com/fclairamb/go-log"
@@ -191,6 +193,20 @@ func (server *FtpServer) Listen() error {
 	return err
 }
 
+func temporaryError(err net.Error) bool {
+	if opErr, ok := err.(*net.OpError); ok {
+		if sysErr, ok := opErr.Err.(*os.SyscallError); ok {
+			if errno, ok := sysErr.Err.(syscall.Errno); ok {
+				if errno == syscall.ECONNABORTED || errno == syscall.ECONNRESET {
+					return true
+				}
+			}
+		}
+	}
+
+	return false
+}
+
 // Serve accepts and processes any new incoming client
 func (server *FtpServer) Serve() error {
 	var tempDelay time.Duration // how long to sleep on accept failure
@@ -209,7 +225,7 @@ func (server *FtpServer) Serve() error {
 			}
 
 			// see https://github.com/golang/go/blob/4aa1efed4853ea067d665a952eee77c52faac774/src/net/http/server.go#L3046
-			if ne, ok := err.(net.Error); ok && ne.Temporary() {
+			if ne, ok := err.(net.Error); ok && temporaryError(ne) {
 				if tempDelay == 0 {
 					tempDelay = 5 * time.Millisecond
 				} else {

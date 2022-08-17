@@ -180,7 +180,7 @@ func (c *clientHandler) handleCOMB(param string) error {
 	if err != nil || len(relativePaths) < 2 {
 		c.writeMessage(StatusSyntaxErrorParameters, fmt.Sprintf("invalid COMB parameters: %v", param))
 
-		return nil
+		return nil //nolint:nilerr
 	}
 
 	targetPath := c.absPath(relativePaths[0])
