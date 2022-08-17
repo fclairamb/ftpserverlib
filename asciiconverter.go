@@ -5,7 +5,7 @@ import (
 	"io"
 )
 
-type convertMode int
+type convertMode int8
 
 const (
 	convertModeToCRLF convertMode = iota

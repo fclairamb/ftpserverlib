@@ -381,6 +381,52 @@ func TestTLSTransfer(t *testing.T) {
 	require.Equal(t, "unable to open transfer: TLS is required", response)
 }
 
+func TestPerClientTLSTransfer(t *testing.T) {
+	s := NewTestServerWithDriver(t, &TestServerDriver{
+		Debug:          true,
+		TLS:            true,
+		TLSRequirement: MandatoryEncryption,
+	})
+
+	conf := goftp.Config{
+		User:     authUser,
+		Password: authPass,
+		TLSConfig: &tls.Config{
+			// nolint:gosec
+			InsecureSkipVerify: true,
+		},
+		TLSMode: goftp.TLSExplicit,
+	}
+
+	c, err := goftp.DialConfig(conf, s.Addr())
+	require.NoError(t, err, "Couldn't connect")
+
+	defer func() { panicOnError(c.Close()) }()
+
+	_, err = c.ReadDir("/")
+	require.NoError(t, err)
+
+	// now switch to unencrypted data connection
+	raw, err := c.OpenRawConn()
+	require.NoError(t, err, "Couldn't open raw connection")
+
+	defer func() { require.NoError(t, raw.Close()) }()
+
+	rc, resp, err := raw.SendCommand("PROT C")
+	require.NoError(t, err)
+	require.Equal(t, StatusOK, rc)
+	require.Equal(t, "OK", resp)
+
+	rc, _, err = raw.SendCommand("PASV")
+	require.NoError(t, err)
+	require.Equal(t, StatusEnteringPASV, rc)
+
+	rc, response, err := raw.SendCommand("MLSD /")
+	require.NoError(t, err)
+	require.Equal(t, StatusServiceNotAvailable, rc)
+	require.Equal(t, "unable to open transfer: TLS is required", response)
+}
+
 func TestDirListingBeforeLogin(t *testing.T) {
 	s := NewTestServer(t, true)
 	conn, err := net.DialTimeout("tcp", s.Addr(), 5*time.Second)
