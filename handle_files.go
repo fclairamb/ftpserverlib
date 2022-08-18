@@ -469,6 +469,10 @@ func (c *clientHandler) handleMLST(param string) error {
 	if info, err := c.driver.Stat(path); err == nil {
 		defer c.multilineAnswer(StatusFileOK, "File details")()
 
+		// Each MLSx entry must start with a space when returned in a multiline answer
+		if errWrite := c.writer.WriteByte(' '); errWrite != nil {
+			return errWrite
+		}
 		if errWrite := c.writeMLSxOutput(c.writer, info); errWrite != nil {
 			return errWrite
 		}
