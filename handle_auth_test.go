@@ -17,7 +17,7 @@ func panicOnError(err error) {
 }
 
 func TestLoginSuccess(t *testing.T) {
-	s := NewTestServer(t, true)
+	s := NewTestServer(t, false)
 	// send a NOOP before the login, this doesn't seems possible using secsy/goftp so use the old way ...
 	conn, err := net.DialTimeout("tcp", s.Addr(), 5*time.Second)
 	require.NoError(t, err)
@@ -74,7 +74,7 @@ func TestLoginSuccess(t *testing.T) {
 }
 
 func TestLoginFailure(t *testing.T) {
-	s := NewTestServer(t, true)
+	s := NewTestServer(t, false)
 
 	conf := goftp.Config{
 		User:     authUser,
@@ -119,7 +119,7 @@ func TestAuthTLS(t *testing.T) {
 }
 
 func TestAuthExplicitTLSFailure(t *testing.T) {
-	s := NewTestServer(t, true)
+	s := NewTestServer(t, false)
 
 	conf := goftp.Config{
 		User:     authUser,

@@ -298,7 +298,7 @@ func TestActiveModeDisabled(t *testing.T) {
 
 // TestFailedTransfer validates the handling of failed transfer caused by file access issues
 func TestFailedTransfer(t *testing.T) {
-	s := NewTestServer(t, true)
+	s := NewTestServer(t, false)
 	conf := goftp.Config{
 		User:     authUser,
 		Password: authPass,
@@ -318,7 +318,7 @@ func TestFailedTransfer(t *testing.T) {
 }
 
 func TestBogusTransferStart(t *testing.T) {
-	s := NewTestServer(t, true)
+	s := NewTestServer(t, false)
 	conf := goftp.Config{
 		User:     authUser,
 		Password: authPass,
@@ -540,7 +540,7 @@ func TestTransfersFromOffset(t *testing.T) {
 }
 
 func TestBasicABOR(t *testing.T) {
-	s := NewTestServer(t, true)
+	s := NewTestServer(t, false)
 	conf := goftp.Config{
 		User:     authUser,
 		Password: authPass,
@@ -592,7 +592,7 @@ func TestBasicABOR(t *testing.T) {
 
 func TestTransferABOR(t *testing.T) {
 	t.Run("passive-mode", func(t *testing.T) {
-		s := NewTestServer(t, true)
+		s := NewTestServer(t, false)
 		s.settings.PassiveTransferPortRange = &PortRange{
 			Start: 49152,
 			End:   65535,
@@ -610,7 +610,7 @@ func TestTransferABOR(t *testing.T) {
 	})
 
 	t.Run("active-mode", func(t *testing.T) {
-		s := NewTestServer(t, true)
+		s := NewTestServer(t, false)
 		conf := goftp.Config{
 			User:            authUser,
 			Password:        authPass,
@@ -627,7 +627,7 @@ func TestTransferABOR(t *testing.T) {
 }
 
 func TestABORWithoutOpenTransfer(t *testing.T) {
-	s := NewTestServer(t, true)
+	s := NewTestServer(t, false)
 	conf := goftp.Config{
 		User:     authUser,
 		Password: authPass,
@@ -685,7 +685,7 @@ func TestABORWithoutOpenTransfer(t *testing.T) {
 
 func TestABORBeforeOpenTransfer(t *testing.T) {
 	t.Run("passive-mode", func(t *testing.T) {
-		s := NewTestServer(t, true)
+		s := NewTestServer(t, false)
 		conf := goftp.Config{
 			User:     authUser,
 			Password: authPass,
@@ -700,7 +700,7 @@ func TestABORBeforeOpenTransfer(t *testing.T) {
 	})
 
 	t.Run("active-mode", func(t *testing.T) {
-		s := NewTestServer(t, true)
+		s := NewTestServer(t, false)
 		conf := goftp.Config{
 			User:            authUser,
 			Password:        authPass,
@@ -801,7 +801,7 @@ func aborBeforeOpenTransfer(t *testing.T, c *goftp.Client) {
 }
 
 func TestASCIITransfers(t *testing.T) {
-	s := NewTestServer(t, true)
+	s := NewTestServer(t, false)
 	conf := goftp.Config{
 		User:     authUser,
 		Password: authPass,
@@ -850,7 +850,7 @@ func TestASCIITransfers(t *testing.T) {
 }
 
 func TestASCIITransfersInvalidFiles(t *testing.T) {
-	s := NewTestServer(t, true)
+	s := NewTestServer(t, false)
 	conf := goftp.Config{
 		User:     authUser,
 		Password: authPass,
@@ -911,7 +911,7 @@ func TestPASVWrappedListenerError(t *testing.T) {
 }
 
 func TestPASVPublicIPResolver(t *testing.T) {
-	s := NewTestServer(t, true)
+	s := NewTestServer(t, false)
 
 	conf := goftp.Config{
 		User:     authUser,
@@ -999,7 +999,7 @@ func TestPASVConnectionWait(t *testing.T) {
 }
 
 func TestPASVIPMatch(t *testing.T) {
-	s := NewTestServer(t, true)
+	s := NewTestServer(t, false)
 
 	conn, err := net.DialTimeout("tcp", s.Addr(), 5*time.Second)
 	require.NoError(t, err)

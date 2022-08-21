@@ -48,7 +48,7 @@ func TestConcurrency(t *testing.T) {
 }
 
 func TestDOS(t *testing.T) {
-	s := NewTestServer(t, true)
+	s := NewTestServer(t, false)
 	conn, err := net.DialTimeout("tcp", s.Addr(), 5*time.Second)
 	require.NoError(t, err)
 
@@ -92,7 +92,7 @@ func TestLastDataChannel(t *testing.T) {
 }
 
 func TestTransferOpenError(t *testing.T) {
-	s := NewTestServer(t, true)
+	s := NewTestServer(t, false)
 	conf := goftp.Config{
 		User:     authUser,
 		Password: authPass,
@@ -118,7 +118,7 @@ func TestTransferOpenError(t *testing.T) {
 func TestTLSMethods(t *testing.T) {
 	t.Run("without-tls", func(t *testing.T) {
 		cc := clientHandler{
-			server: NewTestServer(t, true),
+			server: NewTestServer(t, false),
 		}
 		require.False(t, cc.HasTLSForControl())
 		require.False(t, cc.HasTLSForTransfers())
@@ -322,7 +322,7 @@ func isStringInSlice(s string, list []string) bool {
 }
 
 func TestUnknownCommand(t *testing.T) {
-	s := NewTestServer(t, true)
+	s := NewTestServer(t, false)
 	conf := goftp.Config{
 		User:     authUser,
 		Password: authPass,

@@ -13,7 +13,7 @@ import (
 )
 
 func TestSiteCommand(t *testing.T) {
-	s := NewTestServer(t, true)
+	s := NewTestServer(t, false)
 	conf := goftp.Config{
 		User:     authUser,
 		Password: authPass,
@@ -71,7 +71,7 @@ func TestIdleTimeout(t *testing.T) {
 }
 
 func TestStat(t *testing.T) {
-	s := NewTestServer(t, true)
+	s := NewTestServer(t, false)
 	conf := goftp.Config{
 		User:     authUser,
 		Password: authPass,
@@ -101,7 +101,7 @@ func TestStat(t *testing.T) {
 }
 
 func TestCLNT(t *testing.T) {
-	s := NewTestServer(t, true)
+	s := NewTestServer(t, false)
 	conf := goftp.Config{
 		User:     authUser,
 		Password: authPass,
@@ -123,7 +123,7 @@ func TestCLNT(t *testing.T) {
 }
 
 func TestOPTSUTF8(t *testing.T) {
-	s := NewTestServer(t, true)
+	s := NewTestServer(t, false)
 	conf := goftp.Config{
 		User:     authUser,
 		Password: authPass,
@@ -201,7 +201,7 @@ func TestOPTSHASH(t *testing.T) {
 }
 
 func TestAVBL(t *testing.T) {
-	s := NewTestServer(t, true)
+	s := NewTestServer(t, false)
 	conf := goftp.Config{
 		User:     authUser,
 		Password: authPass,
@@ -273,7 +273,7 @@ func TestQuit(t *testing.T) {
 }
 
 func TestTYPE(t *testing.T) {
-	s := NewTestServer(t, true)
+	s := NewTestServer(t, false)
 	conf := goftp.Config{
 		User:     authUser,
 		Password: authPass,

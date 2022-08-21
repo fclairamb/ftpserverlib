@@ -84,7 +84,7 @@ func TestMLSxEntryValidation(t *testing.T) {
 }
 
 func TestALLO(t *testing.T) {
-	s := NewTestServer(t, true)
+	s := NewTestServer(t, false)
 	conf := goftp.Config{
 		User:     authUser,
 		Password: authPass,
@@ -150,7 +150,7 @@ func TestCHMOD(t *testing.T) {
 }
 
 func TestCHOWN(t *testing.T) {
-	s := NewTestServer(t, true)
+	s := NewTestServer(t, false)
 	conf := goftp.Config{
 		User:     authUser,
 		Password: authPass,
@@ -253,7 +253,7 @@ func TestMFMT(t *testing.T) {
 }
 
 func TestSYMLINK(t *testing.T) {
-	s := NewTestServer(t, true)
+	s := NewTestServer(t, false)
 	conf := goftp.Config{
 		User:     authUser,
 		Password: authPass,
@@ -314,7 +314,7 @@ func TestSYMLINK(t *testing.T) {
 }
 
 func TestSTATFile(t *testing.T) {
-	s := NewTestServer(t, true)
+	s := NewTestServer(t, false)
 	conf := goftp.Config{
 		User:     authUser,
 		Password: authPass,
@@ -362,7 +362,7 @@ func TestSTATFile(t *testing.T) {
 }
 
 func TestMLST(t *testing.T) {
-	s := NewTestServer(t, true)
+	s := NewTestServer(t, false)
 	conf := goftp.Config{
 		User:     authUser,
 		Password: authPass,
@@ -396,7 +396,7 @@ func TestMLST(t *testing.T) {
 }
 
 func TestMDTM(t *testing.T) {
-	s := NewTestServer(t, true)
+	s := NewTestServer(t, false)
 	conf := goftp.Config{
 		User:     authUser,
 		Password: authPass,
@@ -424,7 +424,7 @@ func TestMDTM(t *testing.T) {
 }
 
 func TestRename(t *testing.T) {
-	s := NewTestServer(t, true)
+	s := NewTestServer(t, false)
 	conf := goftp.Config{
 		User:     authUser,
 		Password: authPass,
@@ -462,7 +462,7 @@ func TestRename(t *testing.T) {
 }
 
 func TestUploadErrorCodes(t *testing.T) {
-	s := NewTestServer(t, true)
+	s := NewTestServer(t, false)
 	conf := goftp.Config{
 		User:     authUser,
 		Password: authPass,
@@ -491,7 +491,7 @@ func TestUploadErrorCodes(t *testing.T) {
 }
 
 func TestHASHDisabled(t *testing.T) {
-	s := NewTestServer(t, true)
+	s := NewTestServer(t, false)
 	conf := goftp.Config{
 		User:     authUser,
 		Password: authPass,
@@ -574,8 +574,8 @@ func TestHASHCommand(t *testing.T) {
 }
 
 func TestCustomHASHCommands(t *testing.T) {
-	s := NewTestServer(t, true)
-	s.settings.EnableHASH = true
+	s := NewTestServer(t, false)
+	s.settings.EnableHASH = false
 	conf := goftp.Config{
 		User:     authUser,
 		Password: authPass,
@@ -631,7 +631,7 @@ func TestCustomHASHCommands(t *testing.T) {
 }
 
 func TestCOMB(t *testing.T) {
-	s := NewTestServer(t, true)
+	s := NewTestServer(t, false)
 	conf := goftp.Config{
 		User:     authUser,
 		Password: authPass,
@@ -754,7 +754,7 @@ func TestCOMBAppend(t *testing.T) {
 }
 
 func TestCOMBCloseError(t *testing.T) {
-	s := NewTestServer(t, true)
+	s := NewTestServer(t, false)
 	conf := goftp.Config{
 		User:     authUser,
 		Password: authPass,
@@ -781,7 +781,7 @@ func TestCOMBCloseError(t *testing.T) {
 }
 
 func TestREST(t *testing.T) {
-	s := NewTestServer(t, true)
+	s := NewTestServer(t, false)
 	conf := goftp.Config{
 		User:     authUser,
 		Password: authPass,
@@ -816,7 +816,7 @@ func TestREST(t *testing.T) {
 }
 
 func TestSIZE(t *testing.T) {
-	s := NewTestServer(t, true)
+	s := NewTestServer(t, false)
 	conf := goftp.Config{
 		User:     authUser,
 		Password: authPass,
@@ -854,7 +854,7 @@ func TestSIZE(t *testing.T) {
 }
 
 func TestCOMBErrors(t *testing.T) {
-	s := NewTestServer(t, true)
+	s := NewTestServer(t, false)
 	conf := goftp.Config{
 		User:     authUser,
 		Password: authPass,
