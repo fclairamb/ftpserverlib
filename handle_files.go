@@ -472,7 +472,7 @@ func (c *clientHandler) handleMLST(param string) error {
 
 		// Each MLSx entry must start with a space when returned in a multiline answer
 		if err = c.writer.WriteByte(' '); err == nil {
-			err = c.writeMLSxOutput(c.writer, info)
+			err = c.writeMLSxEntry(c.writer, info)
 		}
 	} else {
 		c.writeMessage(StatusActionNotTaken, fmt.Sprintf("Could not list: %v", err))
