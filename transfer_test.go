@@ -627,7 +627,7 @@ func TestTransferABOR(t *testing.T) {
 }
 
 func TestABORWithoutOpenTransfer(t *testing.T) {
-	s := NewTestServer(t, false)
+	s := NewTestServer(t, true)
 	conf := goftp.Config{
 		User:     authUser,
 		Password: authPass,
