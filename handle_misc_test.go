@@ -41,7 +41,7 @@ func TestSiteCommand(t *testing.T) {
 // will timeout. I handle idle timeout myself in SFTPGo but you could be
 // interested to fix this bug
 func TestIdleTimeout(t *testing.T) {
-	s := NewTestServerWithDriver(t, &TestServerDriver{Debug: true, Settings: &Settings{IdleTimeout: 2}})
+	s := NewTestServerWithDriver(t, &TestServerDriver{Debug: false, Settings: &Settings{IdleTimeout: 2}})
 	conf := goftp.Config{
 		User:     authUser,
 		Password: authPass,
@@ -151,7 +151,7 @@ func TestOPTSHASH(t *testing.T) {
 	s := NewTestServerWithDriver(
 		t,
 		&TestServerDriver{
-			Debug: true,
+			Debug: false,
 			Settings: &Settings{
 				EnableHASH: true,
 			},
@@ -245,7 +245,7 @@ func TestAVBL(t *testing.T) {
 
 func TestQuit(t *testing.T) {
 	s := NewTestServerWithDriver(t, &TestServerDriver{
-		Debug: true,
+		Debug: false,
 		TLS:   true,
 	})
 	conf := goftp.Config{

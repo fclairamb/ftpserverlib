@@ -130,7 +130,7 @@ func TestTLSMethods(t *testing.T) {
 				TLSRequired: ImplicitEncryption,
 			},
 			TLS:   true,
-			Debug: true,
+			Debug: false,
 		})
 		cc := clientHandler{
 			server: s,
@@ -171,7 +171,7 @@ func TestConnectionNotAllowed(t *testing.T) {
 
 func TestCloseConnection(t *testing.T) {
 	driver := &TestServerDriver{
-		Debug: true,
+		Debug: false,
 	}
 	s := NewTestServerWithDriver(t, driver)
 

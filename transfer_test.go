@@ -170,7 +170,7 @@ func TestTransferIPv6(t *testing.T) {
 	s := NewTestServerWithDriver(
 		t,
 		&TestServerDriver{
-			Debug: true,
+			Debug: false,
 			Settings: &Settings{
 				ActiveTransferPortNon20: true,
 				ListenAddr:              "[::1]:0",
@@ -192,7 +192,7 @@ func TestTransfer(t *testing.T) {
 		s := NewTestServerWithDriver(
 			t,
 			&TestServerDriver{
-				Debug: true,
+				Debug: false,
 				Settings: &Settings{
 					ActiveTransferPortNon20: true,
 				},
@@ -206,7 +206,7 @@ func TestTransfer(t *testing.T) {
 		s := NewTestServerWithDriver(
 			t,
 			&TestServerDriver{
-				Debug: true,
+				Debug: false,
 				TLS:   true,
 				Settings: &Settings{
 					ActiveTransferPortNon20: true,
@@ -220,7 +220,7 @@ func TestTransfer(t *testing.T) {
 
 	t.Run("with-implicit-tls", func(t *testing.T) {
 		s := NewTestServerWithDriver(t, &TestServerDriver{
-			Debug: true,
+			Debug: false,
 			TLS:   true,
 			Settings: &Settings{
 				ActiveTransferPortNon20: true,
@@ -273,7 +273,7 @@ func testTransferOnConnection(t *testing.T, server *FtpServer, active, enableTLS
 
 func TestActiveModeDisabled(t *testing.T) {
 	server := NewTestServerWithDriver(t, &TestServerDriver{
-		Debug: true,
+		Debug: false,
 		Settings: &Settings{
 			ActiveTransferPortNon20: true,
 			DisableActiveMode:       true,
@@ -379,7 +379,7 @@ func TestBogusTransferStart(t *testing.T) {
 
 func TestFailingFileTransfer(t *testing.T) {
 	driver := &TestServerDriver{
-		Debug: true,
+		Debug: false,
 	}
 	s := NewTestServerWithDriver(t, driver)
 	conf := goftp.Config{
@@ -443,7 +443,7 @@ func TestFailingFileTransfer(t *testing.T) {
 
 func TestAPPE(t *testing.T) {
 	driver := &TestServerDriver{
-		Debug: true,
+		Debug: false,
 	}
 	s := NewTestServerWithDriver(t, driver)
 	conf := goftp.Config{
@@ -492,7 +492,7 @@ func TestAPPE(t *testing.T) {
 
 func TestTransfersFromOffset(t *testing.T) {
 	driver := &TestServerDriver{
-		Debug: true,
+		Debug: false,
 	}
 	s := NewTestServerWithDriver(t, driver)
 	conf := goftp.Config{

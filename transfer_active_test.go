@@ -33,7 +33,7 @@ func TestActiveTransferFromPort20(t *testing.T) {
 	require.NoError(t, err)
 
 	server := NewTestServerWithDriver(t, &TestServerDriver{
-		Debug: true,
+		Debug: false,
 		Settings: &Settings{
 			ActiveTransferPortNon20: false,
 		},

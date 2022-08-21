@@ -16,7 +16,7 @@ const DirKnown = "known"
 
 func TestDirListing(t *testing.T) {
 	// MLSD is disabled we relies on LIST of files listing
-	s := NewTestServerWithDriver(t, &TestServerDriver{Debug: true, Settings: &Settings{DisableMLSD: true}})
+	s := NewTestServerWithDriver(t, &TestServerDriver{Debug: false, Settings: &Settings{DisableMLSD: true}})
 	conf := goftp.Config{
 		User:     authUser,
 		Password: authPass,
@@ -58,7 +58,7 @@ func TestDirListing(t *testing.T) {
 
 func TestDirListingPathArg(t *testing.T) {
 	// MLSD is disabled we relies on LIST of files listing
-	s := NewTestServerWithDriver(t, &TestServerDriver{Debug: true, Settings: &Settings{DisableMLSD: true}})
+	s := NewTestServerWithDriver(t, &TestServerDriver{Debug: false, Settings: &Settings{DisableMLSD: true}})
 	conf := goftp.Config{
 		User:     authUser,
 		Password: authPass,
@@ -337,7 +337,7 @@ func TestCleanPath(t *testing.T) {
 
 func TestTLSTransfer(t *testing.T) {
 	s := NewTestServerWithDriver(t, &TestServerDriver{
-		Debug: true,
+		Debug: false,
 		TLS:   true,
 	})
 	s.settings.TLSRequired = MandatoryEncryption

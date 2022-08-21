@@ -92,7 +92,7 @@ func TestLoginFailure(t *testing.T) {
 
 func TestAuthTLS(t *testing.T) {
 	s := NewTestServerWithDriver(t, &TestServerDriver{
-		Debug: true,
+		Debug: false,
 		TLS:   true,
 	})
 
@@ -142,7 +142,7 @@ func TestAuthExplicitTLSFailure(t *testing.T) {
 
 func TestAuthTLSRequired(t *testing.T) {
 	s := NewTestServerWithDriver(t, &TestServerDriver{
-		Debug: true,
+		Debug: false,
 		TLS:   true,
 	})
 	s.settings.TLSRequired = MandatoryEncryption
@@ -278,7 +278,7 @@ func TestAuthPerClientTLSRequired(t *testing.T) {
 
 func TestUserVerifierError(t *testing.T) {
 	s := NewTestServerWithDriver(t, &TestServerDriver{
-		Debug: true,
+		Debug: false,
 		TLS:   true,
 		// setting an invalid TLS requirement will cause the test driver
 		// to return an error in PreAuthUser

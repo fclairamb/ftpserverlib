@@ -117,7 +117,7 @@ func TestALLO(t *testing.T) {
 
 func TestCHMOD(t *testing.T) {
 	s := NewTestServerWithDriver(t, &TestServerDriver{
-		Debug: true,
+		Debug: false,
 		TLS:   true,
 	})
 	conf := goftp.Config{
@@ -201,7 +201,7 @@ func TestCHOWN(t *testing.T) {
 
 func TestMFMT(t *testing.T) {
 	s := NewTestServerWithDriver(t, &TestServerDriver{
-		Debug: true,
+		Debug: false,
 		TLS:   true,
 	})
 	conf := goftp.Config{
@@ -516,7 +516,7 @@ func TestHASHCommand(t *testing.T) {
 	s := NewTestServerWithDriver(
 		t,
 		&TestServerDriver{
-			Debug: true,
+			Debug: false,
 			Settings: &Settings{
 				EnableHASH: true,
 			},
@@ -691,7 +691,7 @@ func TestCOMBAppend(t *testing.T) {
 	s := NewTestServerWithDriver(
 		t,
 		&TestServerDriver{
-			Debug: true,
+			Debug: false,
 			Settings: &Settings{
 				EnableCOMB: true,
 			},
