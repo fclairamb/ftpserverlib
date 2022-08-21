@@ -574,8 +574,8 @@ func TestHASHCommand(t *testing.T) {
 }
 
 func TestCustomHASHCommands(t *testing.T) {
-	s := NewTestServer(t, false)
-	s.settings.EnableHASH = false
+	s := NewTestServer(t, true)
+	s.settings.EnableHASH = true
 	conf := goftp.Config{
 		User:     authUser,
 		Password: authPass,
