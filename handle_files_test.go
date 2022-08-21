@@ -362,6 +362,40 @@ func TestSTATFile(t *testing.T) {
 	require.Equal(t, StatusFileActionNotTaken, rc)
 }
 
+func TestMLST(t *testing.T) {
+	s := NewTestServer(t, true)
+	conf := goftp.Config{
+		User:     authUser,
+		Password: authPass,
+	}
+	c, err := goftp.DialConfig(conf, s.Addr())
+	require.NoError(t, err, "Couldn't connect")
+
+	defer func() { panicOnError(c.Close()) }()
+
+	// Creating a tiny file
+	ftpUpload(t, c, createTemporaryFile(t, 10), "file")
+
+	raw, err := c.OpenRawConn()
+	require.NoError(t, err, "Couldn't open raw connection")
+
+	defer func() { require.NoError(t, raw.Close()) }()
+
+	rc, rsp, err := raw.SendCommand("MLST file")
+	require.NoError(t, err)
+	require.Equal(t, StatusFileOK, rc)
+
+	lines := strings.Split(rsp, "\n")
+	require.Len(t, lines, 3)
+	path := validMLSxEntryPattern.FindStringSubmatch(lines[1] + "\r\n")
+
+	if len(path) != 2 {
+		t.Errorf("Valid MLST response example did not pass validation: \"%s\"", lines[1])
+	} else if path[1] != "file" {
+		t.Errorf("Validation returned incorrect pathentry: got \"%s\", want \"%s\"", path, "file")
+	}
+}
+
 func TestMDTM(t *testing.T) {
 	s := NewTestServer(t, true)
 	conf := goftp.Config{
