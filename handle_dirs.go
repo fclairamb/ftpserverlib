@@ -285,14 +285,14 @@ func (c *clientHandler) dirTransferMLSD(w io.Writer, files []os.FileInfo) error 
 	}
 
 	for _, file := range files {
-		if err := c.writeMLSxOutput(w, file); err != nil {
+		if err := c.writeMLSxEntry(w, file); err != nil {
 			return err
 		}
 	}
 
 	return nil
 }
-func (c *clientHandler) writeMLSxOutput(w io.Writer, file os.FileInfo) error {
+func (c *clientHandler) writeMLSxEntry(w io.Writer, file os.FileInfo) error {
 	var listType string
 	if file.IsDir() {
 		listType = "dir"
