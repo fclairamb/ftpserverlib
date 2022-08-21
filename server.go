@@ -197,7 +197,8 @@ func temporaryError(err net.Error) bool {
 	if opErr, ok := err.(*net.OpError); ok {
 		if sysErr, ok := opErr.Err.(*os.SyscallError); ok {
 			if errno, ok := sysErr.Err.(syscall.Errno); ok {
-				if errno == syscall.ECONNABORTED || errno == syscall.ECONNRESET {
+				if errno == syscall.ECONNABORTED ||
+					errno == syscall.ECONNRESET {
 					return true
 				}
 			}
