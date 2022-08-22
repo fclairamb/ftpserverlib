@@ -17,7 +17,7 @@ func panicOnError(err error) {
 }
 
 func TestLoginSuccess(t *testing.T) {
-	s := NewTestServer(t, true)
+	s := NewTestServer(t, false)
 	// send a NOOP before the login, this doesn't seems possible using secsy/goftp so use the old way ...
 	conn, err := net.DialTimeout("tcp", s.Addr(), 5*time.Second)
 	require.NoError(t, err)
@@ -74,7 +74,7 @@ func TestLoginSuccess(t *testing.T) {
 }
 
 func TestLoginFailure(t *testing.T) {
-	s := NewTestServer(t, true)
+	s := NewTestServer(t, false)
 
 	conf := goftp.Config{
 		User:     authUser,
@@ -92,7 +92,7 @@ func TestLoginFailure(t *testing.T) {
 
 func TestAuthTLS(t *testing.T) {
 	s := NewTestServerWithDriver(t, &TestServerDriver{
-		Debug: true,
+		Debug: false,
 		TLS:   true,
 	})
 
@@ -100,7 +100,7 @@ func TestAuthTLS(t *testing.T) {
 		User:     authUser,
 		Password: authPass,
 		TLSConfig: &tls.Config{
-			// nolint:gosec
+			//nolint:gosec
 			InsecureSkipVerify: true,
 		},
 		TLSMode: goftp.TLSExplicit,
@@ -119,13 +119,13 @@ func TestAuthTLS(t *testing.T) {
 }
 
 func TestAuthExplicitTLSFailure(t *testing.T) {
-	s := NewTestServer(t, true)
+	s := NewTestServer(t, false)
 
 	conf := goftp.Config{
 		User:     authUser,
 		Password: authPass,
 		TLSConfig: &tls.Config{
-			// nolint:gosec
+			//nolint:gosec
 			InsecureSkipVerify: true,
 		},
 		TLSMode: goftp.TLSExplicit,
@@ -142,7 +142,7 @@ func TestAuthExplicitTLSFailure(t *testing.T) {
 
 func TestAuthTLSRequired(t *testing.T) {
 	s := NewTestServerWithDriver(t, &TestServerDriver{
-		Debug: true,
+		Debug: false,
 		TLS:   true,
 	})
 	s.settings.TLSRequired = MandatoryEncryption
@@ -162,7 +162,7 @@ func TestAuthTLSRequired(t *testing.T) {
 	require.EqualError(t, err, "unexpected response: 421-TLS is required")
 
 	conf.TLSConfig = &tls.Config{
-		// nolint:gosec
+		//nolint:gosec
 		InsecureSkipVerify: true,
 	}
 	conf.TLSMode = goftp.TLSExplicit
@@ -191,7 +191,7 @@ func TestAuthTLSVerificationFailed(t *testing.T) {
 		User:     authUser,
 		Password: authPass,
 		TLSConfig: &tls.Config{
-			// nolint:gosec
+			//nolint:gosec
 			InsecureSkipVerify: true,
 		},
 		TLSMode: goftp.TLSExplicit,
@@ -216,7 +216,7 @@ func TestAuthTLSCertificate(t *testing.T) {
 	conf := goftp.Config{
 		User: authUser,
 		TLSConfig: &tls.Config{
-			// nolint:gosec
+			//nolint:gosec
 			InsecureSkipVerify: true,
 		},
 		TLSMode: goftp.TLSExplicit,
@@ -259,8 +259,7 @@ func TestAuthPerClientTLSRequired(t *testing.T) {
 	require.EqualError(t, err, "unexpected response: 421-TLS is required")
 
 	conf.TLSConfig = &tls.Config{
-		// nolint:gosec
-		InsecureSkipVerify: true,
+		InsecureSkipVerify: true, //nolint:gosec
 	}
 	conf.TLSMode = goftp.TLSExplicit
 
@@ -279,7 +278,7 @@ func TestAuthPerClientTLSRequired(t *testing.T) {
 
 func TestUserVerifierError(t *testing.T) {
 	s := NewTestServerWithDriver(t, &TestServerDriver{
-		Debug: true,
+		Debug: false,
 		TLS:   true,
 		// setting an invalid TLS requirement will cause the test driver
 		// to return an error in PreAuthUser
@@ -290,8 +289,7 @@ func TestUserVerifierError(t *testing.T) {
 		User:     authUser,
 		Password: authPass,
 		TLSConfig: &tls.Config{
-			// nolint:gosec
-			InsecureSkipVerify: true,
+			InsecureSkipVerify: true, //nolint:gosec
 		},
 		TLSMode: goftp.TLSExplicit,
 	}

@@ -6,6 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"os"
+	"syscall"
 	"time"
 
 	log "github.com/fclairamb/go-log"
@@ -101,7 +103,7 @@ var (
 // FtpServer is where everything is stored
 // We want to keep it as simple as possible
 type FtpServer struct {
-	Logger        log.Logger   // Go-Kit logger
+	Logger        log.Logger   // fclairamb/go-log generic logger
 	settings      *Settings    // General settings
 	listener      net.Listener // listener used to receive files
 	clientCounter uint32       // Clients counter
@@ -191,6 +193,21 @@ func (server *FtpServer) Listen() error {
 	return err
 }
 
+func temporaryError(err net.Error) bool {
+	if opErr, ok := err.(*net.OpError); ok {
+		if sysErr, ok := opErr.Err.(*os.SyscallError); ok {
+			if errno, ok := sysErr.Err.(syscall.Errno); ok {
+				if errno == syscall.ECONNABORTED ||
+					errno == syscall.ECONNRESET {
+					return true
+				}
+			}
+		}
+	}
+
+	return false
+}
+
 // Serve accepts and processes any new incoming client
 func (server *FtpServer) Serve() error {
 	var tempDelay time.Duration // how long to sleep on accept failure
@@ -209,6 +226,9 @@ func (server *FtpServer) Serve() error {
 			}
 
 			// see https://github.com/golang/go/blob/4aa1efed4853ea067d665a952eee77c52faac774/src/net/http/server.go#L3046
+			// & https://github.com/fclairamb/ftpserverlib/pull/352#pullrequestreview-1077459896
+			// The temporaryError method should replace net.Error.Temporary() when the go team
+			// will have provided us a better way to detect temporary errors.
 			if ne, ok := err.(net.Error); ok && ne.Temporary() {
 				if tempDelay == 0 {
 					tempDelay = 5 * time.Millisecond
