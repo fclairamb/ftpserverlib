@@ -103,7 +103,7 @@ var (
 // FtpServer is where everything is stored
 // We want to keep it as simple as possible
 type FtpServer struct {
-	Logger        log.Logger   // Go-Kit logger
+	Logger        log.Logger   // fclairamb/go-log generic logger
 	settings      *Settings    // General settings
 	listener      net.Listener // listener used to receive files
 	clientCounter uint32       // Clients counter

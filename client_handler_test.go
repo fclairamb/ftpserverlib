@@ -48,7 +48,7 @@ func TestConcurrency(t *testing.T) {
 }
 
 func TestDOS(t *testing.T) {
-	s := NewTestServer(t, false)
+	s := NewTestServer(t, true)
 	conn, err := net.DialTimeout("tcp", s.Addr(), 5*time.Second)
 	require.NoError(t, err)
 
