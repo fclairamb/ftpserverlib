@@ -16,7 +16,7 @@ const DirKnown = "known"
 
 func TestDirListing(t *testing.T) {
 	// MLSD is disabled we relies on LIST of files listing
-	s := NewTestServerWithDriver(t, &TestServerDriver{Debug: true, Settings: &Settings{DisableMLSD: true}})
+	s := NewTestServerWithDriver(t, &TestServerDriver{Debug: false, Settings: &Settings{DisableMLSD: true}})
 	conf := goftp.Config{
 		User:     authUser,
 		Password: authPass,
@@ -58,7 +58,7 @@ func TestDirListing(t *testing.T) {
 
 func TestDirListingPathArg(t *testing.T) {
 	// MLSD is disabled we relies on LIST of files listing
-	s := NewTestServerWithDriver(t, &TestServerDriver{Debug: true, Settings: &Settings{DisableMLSD: true}})
+	s := NewTestServerWithDriver(t, &TestServerDriver{Debug: false, Settings: &Settings{DisableMLSD: true}})
 	conf := goftp.Config{
 		User:     authUser,
 		Password: authPass,
@@ -86,7 +86,7 @@ func TestDirListingPathArg(t *testing.T) {
 }
 
 func TestDirHandling(t *testing.T) {
-	s := NewTestServer(t, true)
+	s := NewTestServer(t, false)
 
 	c, err := goftp.DialConfig(goftp.Config{
 		User:     authUser,
@@ -145,7 +145,7 @@ func TestDirHandling(t *testing.T) {
 }
 
 func TestCWDToRegularFile(t *testing.T) {
-	s := NewTestServer(t, true)
+	s := NewTestServer(t, false)
 	conf := goftp.Config{
 		User:     authUser,
 		Password: authPass,
@@ -176,7 +176,7 @@ func TestCWDToRegularFile(t *testing.T) {
 }
 
 func TestMkdirRmDir(t *testing.T) {
-	s := NewTestServer(t, true)
+	s := NewTestServer(t, false)
 	conf := goftp.Config{
 		User:     authUser,
 		Password: authPass,
@@ -247,7 +247,7 @@ func TestMkdirRmDir(t *testing.T) {
 
 // TestDirListingWithSpace uses the MLSD for files listing
 func TestDirListingWithSpace(t *testing.T) {
-	s := NewTestServer(t, true)
+	s := NewTestServer(t, false)
 	conf := goftp.Config{
 		User:     authUser,
 		Password: authPass,
@@ -298,7 +298,7 @@ func TestDirListingWithSpace(t *testing.T) {
 }
 
 func TestCleanPath(t *testing.T) {
-	s := NewTestServer(t, true)
+	s := NewTestServer(t, false)
 	conf := goftp.Config{
 		User:     authUser,
 		Password: authPass,
@@ -337,7 +337,7 @@ func TestCleanPath(t *testing.T) {
 
 func TestTLSTransfer(t *testing.T) {
 	s := NewTestServerWithDriver(t, &TestServerDriver{
-		Debug: true,
+		Debug: false,
 		TLS:   true,
 	})
 	s.settings.TLSRequired = MandatoryEncryption
@@ -346,7 +346,7 @@ func TestTLSTransfer(t *testing.T) {
 		User:     authUser,
 		Password: authPass,
 		TLSConfig: &tls.Config{
-			// nolint:gosec
+			//nolint:gosec
 			InsecureSkipVerify: true,
 		},
 		TLSMode: goftp.TLSExplicit,
@@ -392,8 +392,7 @@ func TestPerClientTLSTransfer(t *testing.T) {
 		User:     authUser,
 		Password: authPass,
 		TLSConfig: &tls.Config{
-			// nolint:gosec
-			InsecureSkipVerify: true,
+			InsecureSkipVerify: true, //nolint:gosec
 		},
 		TLSMode: goftp.TLSExplicit,
 	}
@@ -428,7 +427,7 @@ func TestPerClientTLSTransfer(t *testing.T) {
 }
 
 func TestDirListingBeforeLogin(t *testing.T) {
-	s := NewTestServer(t, true)
+	s := NewTestServer(t, false)
 	conn, err := net.DialTimeout("tcp", s.Addr(), 5*time.Second)
 	require.NoError(t, err)
 
@@ -456,11 +455,17 @@ func TestDirListingBeforeLogin(t *testing.T) {
 
 func TestListArgs(t *testing.T) {
 	t.Run("with-mlsd", func(t *testing.T) {
-		testListDirArgs(t, NewTestServer(t, true))
+		testListDirArgs(
+			t,
+			NewTestServer(t, false),
+		)
 	})
 
 	t.Run("without-mlsd", func(t *testing.T) {
-		testListDirArgs(t, NewTestServerWithDriver(t, &TestServerDriver{Debug: true, Settings: &Settings{DisableMLSD: true}}))
+		testListDirArgs(
+			t,
+			NewTestServerWithDriver(t, &TestServerDriver{Debug: false, Settings: &Settings{DisableMLSD: true}}),
+		)
 	})
 }
 
@@ -514,7 +519,7 @@ func testListDirArgs(t *testing.T, s *FtpServer) {
 }
 
 func TestMLSDTimezone(t *testing.T) {
-	s := NewTestServer(t, true)
+	s := NewTestServer(t, false)
 	conf := goftp.Config{
 		User:     authUser,
 		Password: authPass,
@@ -534,7 +539,7 @@ func TestMLSDTimezone(t *testing.T) {
 }
 
 func TestMLSDAndNLSTFilePathError(t *testing.T) {
-	s := NewTestServer(t, true)
+	s := NewTestServer(t, false)
 	conf := goftp.Config{
 		User:     authUser,
 		Password: authPass,

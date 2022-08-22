@@ -92,7 +92,7 @@ func TestLastDataChannel(t *testing.T) {
 }
 
 func TestTransferOpenError(t *testing.T) {
-	s := NewTestServer(t, true)
+	s := NewTestServer(t, false)
 	conf := goftp.Config{
 		User:     authUser,
 		Password: authPass,
@@ -118,7 +118,7 @@ func TestTransferOpenError(t *testing.T) {
 func TestTLSMethods(t *testing.T) {
 	t.Run("without-tls", func(t *testing.T) {
 		cc := clientHandler{
-			server: NewTestServer(t, true),
+			server: NewTestServer(t, false),
 		}
 		require.False(t, cc.HasTLSForControl())
 		require.False(t, cc.HasTLSForTransfers())
@@ -130,7 +130,7 @@ func TestTLSMethods(t *testing.T) {
 				TLSRequired: ImplicitEncryption,
 			},
 			TLS:   true,
-			Debug: true,
+			Debug: false,
 		})
 		cc := clientHandler{
 			server: s,
@@ -171,7 +171,7 @@ func TestConnectionNotAllowed(t *testing.T) {
 
 func TestCloseConnection(t *testing.T) {
 	driver := &TestServerDriver{
-		Debug: true,
+		Debug: false,
 	}
 	s := NewTestServerWithDriver(t, driver)
 
@@ -322,7 +322,7 @@ func isStringInSlice(s string, list []string) bool {
 }
 
 func TestUnknownCommand(t *testing.T) {
-	s := NewTestServer(t, true)
+	s := NewTestServer(t, false)
 	conf := goftp.Config{
 		User:     authUser,
 		Password: authPass,

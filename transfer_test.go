@@ -7,7 +7,6 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"math/rand"
 	"net"
 	"os"
@@ -37,10 +36,10 @@ func createTemporaryFile(t *testing.T, targetSize int) *os.File {
 
 	var fileErr error
 
-	file, fileErr = ioutil.TempFile("", "ftpserver")
+	file, fileErr = os.CreateTemp("", "ftpserver")
 	require.NoError(t, fileErr, "Temporary file creation error")
 
-	// nolint: gosec
+	//nolint: gosec
 	src := rand.New(rand.NewSource(0))
 	_, err := io.CopyN(file, src, int64(targetSize))
 	require.NoError(t, err, "Couldn't copy")
@@ -171,7 +170,7 @@ func TestTransferIPv6(t *testing.T) {
 	s := NewTestServerWithDriver(
 		t,
 		&TestServerDriver{
-			Debug: true,
+			Debug: false,
 			Settings: &Settings{
 				ActiveTransferPortNon20: true,
 				ListenAddr:              "[::1]:0",
@@ -193,7 +192,7 @@ func TestTransfer(t *testing.T) {
 		s := NewTestServerWithDriver(
 			t,
 			&TestServerDriver{
-				Debug: true,
+				Debug: false,
 				Settings: &Settings{
 					ActiveTransferPortNon20: true,
 				},
@@ -207,7 +206,7 @@ func TestTransfer(t *testing.T) {
 		s := NewTestServerWithDriver(
 			t,
 			&TestServerDriver{
-				Debug: true,
+				Debug: false,
 				TLS:   true,
 				Settings: &Settings{
 					ActiveTransferPortNon20: true,
@@ -221,7 +220,7 @@ func TestTransfer(t *testing.T) {
 
 	t.Run("with-implicit-tls", func(t *testing.T) {
 		s := NewTestServerWithDriver(t, &TestServerDriver{
-			Debug: true,
+			Debug: false,
 			TLS:   true,
 			Settings: &Settings{
 				ActiveTransferPortNon20: true,
@@ -241,7 +240,7 @@ func testTransferOnConnection(t *testing.T, server *FtpServer, active, enableTLS
 	}
 	if enableTLS {
 		conf.TLSConfig = &tls.Config{
-			// nolint:gosec
+			//nolint:gosec
 			InsecureSkipVerify: true,
 		}
 		if implicitTLS {
@@ -274,7 +273,7 @@ func testTransferOnConnection(t *testing.T, server *FtpServer, active, enableTLS
 
 func TestActiveModeDisabled(t *testing.T) {
 	server := NewTestServerWithDriver(t, &TestServerDriver{
-		Debug: true,
+		Debug: false,
 		Settings: &Settings{
 			ActiveTransferPortNon20: true,
 			DisableActiveMode:       true,
@@ -299,7 +298,7 @@ func TestActiveModeDisabled(t *testing.T) {
 
 // TestFailedTransfer validates the handling of failed transfer caused by file access issues
 func TestFailedTransfer(t *testing.T) {
-	s := NewTestServer(t, true)
+	s := NewTestServer(t, false)
 	conf := goftp.Config{
 		User:     authUser,
 		Password: authPass,
@@ -319,7 +318,7 @@ func TestFailedTransfer(t *testing.T) {
 }
 
 func TestBogusTransferStart(t *testing.T) {
-	s := NewTestServer(t, true)
+	s := NewTestServer(t, false)
 	conf := goftp.Config{
 		User:     authUser,
 		Password: authPass,
@@ -380,7 +379,7 @@ func TestBogusTransferStart(t *testing.T) {
 
 func TestFailingFileTransfer(t *testing.T) {
 	driver := &TestServerDriver{
-		Debug: true,
+		Debug: false,
 	}
 	s := NewTestServerWithDriver(t, driver)
 	conf := goftp.Config{
@@ -409,7 +408,7 @@ func TestFailingFileTransfer(t *testing.T) {
 
 	t.Run("on seek", func(t *testing.T) {
 		initialData := []byte("initial data")
-		appendFile, err := ioutil.TempFile("", "ftpserver")
+		appendFile, err := os.CreateTemp("", "ftpserver")
 		require.NoError(t, err)
 
 		_, err = appendFile.Write(initialData)
@@ -444,7 +443,7 @@ func TestFailingFileTransfer(t *testing.T) {
 
 func TestAPPE(t *testing.T) {
 	driver := &TestServerDriver{
-		Debug: true,
+		Debug: false,
 	}
 	s := NewTestServerWithDriver(t, driver)
 	conf := goftp.Config{
@@ -493,7 +492,7 @@ func TestAPPE(t *testing.T) {
 
 func TestTransfersFromOffset(t *testing.T) {
 	driver := &TestServerDriver{
-		Debug: true,
+		Debug: false,
 	}
 	s := NewTestServerWithDriver(t, driver)
 	conf := goftp.Config{
@@ -541,7 +540,7 @@ func TestTransfersFromOffset(t *testing.T) {
 }
 
 func TestBasicABOR(t *testing.T) {
-	s := NewTestServer(t, true)
+	s := NewTestServer(t, false)
 	conf := goftp.Config{
 		User:     authUser,
 		Password: authPass,
@@ -593,7 +592,7 @@ func TestBasicABOR(t *testing.T) {
 
 func TestTransferABOR(t *testing.T) {
 	t.Run("passive-mode", func(t *testing.T) {
-		s := NewTestServer(t, true)
+		s := NewTestServer(t, false)
 		s.settings.PassiveTransferPortRange = &PortRange{
 			Start: 49152,
 			End:   65535,
@@ -611,7 +610,7 @@ func TestTransferABOR(t *testing.T) {
 	})
 
 	t.Run("active-mode", func(t *testing.T) {
-		s := NewTestServer(t, true)
+		s := NewTestServer(t, false)
 		conf := goftp.Config{
 			User:            authUser,
 			Password:        authPass,
@@ -686,7 +685,7 @@ func TestABORWithoutOpenTransfer(t *testing.T) {
 
 func TestABORBeforeOpenTransfer(t *testing.T) {
 	t.Run("passive-mode", func(t *testing.T) {
-		s := NewTestServer(t, true)
+		s := NewTestServer(t, false)
 		conf := goftp.Config{
 			User:     authUser,
 			Password: authPass,
@@ -701,7 +700,7 @@ func TestABORBeforeOpenTransfer(t *testing.T) {
 	})
 
 	t.Run("active-mode", func(t *testing.T) {
-		s := NewTestServer(t, true)
+		s := NewTestServer(t, false)
 		conf := goftp.Config{
 			User:            authUser,
 			Password:        authPass,
@@ -802,7 +801,7 @@ func aborBeforeOpenTransfer(t *testing.T, c *goftp.Client) {
 }
 
 func TestASCIITransfers(t *testing.T) {
-	s := NewTestServer(t, true)
+	s := NewTestServer(t, false)
 	conf := goftp.Config{
 		User:     authUser,
 		Password: authPass,
@@ -817,7 +816,7 @@ func TestASCIITransfers(t *testing.T) {
 
 	defer func() { require.NoError(t, raw.Close()) }()
 
-	file, err := ioutil.TempFile("", "ftpserver")
+	file, err := os.CreateTemp("", "ftpserver")
 	require.NoError(t, err)
 
 	contents := []byte("line1\r\n\r\nline3\r\n,line4")
@@ -851,7 +850,7 @@ func TestASCIITransfers(t *testing.T) {
 }
 
 func TestASCIITransfersInvalidFiles(t *testing.T) {
-	s := NewTestServer(t, true)
+	s := NewTestServer(t, false)
 	conf := goftp.Config{
 		User:     authUser,
 		Password: authPass,
@@ -866,7 +865,7 @@ func TestASCIITransfersInvalidFiles(t *testing.T) {
 
 	defer func() { require.NoError(t, raw.Close()) }()
 
-	file, err := ioutil.TempFile("", "ftpserver")
+	file, err := os.CreateTemp("", "ftpserver")
 	require.NoError(t, err)
 
 	defer func() { require.NoError(t, file.Close()) }()
@@ -912,7 +911,7 @@ func TestPASVWrappedListenerError(t *testing.T) {
 }
 
 func TestPASVPublicIPResolver(t *testing.T) {
-	s := NewTestServer(t, true)
+	s := NewTestServer(t, false)
 
 	conf := goftp.Config{
 		User:     authUser,
@@ -1000,7 +999,7 @@ func TestPASVConnectionWait(t *testing.T) {
 }
 
 func TestPASVIPMatch(t *testing.T) {
-	s := NewTestServer(t, true)
+	s := NewTestServer(t, false)
 
 	conn, err := net.DialTimeout("tcp", s.Addr(), 5*time.Second)
 	require.NoError(t, err)

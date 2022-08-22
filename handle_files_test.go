@@ -6,7 +6,6 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"regexp"
 	"strings"
@@ -85,7 +84,7 @@ func TestMLSxEntryValidation(t *testing.T) {
 }
 
 func TestALLO(t *testing.T) {
-	s := NewTestServer(t, true)
+	s := NewTestServer(t, false)
 	conf := goftp.Config{
 		User:     authUser,
 		Password: authPass,
@@ -118,14 +117,14 @@ func TestALLO(t *testing.T) {
 
 func TestCHMOD(t *testing.T) {
 	s := NewTestServerWithDriver(t, &TestServerDriver{
-		Debug: true,
+		Debug: false,
 		TLS:   true,
 	})
 	conf := goftp.Config{
 		User:     authUser,
 		Password: authPass,
 		TLSConfig: &tls.Config{
-			// nolint:gosec
+			//nolint:gosec
 			InsecureSkipVerify: true,
 		},
 		TLSMode: goftp.TLSExplicit,
@@ -151,7 +150,7 @@ func TestCHMOD(t *testing.T) {
 }
 
 func TestCHOWN(t *testing.T) {
-	s := NewTestServer(t, true)
+	s := NewTestServer(t, false)
 	conf := goftp.Config{
 		User:     authUser,
 		Password: authPass,
@@ -202,14 +201,14 @@ func TestCHOWN(t *testing.T) {
 
 func TestMFMT(t *testing.T) {
 	s := NewTestServerWithDriver(t, &TestServerDriver{
-		Debug: true,
+		Debug: false,
 		TLS:   true,
 	})
 	conf := goftp.Config{
 		User:     authUser,
 		Password: authPass,
 		TLSConfig: &tls.Config{
-			// nolint:gosec
+			//nolint:gosec
 			InsecureSkipVerify: true,
 		},
 		TLSMode: goftp.TLSExplicit,
@@ -254,7 +253,7 @@ func TestMFMT(t *testing.T) {
 }
 
 func TestSYMLINK(t *testing.T) {
-	s := NewTestServer(t, true)
+	s := NewTestServer(t, false)
 	conf := goftp.Config{
 		User:     authUser,
 		Password: authPass,
@@ -315,7 +314,7 @@ func TestSYMLINK(t *testing.T) {
 }
 
 func TestSTATFile(t *testing.T) {
-	s := NewTestServer(t, true)
+	s := NewTestServer(t, false)
 	conf := goftp.Config{
 		User:     authUser,
 		Password: authPass,
@@ -363,7 +362,7 @@ func TestSTATFile(t *testing.T) {
 }
 
 func TestMLST(t *testing.T) {
-	s := NewTestServer(t, true)
+	s := NewTestServer(t, false)
 	conf := goftp.Config{
 		User:     authUser,
 		Password: authPass,
@@ -397,7 +396,7 @@ func TestMLST(t *testing.T) {
 }
 
 func TestMDTM(t *testing.T) {
-	s := NewTestServer(t, true)
+	s := NewTestServer(t, false)
 	conf := goftp.Config{
 		User:     authUser,
 		Password: authPass,
@@ -425,7 +424,7 @@ func TestMDTM(t *testing.T) {
 }
 
 func TestRename(t *testing.T) {
-	s := NewTestServer(t, true)
+	s := NewTestServer(t, false)
 	conf := goftp.Config{
 		User:     authUser,
 		Password: authPass,
@@ -463,7 +462,7 @@ func TestRename(t *testing.T) {
 }
 
 func TestUploadErrorCodes(t *testing.T) {
-	s := NewTestServer(t, true)
+	s := NewTestServer(t, false)
 	conf := goftp.Config{
 		User:     authUser,
 		Password: authPass,
@@ -492,7 +491,7 @@ func TestUploadErrorCodes(t *testing.T) {
 }
 
 func TestHASHDisabled(t *testing.T) {
-	s := NewTestServer(t, true)
+	s := NewTestServer(t, false)
 	conf := goftp.Config{
 		User:     authUser,
 		Password: authPass,
@@ -517,7 +516,7 @@ func TestHASHCommand(t *testing.T) {
 	s := NewTestServerWithDriver(
 		t,
 		&TestServerDriver{
-			Debug: true,
+			Debug: false,
 			Settings: &Settings{
 				EnableHASH: true,
 			},
@@ -536,9 +535,9 @@ func TestHASHCommand(t *testing.T) {
 	dir, err := c.Mkdir("testdir")
 	require.NoError(t, err)
 
-	tempFile, err := ioutil.TempFile("", "ftpserver")
+	tempFile, err := os.CreateTemp("", "ftpserver")
 	require.NoError(t, err)
-	err = ioutil.WriteFile(tempFile.Name(), []byte("sample data with know checksum/hash\n"), os.ModePerm)
+	err = os.WriteFile(tempFile.Name(), []byte("sample data with know checksum/hash\n"), os.ModePerm)
 	require.NoError(t, err)
 
 	crc32Sum := "21b0f382"
@@ -575,7 +574,7 @@ func TestHASHCommand(t *testing.T) {
 }
 
 func TestCustomHASHCommands(t *testing.T) {
-	s := NewTestServer(t, true)
+	s := NewTestServer(t, false)
 	s.settings.EnableHASH = true
 	conf := goftp.Config{
 		User:     authUser,
@@ -587,7 +586,7 @@ func TestCustomHASHCommands(t *testing.T) {
 
 	defer func() { panicOnError(c.Close()) }()
 
-	tempFile, err := ioutil.TempFile("", "ftpserver")
+	tempFile, err := os.CreateTemp("", "ftpserver")
 	require.NoError(t, err)
 	_, err = tempFile.WriteString("sample data with know checksum/hash\n")
 	require.NoError(t, err)
@@ -632,7 +631,7 @@ func TestCustomHASHCommands(t *testing.T) {
 }
 
 func TestCOMB(t *testing.T) {
-	s := NewTestServer(t, true)
+	s := NewTestServer(t, false)
 	conf := goftp.Config{
 		User:     authUser,
 		Password: authPass,
@@ -692,7 +691,7 @@ func TestCOMBAppend(t *testing.T) {
 	s := NewTestServerWithDriver(
 		t,
 		&TestServerDriver{
-			Debug: true,
+			Debug: false,
 			Settings: &Settings{
 				EnableCOMB: true,
 			},
@@ -755,7 +754,7 @@ func TestCOMBAppend(t *testing.T) {
 }
 
 func TestCOMBCloseError(t *testing.T) {
-	s := NewTestServer(t, true)
+	s := NewTestServer(t, false)
 	conf := goftp.Config{
 		User:     authUser,
 		Password: authPass,
@@ -782,7 +781,7 @@ func TestCOMBCloseError(t *testing.T) {
 }
 
 func TestREST(t *testing.T) {
-	s := NewTestServer(t, true)
+	s := NewTestServer(t, false)
 	conf := goftp.Config{
 		User:     authUser,
 		Password: authPass,
@@ -817,7 +816,7 @@ func TestREST(t *testing.T) {
 }
 
 func TestSIZE(t *testing.T) {
-	s := NewTestServer(t, true)
+	s := NewTestServer(t, false)
 	conf := goftp.Config{
 		User:     authUser,
 		Password: authPass,
@@ -855,7 +854,7 @@ func TestSIZE(t *testing.T) {
 }
 
 func TestCOMBErrors(t *testing.T) {
-	s := NewTestServer(t, true)
+	s := NewTestServer(t, false)
 	conf := goftp.Config{
 		User:     authUser,
 		Password: authPass,

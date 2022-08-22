@@ -5,9 +5,11 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"syscall"
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	lognoop "github.com/fclairamb/go-log/noop"
@@ -165,4 +167,21 @@ func TestServerSettings(t *testing.T) {
 	err = server.loadSettings()
 	require.NoError(t, err)
 	require.Equal(t, "192.168.1.1", server.settings.PublicHost)
+}
+
+func TestTemporaryError(t *testing.T) {
+	a := assert.New(t)
+
+	// Test the temporaryError function
+	a.False(temporaryError(nil))
+	a.False(temporaryError(&fakeNetError{error: errListenerAccept}))
+	a.False(temporaryError(&net.OpError{
+		Err: &fakeNetError{error: errListenerAccept},
+	}))
+
+	for _, serr := range []syscall.Errno{syscall.ECONNABORTED, syscall.ECONNRESET} {
+		a.True(temporaryError(&net.OpError{Err: &os.SyscallError{Err: serr}}))
+	}
+
+	a.False(temporaryError(&net.OpError{Err: &os.SyscallError{Err: syscall.EAGAIN}}))
 }
