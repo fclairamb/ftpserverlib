@@ -3,6 +3,7 @@ package ftpserver
 import (
 	"crypto/tls"
 	"fmt"
+	"io"
 	"net"
 	"path"
 	"testing"
@@ -13,6 +14,29 @@ import (
 )
 
 const DirKnown = "known"
+
+func TestGetRelativePaths(t *testing.T) {
+	type relativePathTest struct {
+		workingDir, path, result string
+	}
+	var tests = []relativePathTest{
+		{"/", "/p", "p"},
+		{"/", "/", ""},
+		{"/p", "/p", ""},
+		{"/p", "/p1", "../p1"},
+		{"/p", "/p/p1", "p1"},
+		{"/p/p1", "/p/p2/p3", "../p2/p3"},
+		{"/", "p", "p"},
+	}
+
+	handler := clientHandler{}
+
+	for _, test := range tests {
+		handler.SetPath(test.workingDir)
+		result := handler.getRelativePath(test.path)
+		require.Equal(t, test.result, result)
+	}
+}
 
 func TestDirListing(t *testing.T) {
 	// MLSD is disabled we relies on LIST of files listing
@@ -278,12 +302,18 @@ func TestDirListingWithSpace(t *testing.T) {
 	require.Equal(t, StatusFileOK, rc)
 	require.Equal(t, fmt.Sprintf("CD worked on /%s", dirName), response)
 
-	_, err = raw.PrepareDataConn()
+	dcGetter, err := raw.PrepareDataConn()
 	require.NoError(t, err)
 
 	rc, response, err = raw.SendCommand("NLST /")
 	require.NoError(t, err)
 	require.Equal(t, StatusFileStatusOK, rc, response)
+
+	dc, err := dcGetter()
+	require.NoError(t, err)
+	resp, err := io.ReadAll(dc)
+	require.NoError(t, err)
+	require.Equal(t, "../"+dirName+"\r\n", string(resp))
 
 	rc, _, err = raw.ReadResponse()
 	require.NoError(t, err)
@@ -561,16 +591,22 @@ func TestMLSDAndNLSTFilePathError(t *testing.T) {
 	_, err = c.ReadDir(fileName)
 	require.Error(t, err, "MLSD is enabled, MLSD for filePath must fail")
 
-	// NLST shouldn't work for filePath
+	// NLST should work for filePath
 	raw, err := c.OpenRawConn()
 	require.NoError(t, err, "Couldn't open raw connection")
 
 	defer func() { require.NoError(t, raw.Close()) }()
 
-	_, err = raw.PrepareDataConn()
+	dcGetter, err := raw.PrepareDataConn()
 	require.NoError(t, err)
 
-	rc, response, err := raw.SendCommand("NLST /" + fileName)
+	rc, response, err := raw.SendCommand("NLST /../" + fileName)
 	require.NoError(t, err)
 	require.Equal(t, StatusFileStatusOK, rc, response)
+
+	dc, err := dcGetter()
+	require.NoError(t, err)
+	resp, err := io.ReadAll(dc)
+	require.NoError(t, err)
+	require.Equal(t, fileName+"\r\n", string(resp))
 }
