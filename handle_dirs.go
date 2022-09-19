@@ -20,11 +20,11 @@ var errFileList = errors.New("listing a file isn't allowed")
 var supportedlistArgs = []string{"-al", "-la", "-a", "-l"}
 
 func (c *clientHandler) absPath(p string) string {
-	if strings.HasPrefix(p, "/") {
+	if path.IsAbs(p) {
 		return path.Clean(p)
 	}
 
-	return path.Clean(c.Path() + "/" + p)
+	return path.Join(c.Path(), p)
 }
 
 // getRelativePath returns the specified path as relative to the
