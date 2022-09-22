@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"path"
 	"strings"
@@ -19,11 +20,42 @@ var errFileList = errors.New("listing a file isn't allowed")
 var supportedlistArgs = []string{"-al", "-la", "-a", "-l"}
 
 func (c *clientHandler) absPath(p string) string {
-	if strings.HasPrefix(p, "/") {
+	if path.IsAbs(p) {
 		return path.Clean(p)
 	}
 
-	return path.Clean(c.Path() + "/" + p)
+	return path.Join(c.Path(), p)
+}
+
+// getRelativePath returns the specified path as relative to the
+// current working directory. The specified path must be cleaned
+func (c *clientHandler) getRelativePath(p string) string {
+	var sb strings.Builder
+	base := c.Path()
+
+	for {
+		if base == p {
+			return sb.String()
+		}
+
+		if !strings.HasSuffix(base, "/") {
+			base += "/"
+		}
+
+		if strings.HasPrefix(p, base) {
+			sb.WriteString(strings.TrimPrefix(p, base))
+
+			return sb.String()
+		}
+
+		if base == "/" || base == "./" {
+			return p
+		}
+
+		sb.WriteString("../")
+
+		base = path.Dir(path.Clean(base))
+	}
 }
 
 func (c *clientHandler) handleCWD(param string) error {
@@ -156,7 +188,7 @@ func (c *clientHandler) checkLISTArgs(args string) string {
 func (c *clientHandler) handleLIST(param string) error {
 	info := fmt.Sprintf("LIST %v", param)
 
-	if files, err := c.getFileList(param, true); err == nil || err == io.EOF {
+	if files, _, err := c.getFileList(param, true); err == nil || err == io.EOF {
 		if tr, errTr := c.TransferOpen(info); errTr == nil {
 			err = c.dirTransferLIST(tr, files)
 			c.TransferClose(err)
@@ -175,9 +207,9 @@ func (c *clientHandler) handleLIST(param string) error {
 func (c *clientHandler) handleNLST(param string) error {
 	info := fmt.Sprintf("NLST %v", param)
 
-	if files, err := c.getFileList(param, true); err == nil || err == io.EOF {
+	if files, parentDir, err := c.getFileList(param, true); err == nil || err == io.EOF {
 		if tr, errTrOpen := c.TransferOpen(info); errTrOpen == nil {
-			err = c.dirTransferNLST(tr, files)
+			err = c.dirTransferNLST(tr, files, parentDir)
 			c.TransferClose(err)
 
 			return nil
@@ -191,7 +223,7 @@ func (c *clientHandler) handleNLST(param string) error {
 	return nil
 }
 
-func (c *clientHandler) dirTransferNLST(w io.Writer, files []os.FileInfo) error {
+func (c *clientHandler) dirTransferNLST(w io.Writer, files []os.FileInfo, parentDir string) error {
 	if len(files) == 0 {
 		_, err := w.Write([]byte(""))
 
@@ -199,7 +231,10 @@ func (c *clientHandler) dirTransferNLST(w io.Writer, files []os.FileInfo) error 
 	}
 
 	for _, file := range files {
-		if _, err := fmt.Fprintf(w, "%s\r\n", file.Name()); err != nil {
+		// Based on RFC 959 NLST is intended to return information that can be used
+		// by a program to further process the files automatically.
+		// So we return paths relative to the current working directory
+		if _, err := fmt.Fprintf(w, "%s\r\n", path.Join(c.getRelativePath(parentDir), file.Name())); err != nil {
 			return err
 		}
 	}
@@ -216,7 +251,7 @@ func (c *clientHandler) handleMLSD(param string) error {
 
 	info := fmt.Sprintf("MLSD %v", param)
 
-	if files, err := c.getFileList(param, false); err == nil || err == io.EOF {
+	if files, _, err := c.getFileList(param, false); err == nil || err == io.EOF {
 		if tr, errTr := c.TransferOpen(info); errTr == nil {
 			err = c.dirTransferMLSD(tr, files)
 			c.TransferClose(err)
@@ -312,39 +347,46 @@ func (c *clientHandler) writeMLSxEntry(w io.Writer, file os.FileInfo) error {
 	return err
 }
 
-func (c *clientHandler) getFileList(param string, filePathAllowed bool) ([]os.FileInfo, error) {
+func (c *clientHandler) getFileList(param string, filePathAllowed bool) ([]os.FileInfo, string, error) {
 	if !c.server.settings.DisableLISTArgs {
 		param = c.checkLISTArgs(param)
 	}
 	// directory or filePath
 	listPath := c.absPath(param)
+	c.SetListPath(listPath)
 
 	// return list of single file if directoryPath points to file and filePathAllowed
 	info, err := c.driver.Stat(listPath)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 
 	if !info.IsDir() {
 		if filePathAllowed {
-			return []os.FileInfo{info}, nil
+			return []os.FileInfo{info}, path.Dir(c.getListPath()), nil
 		}
 
-		return nil, errFileList
+		return nil, "", errFileList
 	}
 
+	var files []fs.FileInfo
+
 	if fileList, ok := c.driver.(ClientDriverExtensionFileList); ok {
-		return fileList.ReadDir(listPath)
+		files, err = fileList.ReadDir(listPath)
+
+		return files, c.getListPath(), err
 	}
 
 	directory, errOpenFile := c.driver.Open(listPath)
 	if errOpenFile != nil {
-		return nil, errOpenFile
+		return nil, "", errOpenFile
 	}
 
 	defer c.closeDirectory(listPath, directory)
 
-	return directory.Readdir(-1)
+	files, err = directory.Readdir(-1)
+
+	return files, c.getListPath(), err
 }
 
 func (c *clientHandler) closeDirectory(directoryPath string, directory afero.File) {
