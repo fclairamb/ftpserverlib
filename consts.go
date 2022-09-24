@@ -54,3 +54,8 @@ const (
 	StatusActionAborted            = 552 // RFC 959, 4.2.1
 	StatusActionNotTakenNoFile     = 553 // RFC 959, 4.2.1
 )
+
+const (
+	ParseBase10 = 10
+	Parse32Bits = 32
+)
