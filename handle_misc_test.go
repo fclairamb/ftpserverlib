@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"strings"
 	"testing"
-
 	"time"
 
 	"github.com/secsy/goftp"

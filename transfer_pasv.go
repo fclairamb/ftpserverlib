@@ -47,6 +47,11 @@ func (e *ipValidationError) Error() string {
 	return e.error
 }
 
+const (
+	PortSearchMinAttempts = 10
+	PortSearchMaxAttempts = 1000
+)
+
 func (c *clientHandler) getCurrentIP() ([]string, error) {
 	// Provide our external IP address so the ftp client can connect back to us
 	ip := c.server.settings.PublicHost
@@ -83,10 +88,10 @@ func (c *clientHandler) findListenerWithinPortRange(portRange *PortRange) (*net.
 	nbAttempts := portRange.End - portRange.Start
 
 	// Making sure we trying a reasonable amount of ports before giving up
-	if nbAttempts < 10 {
-		nbAttempts = 10
-	} else if nbAttempts > 1000 {
-		nbAttempts = 1000
+	if nbAttempts < PortSearchMinAttempts {
+		nbAttempts = PortSearchMinAttempts
+	} else if nbAttempts > PortSearchMaxAttempts {
+		nbAttempts = PortSearchMaxAttempts
 	}
 
 	for i := 0; i < nbAttempts; i++ {

@@ -9,10 +9,9 @@ import (
 	"testing"
 	"time"
 
+	lognoop "github.com/fclairamb/go-log/noop"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	lognoop "github.com/fclairamb/go-log/noop"
 )
 
 func TestMain(m *testing.M) {
@@ -123,7 +122,6 @@ func TestQuoteDoubling(t *testing.T) {
 		args args
 		want string
 	}{
-		// TODO: Add test cases.
 		{"1", args{" white space"}, " white space"},
 		{"1", args{` one" quote`}, ` one"" quote`},
 		{"1", args{` two"" quote`}, ` two"""" quote`},

@@ -97,10 +97,7 @@ func (a *activeTransferHandler) Open() (net.Conn, error) {
 		dialer.LocalAddr, _ = net.ResolveTCPAddr("tcp", ":20")
 		dialer.Control = Control
 	}
-	// TODO(mgenov): support dialing with timeout
-	// Issues:
-	//	https://github.com/golang/go/issues/3097
-	// 	https://github.com/golang/go/issues/4842
+
 	conn, err := dialer.Dial("tcp", a.raddr.String())
 
 	if err != nil {
