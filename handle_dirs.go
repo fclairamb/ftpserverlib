@@ -227,6 +227,10 @@ func (c *clientHandler) dirTransferNLST(w io.Writer, files []os.FileInfo, parent
 	if len(files) == 0 {
 		_, err := w.Write([]byte(""))
 
+		if err != nil {
+			err = NewNetworkError("couldn't send NLST data", err)
+		}
+
 		return err
 	}
 
@@ -235,7 +239,7 @@ func (c *clientHandler) dirTransferNLST(w io.Writer, files []os.FileInfo, parent
 		// by a program to further process the files automatically.
 		// So we return paths relative to the current working directory
 		if _, err := fmt.Fprintf(w, "%s\r\n", path.Join(c.getRelativePath(parentDir), file.Name())); err != nil {
-			return err
+			return NewNetworkError("couldn't send NLST data", err)
 		}
 	}
 
@@ -299,12 +303,16 @@ func (c *clientHandler) dirTransferLIST(w io.Writer, files []os.FileInfo) error 
 	if len(files) == 0 {
 		_, err := w.Write([]byte(""))
 
+		if err != nil {
+			err = NewNetworkError("error writing LIST entry", err)
+		}
+
 		return err
 	}
 
 	for _, file := range files {
 		if _, err := fmt.Fprintf(w, "%s\r\n", c.fileStat(file)); err != nil {
-			return err
+			return fmt.Errorf("error writing LIST entry: %w", err)
 		}
 	}
 
@@ -315,6 +323,10 @@ func (c *clientHandler) dirTransferLIST(w io.Writer, files []os.FileInfo) error 
 func (c *clientHandler) dirTransferMLSD(w io.Writer, files []os.FileInfo) error {
 	if len(files) == 0 {
 		_, err := w.Write([]byte(""))
+
+		if err != nil {
+			err = NewNetworkError("error writing MLSD entry", err)
+		}
 
 		return err
 	}
@@ -344,6 +356,10 @@ func (c *clientHandler) writeMLSxEntry(w io.Writer, file os.FileInfo) error {
 		file.Name(),
 	)
 
+	if err != nil {
+		err = fmt.Errorf("error writing MLSD entry: %w", err)
+	}
+
 	return err
 }
 
@@ -358,7 +374,7 @@ func (c *clientHandler) getFileList(param string, filePathAllowed bool) ([]os.Fi
 	// return list of single file if directoryPath points to file and filePathAllowed
 	info, err := c.driver.Stat(listPath)
 	if err != nil {
-		return nil, "", err
+		return nil, "", NewFileAccessError("couldn't stat", err)
 	}
 
 	if !info.IsDir() {
@@ -379,7 +395,7 @@ func (c *clientHandler) getFileList(param string, filePathAllowed bool) ([]os.Fi
 
 	directory, errOpenFile := c.driver.Open(listPath)
 	if errOpenFile != nil {
-		return nil, "", errOpenFile
+		return nil, "", NewFileAccessError("couldn't open directory", errOpenFile)
 	}
 
 	defer c.closeDirectory(listPath, directory)

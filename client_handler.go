@@ -319,6 +319,10 @@ func (c *clientHandler) closeTransfer() error {
 		}
 	}
 
+	if err != nil {
+		err = fmt.Errorf("error closing transfer connection: %w", err)
+	}
+
 	return err
 }
 
@@ -345,7 +349,12 @@ func (c *clientHandler) Close() error {
 	// 2) the client could wait for another response and so we break the protocol
 	//
 	// closing the connection from a different goroutine should be safe
-	return c.conn.Close()
+	err := c.conn.Close()
+	if err != nil {
+		err = NewNetworkError("error closing control connection", err)
+	}
+
+	return err
 }
 
 func (c *clientHandler) end() {
@@ -632,6 +641,8 @@ func (c *clientHandler) TransferOpen(info string) (net.Conn, error) {
 
 		c.writeMessage(StatusCannotOpenDataConnection, err.Error())
 
+		err = NewNetworkError("Unable to open transfer", err)
+
 		return nil, err
 	}
 
@@ -647,7 +658,7 @@ func (c *clientHandler) TransferOpen(info string) (net.Conn, error) {
 			"localAddr", conn.LocalAddr().String())
 	}
 
-	return conn, err
+	return conn, nil
 }
 
 func (c *clientHandler) TransferClose(err error) {
@@ -718,7 +729,7 @@ func getIPFromRemoteAddr(remoteAddr net.Addr) (net.IP, error) {
 
 	ip, _, err := net.SplitHostPort(remoteAddr.String())
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error parsing remote address: %w", err)
 	}
 
 	remoteIP := net.ParseIP(ip)

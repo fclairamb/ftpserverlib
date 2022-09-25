@@ -163,6 +163,8 @@ func (c *clientHandler) doFileTransfer(tr net.Conn, file io.ReadWriter, write bo
 		if fileTransferError, ok := file.(FileTransferError); ok {
 			fileTransferError.TransferError(err)
 		}
+
+		err = NewNetworkError("error transferring data", err)
 	}
 
 	return err
@@ -695,14 +697,14 @@ func (c *clientHandler) computeHashForFile(filePath string, algo HASHAlgo, start
 	if start > 0 {
 		_, err = file.Seek(start, io.SeekStart)
 		if err != nil {
-			return "", err
+			return "", NewFileAccessError("couldn't seek file", err)
 		}
 	}
 
 	_, err = io.CopyN(h, file, end-start)
 
 	if err != nil && err != io.EOF {
-		return "", err
+		return "", NewFileAccessError("couldn't read file", err)
 	}
 
 	return hex.EncodeToString(h.Sum(nil)), nil
@@ -710,10 +712,21 @@ func (c *clientHandler) computeHashForFile(filePath string, algo HASHAlgo, start
 
 func (c *clientHandler) getFileHandle(name string, flags int, offset int64) (FileTransfer, error) {
 	if fileTransfer, ok := c.driver.(ClientDriverExtentionFileTransfer); ok {
-		return fileTransfer.GetHandle(name, flags, offset)
+		ft, err := fileTransfer.GetHandle(name, flags, offset)
+		if err != nil {
+			err = NewDriverError("calling GetHandle", err)
+		}
+
+		return ft, err
 	}
 
-	return c.driver.OpenFile(name, flags, os.ModePerm)
+	ft, err := c.driver.OpenFile(name, flags, os.ModePerm)
+
+	if err != nil {
+		err = NewDriverError("calling OpenFile", err)
+	}
+
+	return ft, err
 }
 
 func (c *clientHandler) closeUnchecked(file io.Closer) {
@@ -737,5 +750,10 @@ func unquoteSpaceSeparatedParams(params string) ([]string, error) {
 	reader := csv.NewReader(strings.NewReader(params))
 	reader.Comma = ' ' // space
 
-	return reader.Read()
+	spl, err := reader.Read()
+	if err != nil {
+		return nil, fmt.Errorf("error parsing params: %w", err)
+	}
+
+	return spl, nil
 }

@@ -81,5 +81,5 @@ func (c *asciiConverter) Read(p []byte) (n int, err error) {
 		}
 	}
 
-	return n, err
+	return n, err //nolint:wrapcheck // here wrapping errors brings nothing
 }

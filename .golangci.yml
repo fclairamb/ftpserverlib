@@ -36,7 +36,7 @@ linters:
     - goimports
     # - golint --> revive
     - revive
-    - gomnd
+    # - gomnd (delayed)
     - goprintffuncname
     - gosec
     - gosimple
@@ -48,7 +48,7 @@ linters:
     - megacheck
     - misspell
     - nakedret
-    - nestif
+    # - nestif (delayed)
     - nlreturn
     - prealloc
     - nilerr
@@ -149,7 +149,6 @@ linters-settings:
     allow-cuddle-declarations: true
 
 issues:
-  new: true
   exclude-rules:
     - path: _test\.go$
       linters:

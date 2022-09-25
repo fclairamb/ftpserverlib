@@ -83,6 +83,27 @@ func newFakeListener(err error) net.Listener {
 	}
 }
 
+func TestCannotListen(t *testing.T) {
+	a := assert.New(t)
+
+	portBlockerListener, err := net.Listen("tcp", "127.0.0.1:0")
+	a.NoError(err)
+
+	defer portBlockerListener.Close()
+
+	server := FtpServer{
+		Logger: lognoop.NewNoOpLogger(),
+		driver: &TestServerDriver{
+			Settings: &Settings{
+				ListenAddr: portBlockerListener.Addr().String(),
+			},
+		},
+	}
+
+	err = server.Listen()
+	a.Error(err)
+}
+
 func TestListenerAcceptErrors(t *testing.T) {
 	errNetFake := &fakeNetError{error: errListenerAccept}
 

@@ -114,7 +114,7 @@ func (server *FtpServer) loadSettings() error {
 	s, err := server.driver.GetSettings()
 
 	if err != nil {
-		return err
+		return fmt.Errorf("error while loading settings: %w", err)
 	}
 
 	if s.PublicHost != "" {
@@ -170,10 +170,11 @@ func (server *FtpServer) Listen() error {
 		server.listener, err = net.Listen("tcp", server.settings.ListenAddr)
 
 		if err != nil {
-			server.Logger.Error("Cannot listen", "err", err)
+			server.Logger.Error("cannot listen on main port", "err", err, "listenAddr", server.settings.ListenAddr)
 
-			return err
+			return fmt.Errorf("cannot listen on main port: %w", err)
 		}
+
 		if server.settings.TLSRequired == ImplicitEncryption {
 			// implicit TLS
 			var tlsConfig *tls.Config
@@ -182,7 +183,7 @@ func (server *FtpServer) Listen() error {
 			if err != nil {
 				server.Logger.Error("Cannot get tls config", "err", err)
 
-				return err
+				return fmt.Errorf("cannot get tls config: %w", err)
 			}
 			server.listener = tls.NewListener(server.listener, tlsConfig)
 		}
@@ -190,7 +191,7 @@ func (server *FtpServer) Listen() error {
 
 	server.Logger.Info("Listening...", "address", server.listener.Addr())
 
-	return err
+	return fmt.Errorf("cannot listen on main port: %w", err)
 }
 
 func temporaryError(err net.Error) bool {
@@ -229,7 +230,7 @@ func (server *FtpServer) Serve() error {
 			// & https://github.com/fclairamb/ftpserverlib/pull/352#pullrequestreview-1077459896
 			// The temporaryError method should replace net.Error.Temporary() when the go team
 			// will have provided us a better way to detect temporary errors.
-			if ne, ok := err.(net.Error); ok && ne.Temporary() {
+			if ne, ok := err.(net.Error); ok && ne.Temporary() { //nolint:staticcheck
 				if tempDelay == 0 {
 					tempDelay = 5 * time.Millisecond
 				} else {
@@ -250,7 +251,7 @@ func (server *FtpServer) Serve() error {
 
 			server.Logger.Error("Listener accept error", "err", err)
 
-			return err
+			return fmt.Errorf("listener accept error: %w", err)
 		}
 
 		tempDelay = 0
@@ -293,15 +294,16 @@ func (server *FtpServer) Stop() error {
 		return ErrNotListening
 	}
 
-	err := server.listener.Close()
-	if err != nil {
+	if err := server.listener.Close(); err != nil {
 		server.Logger.Warn(
 			"Could not close listener",
 			"err", err,
 		)
+
+		return NewNetworkError("couln't close listener", err)
 	}
 
-	return err
+	return nil
 }
 
 // When a client connects, the server could refuse the connection

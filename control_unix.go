@@ -4,6 +4,7 @@
 package ftpserver
 
 import (
+	"fmt"
 	"syscall"
 
 	"golang.org/x/sys/unix"
@@ -24,8 +25,13 @@ func Control(network, address string, c syscall.RawConn) error {
 			return
 		}
 	})
+
 	if err != nil {
-		return err
+		return fmt.Errorf("unable to set control options: %w", err)
+	}
+
+	if errSetOpts != nil {
+		errSetOpts = fmt.Errorf("unable to set control options: %w", errSetOpts)
 	}
 
 	return errSetOpts

@@ -117,7 +117,9 @@ func (a *activeTransferHandler) Open() (net.Conn, error) {
 // Close closes only if connection is established
 func (a *activeTransferHandler) Close() error {
 	if a.conn != nil {
-		return a.conn.Close()
+		if err := a.conn.Close(); err != nil {
+			return fmt.Errorf("could not close active connection: %w", err)
+		}
 	}
 
 	return nil
@@ -145,18 +147,24 @@ func parsePORTAddr(param string) (*net.TCPAddr, error) {
 
 	p1, err := strconv.Atoi(params[4])
 	if err != nil {
-		return nil, err
+		return nil, ErrRemoteAddrFormat
 	}
 
 	p2, err := strconv.Atoi(params[5])
 
 	if err != nil {
-		return nil, err
+		return nil, ErrRemoteAddrFormat
 	}
 
 	port := p1<<8 + p2
 
-	return net.ResolveTCPAddr("tcp", fmt.Sprintf("%s:%d", ip, port))
+	addr, err := net.ResolveTCPAddr("tcp", fmt.Sprintf("%s:%d", ip, port))
+
+	if err != nil {
+		err = fmt.Errorf("could not resolve %s: %w", param, err)
+	}
+
+	return addr, err
 }
 
 // Parse EPRT parameter. Full EPRT command format:
@@ -192,5 +200,11 @@ func parseEPRTAddr(param string) (addr *net.TCPAddr, err error) {
 		return nil, ErrRemoteAddrFormat
 	}
 
-	return net.ResolveTCPAddr("tcp", net.JoinHostPort(ip.String(), strconv.Itoa(portI)))
+	addr, err = net.ResolveTCPAddr("tcp", net.JoinHostPort(ip.String(), strconv.Itoa(portI)))
+
+	if err != nil {
+		err = fmt.Errorf("could not resolve addr %v:%v: %w", ip, portI, err)
+	}
+
+	return addr, err
 }
