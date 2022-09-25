@@ -113,8 +113,8 @@ type FtpServer struct {
 func (server *FtpServer) loadSettings() error {
 	s, err := server.driver.GetSettings()
 
-	if err != nil {
-		return NewDriverError("loading settings", err)
+	if err != nil || s == nil {
+		return NewDriverError("couldn't load settings", err)
 	}
 
 	if s.PublicHost != "" {
@@ -180,7 +180,7 @@ func (server *FtpServer) Listen() error {
 			var tlsConfig *tls.Config
 
 			tlsConfig, err = server.driver.GetTLSConfig()
-			if err != nil {
+			if err != nil || tlsConfig == nil {
 				server.Logger.Error("Cannot get tls config", "err", err)
 
 				return NewDriverError("cannot get tls config", err)

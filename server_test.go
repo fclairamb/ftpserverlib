@@ -101,7 +101,33 @@ func TestCannotListen(t *testing.T) {
 	}
 
 	err = server.Listen()
-	a.Error(err)
+	var ne NetworkError
+	a.ErrorAs(err, &ne)
+	a.Equal("cannot listen on main port", ne.str)
+}
+
+func TestListenWithBadTLSSettings(t *testing.T) {
+	a := assert.New(t)
+
+	portBlockerListener, err := net.Listen("tcp", "127.0.0.1:0")
+	a.NoError(err)
+
+	defer portBlockerListener.Close()
+
+	server := FtpServer{
+		Logger: lognoop.NewNoOpLogger(),
+		driver: &TestServerDriver{
+			Settings: &Settings{
+				TLSRequired: ImplicitEncryption,
+			},
+			TLS: false,
+		},
+	}
+
+	err = server.Listen()
+	var drvErr DriverError
+	a.ErrorAs(err, &drvErr)
+	a.Equal("cannot get tls config", drvErr.str)
 }
 
 func TestListenerAcceptErrors(t *testing.T) {
@@ -156,36 +182,62 @@ func TestQuoteDoubling(t *testing.T) {
 	}
 }
 
-func TestServerSettings(t *testing.T) {
+func TestServerSettingsIPError(t *testing.T) {
 	server := FtpServer{
 		Logger: lognoop.NewNoOpLogger(),
-		driver: &TestServerDriver{
+	}
+
+	t.Run("IPv4 with 3 numbers", func(t *testing.T) {
+		server.driver = &TestServerDriver{
 			Settings: &Settings{
 				PublicHost: "127.0.0",
 			},
+		}
+
+		err := server.loadSettings()
+		_, ok := err.(*ipValidationError)
+		require.True(t, ok)
+	})
+
+	t.Run("localhost public host", func(t *testing.T) {
+		server.driver = &TestServerDriver{
+			Settings: &Settings{
+				PublicHost: "::1",
+			},
+		}
+
+		err := server.loadSettings()
+		_, ok := err.(*ipValidationError)
+		require.True(t, ok)
+	})
+
+	t.Run("Strangely looking IPv6/IPv4 address", func(t *testing.T) {
+		server.driver = &TestServerDriver{
+			Settings: &Settings{
+				PublicHost: "::ffff:192.168.1.1",
+			},
+		}
+		err := server.loadSettings()
+		require.NoError(t, err)
+		require.Equal(t, "192.168.1.1", server.settings.PublicHost)
+	})
+}
+
+func TestServerSettingsNilSettings(t *testing.T) {
+	a := assert.New(t)
+	server := FtpServer{
+		Logger: lognoop.NewNoOpLogger(),
+		driver: &TestServerDriver{
+			Settings: nil,
 		},
 	}
+
 	err := server.loadSettings()
-	_, ok := err.(*ipValidationError)
-	require.True(t, ok)
+	a.Error(err)
 
-	server.driver = &TestServerDriver{
-		Settings: &Settings{
-			PublicHost: "::1",
-		},
-	}
-	err = server.loadSettings()
-	_, ok = err.(*ipValidationError)
-	require.True(t, ok)
-
-	server.driver = &TestServerDriver{
-		Settings: &Settings{
-			PublicHost: "::ffff:192.168.1.1",
-		},
-	}
-	err = server.loadSettings()
-	require.NoError(t, err)
-	require.Equal(t, "192.168.1.1", server.settings.PublicHost)
+	drvErr := DriverError{}
+	a.ErrorAs(err, &drvErr)
+	a.ErrorContains(drvErr, "couldn't load settings")
 }
 
 func TestTemporaryError(t *testing.T) {

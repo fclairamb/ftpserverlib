@@ -27,3 +27,35 @@ func TestTransferCloseStorageExceeded(t *testing.T) {
 	h.TransferClose(ErrStorageExceeded)
 	require.Equal(t, "552 Issue during transfer: storage limit exceeded\r\n", buf.String())
 }
+
+func TestErrorTypes(t *testing.T) {
+	a := assert.New(t)
+	t.Run("DriverError", func(t *testing.T) {
+		var err error = NewDriverError("test", os.ErrPermission)
+		a.Equal("driver error: test: permission denied", err.Error())
+		a.ErrorIs(err, os.ErrPermission)
+
+		var specificError DriverError
+		a.ErrorAs(err, &specificError)
+		a.Equal("test", specificError.str)
+	})
+
+	t.Run("NetworkError", func(t *testing.T) {
+		var err error = NewNetworkError("test", os.ErrPermission)
+		a.Equal("network error: test: permission denied", err.Error())
+		a.ErrorIs(err, os.ErrPermission)
+
+		var specificError NetworkError
+		a.ErrorAs(err, &specificError)
+		a.Equal("test", specificError.str)
+	})
+
+	t.Run("FileAccessError", func(t *testing.T) {
+		var err error = NewFileAccessError("test", os.ErrPermission)
+		a.Equal("file access error: test: permission denied", err.Error())
+		a.ErrorIs(err, os.ErrPermission)
+		var specificError FileAccessError
+		a.ErrorAs(err, &specificError)
+		a.Equal("test", specificError.str)
+	})
+}

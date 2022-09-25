@@ -102,7 +102,7 @@ func (c *clientHandler) findListenerWithinPortRange(portRange *PortRange) (*net.
 		if errResolve != nil {
 			c.logger.Error("Problem resolving local port", "err", errResolve, "port", port)
 
-			return nil, fmt.Errorf("could not resolve port %d: %w", port, errResolve)
+			return nil, NewNetworkError(fmt.Sprintf("could not resolve port %d", port), errResolve)
 		}
 
 		tcpListener, errListen := net.ListenTCP("tcp", laddr)
