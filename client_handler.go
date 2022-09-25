@@ -87,6 +87,7 @@ type clientHandler struct {
 	reader              *bufio.Reader   // Reader on the TCP connection
 	user                string          // Authenticated user
 	path                string          // Current path
+	listPath            string          // Path for NLST/LIST requests
 	clnt                string          // Identified client
 	command             string          // Command received on the connection
 	connectedAt         time.Time       // Date of connection
@@ -149,6 +150,22 @@ func (c *clientHandler) SetPath(value string) {
 	defer c.paramsMutex.Unlock()
 
 	c.path = value
+}
+
+// getListPath returns the path for the last LIST/NLST request
+func (c *clientHandler) getListPath() string {
+	c.paramsMutex.RLock()
+	defer c.paramsMutex.RUnlock()
+
+	return c.listPath
+}
+
+// SetListPath changes the path for the last LIST/NLST request
+func (c *clientHandler) SetListPath(value string) {
+	c.paramsMutex.Lock()
+	defer c.paramsMutex.Unlock()
+
+	c.listPath = value
 }
 
 // Debug defines if we will list all interaction
