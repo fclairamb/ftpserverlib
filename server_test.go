@@ -112,7 +112,7 @@ func TestListenerAcceptErrors(t *testing.T) {
 		Logger:   lognoop.NewNoOpLogger(),
 	}
 	err := server.Serve()
-	require.EqualError(t, err, errListenerAccept.Error())
+	require.ErrorContains(t, err, errListenerAccept.Error())
 }
 
 func TestPortCommandFormatOK(t *testing.T) {

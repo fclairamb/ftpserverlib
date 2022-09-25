@@ -251,7 +251,7 @@ func (server *FtpServer) Serve() error {
 
 			server.Logger.Error("Listener accept error", "err", err)
 
-			return fmt.Errorf("listener accept error: %w", err)
+			return NewNetworkError("listener accept error", err)
 		}
 
 		tempDelay = 0
