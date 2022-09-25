@@ -141,6 +141,12 @@ type ClientContext interface {
 	// Calling this method after the authentication step could lead to undefined behavior
 	SetPath(value string)
 
+	// SetListPath allows to change the path for the last LIST/NLST request.
+	// This method is useful if the driver expands wildcards and so the returned results
+	// refer to a path different from the requested one.
+	// The value must be cleaned using path.Clean
+	SetListPath(value string)
+
 	// SetDebug activates the debugging of this connection commands
 	SetDebug(debug bool)
 

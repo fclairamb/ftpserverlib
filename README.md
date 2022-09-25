@@ -2,8 +2,8 @@
 
 [![Go version](https://img.shields.io/github/go-mod/go-version/fclairamb/ftpserverlib)](https://golang.org/doc/devel/release.html)
 [![Release](https://img.shields.io/github/v/release/fclairamb/ftpserverlib)](https://github.com/fclairamb/ftpserverlib/releases/latest)
-![Build](https://github.com/fclairamb/ftpserverlib/workflows/Build/badge.svg)
-[![codecov](https://codecov.io/gh/fclairamb/ftpserverlib/branch/master/graph/badge.svg?token=IVeoGgl1rj)](https://codecov.io/gh/fclairamb/ftpserverlib)
+[![Build](https://github.com/fclairamb/ftpserverlib/workflows/Build/badge.svg)](https://github.com/fclairamb/ftpserverlib/actions/workflows/build.yml)
+[![codecov](https://codecov.io/gh/fclairamb/ftpserverlib/branch/main/graph/badge.svg?token=IVeoGgl1rj)](https://codecov.io/gh/fclairamb/ftpserverlib)
 [![gocover.io](https://gocover.io/_badge/github.com/fclairamb/ftpserverlib)](https://gocover.io/github.com/fclairamb/ftpserverlib)
 [![Go Report Card](https://goreportcard.com/badge/fclairamb/ftpserverlib)](https://goreportcard.com/report/fclairamb/ftpserverlib)
 [![GoDoc](https://godoc.org/github.com/fclairamb/ftpserverlib?status.svg)](https://godoc.org/github.com/fclairamb/ftpserverlib)
