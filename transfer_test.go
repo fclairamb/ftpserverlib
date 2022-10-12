@@ -441,7 +441,7 @@ func TestFailingFileTransfer(t *testing.T) {
 	})
 }
 
-func TestAPPE(t *testing.T) {
+func TestAPPEExistingFile(t *testing.T) {
 	driver := &TestServerDriver{
 		Debug: false,
 	}
@@ -484,6 +484,38 @@ func TestAPPE(t *testing.T) {
 	info, err := c.Stat(fileName)
 	require.NoError(t, err)
 	require.Equal(t, int64(1024+len(data)), info.Size())
+
+	localHash := hashFile(t, file)
+	remoteHash := ftpDownloadAndHash(t, c, fileName)
+	require.Equal(t, localHash, remoteHash)
+}
+
+func TestAPPENewFile(t *testing.T) {
+	driver := &TestServerDriver{
+		Debug: false,
+	}
+	s := NewTestServerWithDriver(t, driver)
+	conf := goftp.Config{
+		User:     authUser,
+		Password: authPass,
+	}
+	file := createTemporaryFile(t, 1*1024)
+	_, err := file.Seek(0, io.SeekStart)
+	require.NoError(t, err)
+
+	c, err := goftp.DialConfig(conf, s.Addr())
+	require.NoError(t, err)
+
+	defer func() { require.NoError(t, c.Close()) }()
+
+	raw, err := c.OpenRawConn()
+	require.NoError(t, err)
+
+	defer func() { require.NoError(t, raw.Close()) }()
+
+	fileName := filepath.Base(file.Name())
+
+	ftpUploadWithRawConnection(t, raw, file, fileName, true)
 
 	localHash := hashFile(t, file)
 	remoteHash := ftpDownloadAndHash(t, c, fileName)
