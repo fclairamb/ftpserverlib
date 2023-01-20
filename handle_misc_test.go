@@ -297,6 +297,10 @@ func TestTYPE(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, StatusOK, rc)
 
+	rc, _, err = raw.SendCommand("TYPE A N")
+	require.NoError(t, err)
+	require.Equal(t, StatusOK, rc)
+
 	rc, _, err = raw.SendCommand("TYPE i")
 	require.NoError(t, err)
 	require.Equal(t, StatusOK, rc)
