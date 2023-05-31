@@ -296,6 +296,26 @@ func TestTYPE(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, StatusOK, rc)
 
+	rc, _, err = raw.SendCommand("TYPE A N")
+	require.NoError(t, err)
+	require.Equal(t, StatusOK, rc)
+
+	rc, _, err = raw.SendCommand("TYPE i")
+	require.NoError(t, err)
+	require.Equal(t, StatusOK, rc)
+
+	rc, _, err = raw.SendCommand("TYPE a")
+	require.NoError(t, err)
+	require.Equal(t, StatusOK, rc)
+
+	rc, _, err = raw.SendCommand("TYPE l 8")
+	require.NoError(t, err)
+	require.Equal(t, StatusOK, rc)
+
+	rc, _, err = raw.SendCommand("TYPE l 7")
+	require.NoError(t, err)
+	require.Equal(t, StatusOK, rc)
+
 	rc, _, err = raw.SendCommand("TYPE wrong")
 	require.NoError(t, err)
 	require.Equal(t, StatusNotImplementedParam, rc)

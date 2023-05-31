@@ -54,7 +54,7 @@ func (c *clientHandler) transferFile(write bool, append bool, param, info string
 	if write {
 		fileFlag = os.O_WRONLY
 		if append {
-			fileFlag |= os.O_APPEND
+			fileFlag |= os.O_CREATE | os.O_APPEND
 			// ignore the seek position for append mode
 			c.ctxRest = 0
 		} else {

@@ -257,11 +257,12 @@ func (c *clientHandler) handleFEAT(param string) error {
 }
 
 func (c *clientHandler) handleTYPE(param string) error {
+	param = strings.ReplaceAll(strings.ToUpper(param), " ", "")
 	switch param {
 	case "I", "L8":
 		c.currentTransferType = TransferTypeBinary
 		c.writeMessage(StatusOK, "Type set to binary")
-	case "A", "L7":
+	case "A", "AN", "L7":
 		c.currentTransferType = TransferTypeASCII
 		c.writeMessage(StatusOK, "Type set to ASCII")
 	default:
