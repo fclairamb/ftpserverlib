@@ -70,15 +70,6 @@ type ClientDriverExtensionAllocate interface {
 	AllocateSpace(size int) error
 }
 
-/*
-// ClientDriverExtensionChown is an extension to support the "CHOWN" - owner change - command
-type ClientDriverExtensionChown interface {
-
-	// Chown changes the owner of a file
-	Chown(name string, user string, group string) error
-}
-*/
-
 // ClientDriverExtensionSymlink is an extension to support the "SITE SYMLINK" - symbolic link creation - command
 type ClientDriverExtensionSymlink interface {
 

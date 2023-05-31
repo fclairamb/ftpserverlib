@@ -253,19 +253,14 @@ func (p *passiveTransferHandler) Open() (net.Conn, error) {
 func (p *passiveTransferHandler) Close() error {
 	if p.tcpListener != nil {
 		if err := p.tcpListener.Close(); err != nil {
-			p.logger.Warn(
-				"Problem closing passive listener",
-				"err", err,
-			)
+			p.logger.Warn("Problem closing passive listener", "err", err)
 		}
 	}
 
 	if p.connection != nil {
 		if err := p.connection.Close(); err != nil {
 			p.logger.Warn(
-				"Problem closing passive connection",
-				"err", err,
-			)
+				"Problem closing passive connection", "err", err)
 		}
 	}
 
