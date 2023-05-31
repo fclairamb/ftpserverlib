@@ -11,19 +11,19 @@ jobs:
   # This workflow contains a single job called "build"
   build:
     # The type of runner that the job will run on
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
 
     strategy:
       matrix:
-        go: [ 1.19, 1.18, 1.17 ]
+        go: [ 1.20, 1.19, 1.18 ]
         include:
-          - go: 1.19
+          - go: 1.20
             lint: true
   
     # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
       # Checks-out your repository under $GITHUB_WORKSPACE
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v3.5.2
 
       # Running golangci-lint
       - name: Linting
@@ -53,6 +53,6 @@ jobs:
   # For github to have a unique status check name
   build-status:
     needs: build
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     steps:
       - run: echo 'All good'
