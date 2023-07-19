@@ -1096,6 +1096,33 @@ func TestPASVIPMatch(t *testing.T) {
 	}
 }
 
+func TestPassivePortExhaustion(t *testing.T) {
+	s := NewTestServer(t, false)
+	s.settings.PassiveTransferPortRange = &PortRange{
+		Start: 40000,
+		End:   40005,
+	}
+
+	c, err := goftp.DialConfig(goftp.Config{
+		User:     authUser,
+		Password: authPass,
+	}, s.Addr())
+	require.NoError(t, err, "Couldn't connect")
+
+	defer func() { panicOnError(c.Close()) }()
+
+	raw, err := c.OpenRawConn()
+	require.NoError(t, err, "Couldn't open raw connection")
+
+	defer func() { require.NoError(t, raw.Close()) }()
+
+	for i := 0; i < 20; i++ {
+		rc, message, err := raw.SendCommand("PASV")
+		require.NoError(t, err)
+		require.Equal(t, StatusEnteringPASV, rc, message)
+	}
+}
+
 func loginConnection(t *testing.T, conn net.Conn) {
 	buf := make([]byte, 1024)
 	_, err := fmt.Fprintf(conn, "USER %v\r\n", authUser)

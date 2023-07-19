@@ -119,10 +119,8 @@ func (c *clientHandler) findListenerWithinPortRange(portRange *PortRange) (*net.
 func (c *clientHandler) handlePASV(param string) error {
 	command := c.GetLastCommand()
 	addr, _ := net.ResolveTCPAddr("tcp", ":0")
-
 	var tcpListener *net.TCPListener
 	var err error
-
 	portRange := c.server.settings.PassiveTransferPortRange
 
 	if portRange != nil {
@@ -137,10 +135,8 @@ func (c *clientHandler) handlePASV(param string) error {
 
 		return nil
 	}
-
 	// The listener will either be plain TCP or TLS
 	var listener net.Listener
-
 	listener = tcpListener
 
 	if wrapper, ok := c.server.driver.(MainDriverExtensionPassiveWrapper); ok {
@@ -192,6 +188,10 @@ func (c *clientHandler) handlePASV(param string) error {
 	}
 
 	c.transferMu.Lock()
+	if c.transfer != nil {
+		c.transfer.Close() //nolint:errcheck,gosec
+	}
+
 	c.transfer = p
 	c.transferMu.Unlock()
 	c.setLastDataChannel(DataChannelPassive)
