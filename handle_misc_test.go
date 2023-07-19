@@ -3,12 +3,15 @@ package ftpserver
 import (
 	"crypto/tls"
 	"fmt"
+	"io"
+	"path/filepath"
 	"strings"
 	"testing"
 
 	"time"
 
 	"github.com/secsy/goftp"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -268,6 +271,63 @@ func TestQuit(t *testing.T) {
 	defer func() { require.NoError(t, raw.Close()) }()
 
 	rc, _, err := raw.SendCommand("QUIT")
+	require.NoError(t, err)
+	require.Equal(t, StatusClosingControlConn, rc)
+}
+
+func TestQuitWithTransferInProgress(t *testing.T) {
+	s := NewTestServerWithDriver(t, &TestServerDriver{
+		Debug: false,
+	})
+	conf := goftp.Config{
+		User:     authUser,
+		Password: authPass,
+	}
+	c, err := goftp.DialConfig(conf, s.Addr())
+	require.NoError(t, err, "Couldn't connect")
+
+	defer func() { panicOnError(c.Close()) }()
+
+	raw, err := c.OpenRawConn()
+	require.NoError(t, err, "Couldn't open raw connection")
+
+	defer func() { require.NoError(t, raw.Close()) }()
+
+	ch := make(chan struct{}, 1)
+	go func() {
+		defer close(ch)
+
+		dcGetter, err := raw.PrepareDataConn() //nolint:govet
+		require.NoError(t, err)
+		file := createTemporaryFile(t, 256*1024)
+		fileName := filepath.Base(file.Name())
+		rc, response, err := raw.SendCommand(fmt.Sprintf("%s %s", "STOR", fileName))
+		require.NoError(t, err)
+		require.Equal(t, StatusFileStatusOK, rc, response)
+
+		dc, err := dcGetter()
+		assert.NoError(t, err)
+
+		ch <- struct{}{}
+		// wait some more time to be sure we send the QUIT command before starting the file copy
+		time.Sleep(100 * time.Millisecond)
+
+		_, err = io.Copy(dc, file)
+		assert.NoError(t, err)
+
+		err = dc.Close()
+		assert.NoError(t, err)
+	}()
+
+	// wait for the trasfer to start
+	<-ch
+	// we send a QUIT command after sending STOR and before the transfer ends.
+	// We expect the transfer close response and then the QUIT response
+	rc, _, err := raw.SendCommand("QUIT")
+	require.NoError(t, err)
+	require.Equal(t, StatusClosingDataConn, rc)
+
+	rc, _, err = raw.ReadResponse()
 	require.NoError(t, err)
 	require.Equal(t, StatusClosingControlConn, rc)
 }
