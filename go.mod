@@ -6,9 +6,9 @@ require (
 	github.com/fclairamb/go-log v0.4.1
 	github.com/go-kit/log v0.2.1
 	github.com/secsy/goftp v0.0.0-20200609142545-aa2de14babf4
-	github.com/spf13/afero v1.9.5
+	github.com/spf13/afero v1.10.0
 	github.com/stretchr/testify v1.8.4
-	golang.org/x/sys v0.11.0
+	golang.org/x/sys v0.13.0
 )
 
 require (
