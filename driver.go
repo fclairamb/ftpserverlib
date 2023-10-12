@@ -23,7 +23,7 @@ type MainDriver interface {
 	ClientDisconnected(cc ClientContext)
 
 	// AuthUser authenticates the user and selects an handling driver
-	AuthUser(cc ClientContext, user, pass string) (ClientDriver, error)
+	AuthUser(cc ClientContext, user, pass string) (ClientDriver, string, error)
 
 	// GetTLSConfig returns a TLS Certificate to use
 	// The certificate could frequently change if we use something like "let's encrypt"
@@ -56,6 +56,12 @@ type MainDriverExtensionUserVerifier interface {
 	// PreAuthUser is called when receiving the "USER" command before proceeding with any other checks
 	// If it returns a non-nil error, the client will receive a 530 error and be disconnected.
 	PreAuthUser(cc ClientContext, user string) error
+}
+
+// MainDriverExtensionQuitter is an extension that allows to control the quit message
+type MainDriverExtensionQuitter interface {
+	// GetQuitMessage returns the message to display when the user quits the server
+	GetQuitMessage() string
 }
 
 // ClientDriver is the base FS implementation that allows to manipulate files

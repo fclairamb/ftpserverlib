@@ -224,14 +224,14 @@ func (driver *TestServerDriver) ClientConnected(cc ClientContext) (string, error
 var errBadUserNameOrPassword = errors.New("bad username or password")
 
 // AuthUser with authenticate users
-func (driver *TestServerDriver) AuthUser(_ ClientContext, user, pass string) (ClientDriver, error) {
+func (driver *TestServerDriver) AuthUser(_ ClientContext, user, pass string) (ClientDriver, string, error) {
 	if user == authUser && pass == authPass {
 		clientdriver := NewTestClientDriver(driver)
 
-		return clientdriver, nil
+		return clientdriver, "Welcome!", nil
 	}
 
-	return nil, errBadUserNameOrPassword
+	return nil, "Nope!", errBadUserNameOrPassword
 }
 
 // ClientDisconnected is called when the user disconnects
