@@ -222,14 +222,22 @@ func (driver *TestServerDriver) ClientConnected(cc ClientContext) (string, error
 var errBadUserNameOrPassword = errors.New("bad username or password")
 
 // AuthUser with authenticate users
-func (driver *TestServerDriver) AuthUser(_ ClientContext, user, pass string) (ClientDriver, string, error) {
+func (driver *TestServerDriver) AuthUser(_ ClientContext, user, pass string) (ClientDriver, error) {
 	if user == authUser && pass == authPass {
 		clientdriver := NewTestClientDriver(driver)
 
-		return clientdriver, "Welcome!", nil
+		return clientdriver, nil
 	}
 
-	return nil, "Nope!", errBadUserNameOrPassword
+	return nil, errBadUserNameOrPassword
+}
+
+// GetPostAuthMessage returns a message displayed after authentication
+func (driver *TestServerDriver) GetPostAuthMessage(cc ClientContext, user string, authErr error) string {
+	if authErr != nil {
+		return "You are not welcome here"
+	}
+	return "Welcome to the FTP Server"
 }
 
 // ClientDisconnected is called when the user disconnects

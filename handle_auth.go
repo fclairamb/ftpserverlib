@@ -58,7 +58,11 @@ func (c *clientHandler) handleUSER(param string) error {
 func (c *clientHandler) handlePASS(param string) error {
 	var err error
 	var msg string
-	c.driver, msg, err = c.server.driver.AuthUser(c, c.user, param)
+	c.driver, err = c.server.driver.AuthUser(c, c.user, param)
+	dpa, ok := c.server.driver.(MainDriverExtensionPostAuthMessage)
+	if ok {
+		msg = dpa.GetPostAuthMessage(c, c.user, err)
+	}
 
 	switch {
 	case err == nil:
