@@ -23,7 +23,7 @@ type MainDriver interface {
 	ClientDisconnected(cc ClientContext)
 
 	// AuthUser authenticates the user and selects an handling driver
-	AuthUser(cc ClientContext, user, pass string) (ClientDriver, string, error)
+	AuthUser(cc ClientContext, user, pass string) (ClientDriver, error)
 
 	// GetTLSConfig returns a TLS Certificate to use
 	// The certificate could frequently change if we use something like "let's encrypt"
@@ -56,6 +56,13 @@ type MainDriverExtensionUserVerifier interface {
 	// PreAuthUser is called when receiving the "USER" command before proceeding with any other checks
 	// If it returns a non-nil error, the client will receive a 530 error and be disconnected.
 	PreAuthUser(cc ClientContext, user string) error
+}
+
+// MainDriverExtensionPostAuthMessage is an extension that allows to send a message
+// after the authentication
+type MainDriverExtensionPostAuthMessage interface {
+	// PostAuthMessage is called after the authentication
+	GetPostAuthMessage(cc ClientContext, user string, authErr error) string
 }
 
 // MainDriverExtensionQuitter is an extension that allows to control the quit message
