@@ -277,9 +277,6 @@ func (c *clientHandler) handleQUIT(param string) error {
 	msg := "Goodbye"
 	if quitter, ok := c.server.driver.(MainDriverExtensionQuitter); ok {
 		msg = quitter.GetQuitMessage()
-		if msg == "" {
-			msg = "Goodbye"
-		}
 	}
 	c.writeMessage(StatusClosingControlConn, msg)
 	c.disconnect()
