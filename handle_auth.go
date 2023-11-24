@@ -63,7 +63,7 @@ func (c *clientHandler) handlePASS(param string) error {
 	switch {
 	case err == nil:
 		if msg == "" {
-			msg = "Ok"
+			msg = "Password ok, continue"
 		}
 		c.writeMessage(StatusUserLoggedIn, msg)
 	case err != nil:
