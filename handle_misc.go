@@ -274,10 +274,13 @@ func (c *clientHandler) handleTYPE(param string) error {
 
 func (c *clientHandler) handleQUIT(param string) error {
 	c.transferWg.Wait()
+
 	msg := "Goodbye"
+
 	if quitter, ok := c.server.driver.(MainDriverExtensionQuitter); ok {
 		msg = quitter.GetQuitMessage()
 	}
+
 	c.writeMessage(StatusClosingControlConn, msg)
 	c.disconnect()
 	c.reader = nil

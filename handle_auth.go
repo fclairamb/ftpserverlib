@@ -59,6 +59,7 @@ func (c *clientHandler) handlePASS(param string) error {
 	var err error
 	var msg string
 	c.driver, err = c.server.driver.AuthUser(c, c.user, param)
+
 	dpa, ok := c.server.driver.(MainDriverExtensionPostAuthMessage)
 	if ok {
 		msg = dpa.GetPostAuthMessage(c, c.user, err)
@@ -69,11 +70,13 @@ func (c *clientHandler) handlePASS(param string) error {
 		if msg == "" {
 			msg = "Password ok, continue"
 		}
+
 		c.writeMessage(StatusUserLoggedIn, msg)
 	case err != nil:
 		if msg == "" {
 			msg = fmt.Sprintf("Authentication error: %v", err)
 		}
+
 		c.writeMessage(StatusNotLoggedIn, msg)
 		c.disconnect()
 	default:
