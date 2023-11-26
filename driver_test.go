@@ -239,6 +239,7 @@ func (driver *TestServerDriver) GetPostAuthMessage(cc ClientContext, user string
 	if authErr != nil {
 		return "You are not welcome here"
 	}
+
 	return "Welcome to the FTP Server"
 }
 
