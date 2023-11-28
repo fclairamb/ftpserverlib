@@ -232,13 +232,18 @@ func (driver *TestServerDriver) AuthUser(_ ClientContext, user, pass string) (Cl
 	return nil, errBadUserNameOrPassword
 }
 
-// GetPostAuthMessage returns a message displayed after authentication
-func (driver *TestServerDriver) GetPostAuthMessage(cc ClientContext, user string, authErr error) string {
+// PostAuthMessage returns a message displayed after authentication
+func (driver *TestServerDriver) PostAuthMessage(cc ClientContext, user string, authErr error) string {
 	if authErr != nil {
 		return "You are not welcome here"
 	}
 
 	return "Welcome to the FTP Server"
+}
+
+// QuitMessage returns a goodbye message
+func (driver *TestServerDriver) QuitMessage() string {
+	return "Sayonara, bye bye!"
 }
 
 // ClientDisconnected is called when the user disconnects

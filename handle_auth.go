@@ -62,7 +62,7 @@ func (c *clientHandler) handlePASS(param string) error {
 
 	dpa, ok := c.server.driver.(MainDriverExtensionPostAuthMessage)
 	if ok {
-		msg = dpa.GetPostAuthMessage(c, c.user, err)
+		msg = dpa.PostAuthMessage(c, c.user, err)
 	}
 
 	switch {

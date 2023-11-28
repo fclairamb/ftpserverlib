@@ -62,13 +62,13 @@ type MainDriverExtensionUserVerifier interface {
 // after the authentication
 type MainDriverExtensionPostAuthMessage interface {
 	// PostAuthMessage is called after the authentication
-	GetPostAuthMessage(cc ClientContext, user string, authErr error) string
+	PostAuthMessage(cc ClientContext, user string, authErr error) string
 }
 
 // MainDriverExtensionQuitter is an extension that allows to control the quit message
 type MainDriverExtensionQuitter interface {
-	// GetQuitMessage returns the message to display when the user quits the server
-	GetQuitMessage() string
+	// QuitMessage returns the message to display when the user quits the server
+	QuitMessage() string
 }
 
 // ClientDriver is the base FS implementation that allows to manipulate files
