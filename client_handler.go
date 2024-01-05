@@ -106,6 +106,7 @@ type clientHandler struct {
 	isTransferOpen      bool            // indicate if the transfer connection is opened
 	isTransferAborted   bool            // indicate if the transfer was aborted
 	tlsRequirement      TLSRequirement  // TLS requirement to respect
+	extra               any             // Additional application-specific data
 	paramsMutex         sync.RWMutex    // mutex to protect the parameters exposed to the library users
 }
 
@@ -243,6 +244,14 @@ func (c *clientHandler) HasTLSForTransfers() bool {
 	defer c.paramsMutex.RUnlock()
 
 	return c.transferTLS
+}
+
+func (c *clientHandler) SetExtra(extra any) {
+	c.extra = extra
+}
+
+func (c *clientHandler) Extra() any {
+	return c.extra
 }
 
 func (c *clientHandler) setTLSForTransfer(value bool) {
