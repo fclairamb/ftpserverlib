@@ -456,3 +456,36 @@ func TestDataConnectionRequirements(t *testing.T) {
 		assert.Contains(t, err.Error(), "unhandled data connection requirement")
 	}
 }
+
+func TestExtraData(t *testing.T) {
+	driver := &TestServerDriver{
+		Debug: false,
+	}
+	s := NewTestServerWithDriver(t, driver)
+
+	conf := goftp.Config{
+		User:     authUser,
+		Password: authPass,
+	}
+
+	c, err := goftp.DialConfig(conf, s.Addr())
+	require.NoError(t, err, "Couldn't connect")
+
+	defer func() { panicOnError(c.Close()) }()
+
+	raw, err := c.OpenRawConn()
+	require.NoError(t, err)
+
+	defer func() { require.NoError(t, raw.Close()) }()
+
+	info := driver.GetClientsInfo()
+	require.Len(t, info, 1)
+
+	for k, v := range info {
+		ccInfo, ok := v.(map[string]interface{})
+		require.True(t, ok)
+		extra, ok := ccInfo["extra"].(uint32)
+		require.True(t, ok)
+		require.Equal(t, k, extra)
+	}
+}

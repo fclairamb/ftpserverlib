@@ -214,6 +214,8 @@ func (driver *TestServerDriver) ClientConnected(cc ClientContext) (string, error
 	}
 
 	cc.SetDebug(driver.Debug)
+	// we set the client id as extra data just for testing
+	cc.SetExtra(cc.ID())
 	driver.Clients = append(driver.Clients, cc)
 	// This will remain the official name for now
 	return "TEST Server", err
@@ -281,6 +283,7 @@ func (driver *TestServerDriver) GetClientsInfo() map[uint32]interface{} {
 		ccInfo["hasTLSForTransfers"] = cc.HasTLSForTransfers()
 		ccInfo["lastCommand"] = cc.GetLastCommand()
 		ccInfo["debug"] = cc.Debug()
+		ccInfo["extra"] = cc.Extra()
 
 		info[cc.ID()] = ccInfo
 	}

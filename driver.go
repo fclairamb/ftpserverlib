@@ -201,6 +201,12 @@ type ClientContext interface {
 	// If you want to enforce the same requirement for all
 	// clients, use the TLSRequired parameter defined in server settings instead
 	SetTLSRequirement(requirement TLSRequirement) error
+
+	// SetExtra allows to set application specific data
+	SetExtra(extra any)
+
+	// Extra returns application specific data set using SetExtra
+	Extra() any
 }
 
 // FileTransfer defines the inferface for file transfers.
