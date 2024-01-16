@@ -593,7 +593,12 @@ func (c *clientHandler) handleGenericHash(param string, algo HASHAlgo, isCustomM
 		return nil
 	}
 
-	args := strings.SplitN(param, " ", 3)
+	args, err := advSplitN(param, ' ', 3)
+
+	if err != nil || len(args) < 1 {
+		c.writeMessage(StatusSyntaxErrorParameters, fmt.Sprintf("invalid HASH parameters: %v", param))
+	}
+
 	info, err := c.driver.Stat(args[0])
 
 	if err != nil {
