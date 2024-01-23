@@ -120,6 +120,11 @@ func (c *clientHandler) transferFile(write bool, append bool, param, info string
 
 	// closing the transfer we also send the response message to the FTP client
 	c.TransferClose(err)
+	if write {
+		if cAF, ok := c.driver.(ClientDriverExtensionAfterWrite); ok {
+			cAF.AfterSuccessfullWrite(path)
+		}
+	}
 }
 
 func (c *clientHandler) doFileTransfer(tr net.Conn, file io.ReadWriter, write bool) error {

@@ -130,6 +130,13 @@ type ClientDriverExtensionAvailableSpace interface {
 	GetAvailableSpace(dirName string) (int64, error)
 }
 
+// ClientDriverExtensionAfterWrite is an extension to implement if you want a method to be called
+// once a successfull write to the server has occured. The path is the path to the file relative to
+// the client filesystem. The file will be closed and can be modified/deleted by your needs.
+type ClientDriverExtensionAfterWrite interface {
+	AfterSuccessfullWrite(path string)
+}
+
 // ClientContext is implemented on the server side to provide some access to few data around the client
 type ClientContext interface {
 	// Path provides the path of the current connection

@@ -408,6 +408,8 @@ func (driver *TestClientDriver) GetAvailableSpace(dirName string) (int64, error)
 	return int64(123), nil
 }
 
+func (driver *TestClientDriver) AfterSuccessfullWrite(path string) {}
+
 var errInvalidChownUser = errors.New("invalid chown on user")
 var errInvalidChownGroup = errors.New("invalid chown on group")
 
