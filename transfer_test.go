@@ -1030,6 +1030,8 @@ func TestPASVConnectionWait(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+// Note: On Mac Os X, this requires to issue the following command:
+// sudo ifconfig lo0 alias 127.0.1.1 up
 func TestPASVIPMatch(t *testing.T) {
 	s := NewTestServer(t, false)
 
