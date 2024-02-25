@@ -11,7 +11,7 @@ import (
 
 var errUnknowHash = errors.New("unknown hash algorithm")
 
-func (c *clientHandler) handleAUTH(param string) error {
+func (c *clientHandler) handleAUTH(_ string) error {
 	if tlsConfig, err := c.server.driver.GetTLSConfig(); err == nil {
 		c.writeMessage(StatusAuthAccepted, "AUTH command ok. Expecting TLS Negotiation.")
 		c.conn = tls.Server(c.conn, tlsConfig)
@@ -275,10 +275,12 @@ func (c *clientHandler) handleTYPE(param string) error {
 func (c *clientHandler) handleQUIT(param string) error {
 	c.transferWg.Wait()
 
-	msg := "Goodbye"
+	var msg string
 
 	if quitter, ok := c.server.driver.(MainDriverExtensionQuitMessage); ok {
 		msg = quitter.QuitMessage()
+	} else {
+		msg = "Goodbye"
 	}
 
 	c.writeMessage(StatusClosingControlConn, msg)
