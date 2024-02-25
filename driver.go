@@ -65,8 +65,8 @@ type MainDriverExtensionPostAuthMessage interface {
 	PostAuthMessage(cc ClientContext, user string, authErr error) string
 }
 
-// MainDriverExtensionQuitter is an extension that allows to control the quit message
-type MainDriverExtensionQuitter interface {
+// MainDriverExtensionQuitMessage is an extension that allows to control the quit message
+type MainDriverExtensionQuitMessage interface {
 	// QuitMessage returns the message to display when the user quits the server
 	QuitMessage() string
 }
