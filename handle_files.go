@@ -594,7 +594,6 @@ func (c *clientHandler) handleGenericHash(param string, algo HASHAlgo, isCustomM
 	}
 
 	args := strings.SplitN(param, " ", 3)
-
 	info, err := c.driver.Stat(args[0])
 
 	if err != nil {
