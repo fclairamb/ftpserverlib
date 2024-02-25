@@ -275,6 +275,36 @@ func TestQuit(t *testing.T) {
 	require.Equal(t, StatusClosingControlConn, rc)
 }
 
+func TestQuitWithCustomMessage(_t *testing.T) {
+	s := NewTestServerWithDriver(_t, &TestServerDriver{
+		Debug:             true,
+		TLS:               true,
+		customQuitMessage: true,
+	})
+	t := require.New(_t)
+	conf := goftp.Config{
+		User:     authUser,
+		Password: authPass,
+		TLSConfig: &tls.Config{
+			//nolint:gosec
+			InsecureSkipVerify: true,
+		},
+		TLSMode: goftp.TLSExplicit,
+	}
+	c, err := goftp.DialConfig(conf, s.Addr())
+	t.NoError(err, "Couldn't connect")
+
+	defer func() { panicOnError(c.Close()) }()
+
+	raw, err := c.OpenRawConn()
+	t.NoError(err, "Couldn't open raw connection")
+
+	rc, msg, err := raw.SendCommand("QUIT")
+	t.NoError(err)
+	t.Equal(StatusClosingControlConn, rc)
+	t.Equal("Sayonara, bye bye!", msg)
+}
+
 func TestQuitWithTransferInProgress(t *testing.T) {
 	s := NewTestServerWithDriver(t, &TestServerDriver{
 		Debug: false,

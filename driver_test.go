@@ -103,6 +103,8 @@ type TestServerDriver struct {
 	TLSVerificationReply tlsVerificationReply
 	errPassiveListener   error
 	TLSRequirement       TLSRequirement
+	customAuthMessage    bool
+	customQuitMessage    bool
 }
 
 // TestClientDriver defines a minimal serverftp client driver
@@ -236,6 +238,10 @@ func (driver *TestServerDriver) AuthUser(_ ClientContext, user, pass string) (Cl
 
 // PostAuthMessage returns a message displayed after authentication
 func (driver *TestServerDriver) PostAuthMessage(cc ClientContext, user string, authErr error) string {
+	if !driver.customAuthMessage {
+		return ""
+	}
+
 	if authErr != nil {
 		return "You are not welcome here"
 	}
@@ -245,6 +251,10 @@ func (driver *TestServerDriver) PostAuthMessage(cc ClientContext, user string, a
 
 // QuitMessage returns a goodbye message
 func (driver *TestServerDriver) QuitMessage() string {
+	if !driver.customQuitMessage {
+		return ""
+	}
+
 	return "Sayonara, bye bye!"
 }
 
