@@ -90,6 +90,24 @@ func TestLoginFailure(t *testing.T) {
 	require.Error(t, err, "We should have failed to login")
 }
 
+func TestLoginCustom(t *testing.T) {
+	s := NewTestServerWithDriver(t, &TestServerDriver{Debug: true, customAuthMessage: true})
+	r := require.New(t)
+
+	conf := goftp.Config{
+		User:     authUser,
+		Password: authPass + "_wrong",
+	}
+
+	c, err := goftp.DialConfig(conf, s.Addr())
+	r.NoError(err, "Couldn't connect")
+
+	defer func() { panicOnError(c.Close()) }()
+
+	_, err = c.OpenRawConn()
+	r.Error(err, "We should have failed to login")
+}
+
 func TestAuthTLS(t *testing.T) {
 	s := NewTestServerWithDriver(t, &TestServerDriver{
 		Debug: false,
