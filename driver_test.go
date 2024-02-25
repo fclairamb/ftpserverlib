@@ -231,6 +231,9 @@ func (driver *TestServerDriver) AuthUser(_ ClientContext, user, pass string) (Cl
 		clientdriver := NewTestClientDriver(driver)
 
 		return clientdriver, nil
+	} else if user == "nil" && pass == "nil" {
+		// Definitely a bad behavior (but can be done on the driver side)
+		return nil, nil
 	}
 
 	return nil, errBadUserNameOrPassword
