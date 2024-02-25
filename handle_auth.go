@@ -66,12 +66,9 @@ func (c *clientHandler) handlePASS(param string) error {
 	}
 
 	switch {
-	case err == nil:
-		if msg == "" {
-			msg = "Password ok, continue"
-		}
-
-		c.writeMessage(StatusUserLoggedIn, msg)
+	case err == nil && c.driver == nil:
+		c.writeMessage(StatusNotLoggedIn, "Unexpected exception (driver is nil)")
+		c.disconnect()
 	case err != nil:
 		if msg == "" {
 			msg = fmt.Sprintf("Authentication error: %v", err)
@@ -79,9 +76,12 @@ func (c *clientHandler) handlePASS(param string) error {
 
 		c.writeMessage(StatusNotLoggedIn, msg)
 		c.disconnect()
-	default:
-		c.writeMessage(StatusNotLoggedIn, "Unexpected exception (driver is nil)")
-		c.disconnect()
+	case err == nil:
+		if msg == "" {
+			msg = "Password ok, continue"
+		}
+
+		c.writeMessage(StatusUserLoggedIn, msg)
 	}
 
 	return nil
