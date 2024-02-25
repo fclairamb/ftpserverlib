@@ -593,9 +593,9 @@ func (c *clientHandler) handleGenericHash(param string, algo HASHAlgo, isCustomM
 		return nil
 	}
 
-	args, err := advSplitN(param, ' ', 3)
+	args := strings.SplitN(param, " ", 3)
 
-	if err != nil || len(args) < 1 {
+	if len(args) < 1 {
 		c.writeMessage(StatusSyntaxErrorParameters, fmt.Sprintf("invalid HASH parameters: %v", param))
 	}
 
