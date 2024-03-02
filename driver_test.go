@@ -240,7 +240,7 @@ func (driver *TestServerDriver) AuthUser(_ ClientContext, user, pass string) (Cl
 }
 
 // PostAuthMessage returns a message displayed after authentication
-func (driver *TestServerDriver) PostAuthMessage(cc ClientContext, user string, authErr error) string {
+func (driver *TestServerDriver) PostAuthMessage(_ ClientContext, user string, authErr error) string {
 	if !driver.customAuthMessage {
 		return ""
 	}
