@@ -75,13 +75,17 @@ linters-settings:
       # minimal occurrences count to trigger, 3 by default
       min-occurrences: 3
     depguard:
-      list-type: blacklist
-      include-go-root: false
-      packages:
-        - github.com/sirupsen/logrus
-      packages-with-error-messages:
-        # specify an error message to output when a blacklisted package is used
-        github.com/sirupsen/logrus: "logging is allowed only by logutils.Log"
+      rules:
+        prevent_unmaintained_packages:
+          list-mode: lax # allow unless explicitely denied
+          files:
+            - $all
+            - "!$test"
+          allow:
+            - $gostd
+          deny:
+            - pkg: io/ioutil
+              desc: "replaced by io and os packages since Go 1.16: https://tip.golang.org/doc/go1.16#ioutil"
     misspell:
       # Correct spellings using locale preferences for US or UK.
       # Default is to use a neutral variety of English.
@@ -95,12 +99,7 @@ linters-settings:
       line-length: 120
       # tab width in spaces. Default to 1.
       tab-width: 1
-    unused:
-      # treat code as a program (not a library) and report unused exported identifiers; default is false.
-      # XXX: if you enable this setting, unused will report a lot of false-positives in text editors:
-      # if it's called for subdir of a project it can't find funcs usages. All text editor integrations
-      # with golangci-lint call it on a directory with the changed file.
-      check-exported: false
+    # unused:
     unparam:
       # Inspect exported functions, default is false. Set to true if no external program/library imports your code.
       # XXX: if you enable this setting, unparam will report a lot of false-positives in text editors:
