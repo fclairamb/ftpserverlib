@@ -182,6 +182,7 @@ linters:
         - goerr113
         - gofmt
         - goimports
+        - gosimple
         # - golint --> revive
         - revive
         # - gomnd
