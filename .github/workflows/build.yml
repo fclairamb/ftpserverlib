@@ -6,6 +6,7 @@ on:
   push:
     branches:
       - main
+      - chore/lint-*
   pull_request:
 
 permissions:
