@@ -91,7 +91,7 @@ func TestLoginFailure(t *testing.T) {
 }
 
 func TestLoginCustom(t *testing.T) {
-	s := NewTestServerWithDriver(t, &TestServerDriver{Debug: true, customAuthMessage: true})
+	s := NewTestServerWithTestDriver(t, &TestServerDriver{Debug: true, customAuthMessage: true})
 	r := require.New(t)
 
 	conf := goftp.Config{
@@ -127,7 +127,7 @@ func TestLoginNil(t *testing.T) {
 }
 
 func TestAuthTLS(t *testing.T) {
-	s := NewTestServerWithDriver(t, &TestServerDriver{
+	s := NewTestServerWithTestDriver(t, &TestServerDriver{
 		Debug: false,
 		TLS:   true,
 	})
@@ -177,7 +177,7 @@ func TestAuthExplicitTLSFailure(t *testing.T) {
 }
 
 func TestAuthTLSRequired(t *testing.T) {
-	s := NewTestServerWithDriver(t, &TestServerDriver{
+	s := NewTestServerWithTestDriver(t, &TestServerDriver{
 		Debug: false,
 		TLS:   true,
 	})
@@ -217,7 +217,7 @@ func TestAuthTLSRequired(t *testing.T) {
 }
 
 func TestAuthTLSVerificationFailed(t *testing.T) {
-	s := NewTestServerWithDriver(t, &TestServerDriver{
+	s := NewTestServerWithTestDriver(t, &TestServerDriver{
 		Debug:                true,
 		TLS:                  true,
 		TLSVerificationReply: tlsVerificationFailed,
@@ -243,7 +243,7 @@ func TestAuthTLSVerificationFailed(t *testing.T) {
 }
 
 func TestAuthTLSCertificate(t *testing.T) {
-	s := NewTestServerWithDriver(t, &TestServerDriver{
+	s := NewTestServerWithTestDriver(t, &TestServerDriver{
 		Debug:                true,
 		TLS:                  true,
 		TLSVerificationReply: tlsVerificationAuthenticated,
@@ -274,7 +274,7 @@ func TestAuthTLSCertificate(t *testing.T) {
 }
 
 func TestAuthPerClientTLSRequired(t *testing.T) {
-	s := NewTestServerWithDriver(t, &TestServerDriver{
+	s := NewTestServerWithTestDriver(t, &TestServerDriver{
 		Debug:          true,
 		TLS:            true,
 		TLSRequirement: MandatoryEncryption,
@@ -313,7 +313,7 @@ func TestAuthPerClientTLSRequired(t *testing.T) {
 }
 
 func TestUserVerifierError(t *testing.T) {
-	s := NewTestServerWithDriver(t, &TestServerDriver{
+	s := NewTestServerWithTestDriver(t, &TestServerDriver{
 		Debug: false,
 		TLS:   true,
 		// setting an invalid TLS requirement will cause the test driver

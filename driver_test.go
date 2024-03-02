@@ -38,11 +38,11 @@ var errInvalidTLSCertificate = errors.New("invalid TLS certificate")
 
 // NewTestServer provides a test server with or without debugging
 func NewTestServer(t *testing.T, debug bool) *FtpServer {
-	return NewTestServerWithDriver(t, &TestServerDriver{Debug: debug})
+	return NewTestServerWithTestDriver(t, &TestServerDriver{Debug: debug})
 }
 
-// NewTestServerWithDriver provides a server instantiated with some settings
-func NewTestServerWithDriver(t *testing.T, driver *TestServerDriver) *FtpServer {
+// NewTestServerWithTestDriver provides a server instantiated with some settings
+func NewTestServerWithTestDriver(t *testing.T, driver *TestServerDriver) *FtpServer {
 	t.Parallel()
 
 	if driver.Settings == nil {

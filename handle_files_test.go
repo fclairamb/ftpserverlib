@@ -116,7 +116,7 @@ func TestALLO(t *testing.T) {
 }
 
 func TestCHMOD(t *testing.T) {
-	s := NewTestServerWithDriver(t, &TestServerDriver{
+	s := NewTestServerWithTestDriver(t, &TestServerDriver{
 		Debug: false,
 		TLS:   true,
 	})
@@ -200,7 +200,7 @@ func TestCHOWN(t *testing.T) {
 }
 
 func TestMFMT(t *testing.T) {
-	s := NewTestServerWithDriver(t, &TestServerDriver{
+	s := NewTestServerWithTestDriver(t, &TestServerDriver{
 		Debug: false,
 		TLS:   true,
 	})
@@ -513,7 +513,7 @@ func TestHASHDisabled(t *testing.T) {
 }
 
 func TestHASHCommand(t *testing.T) {
-	s := NewTestServerWithDriver(
+	s := NewTestServerWithTestDriver(
 		t,
 		&TestServerDriver{
 			Debug: false,
@@ -688,7 +688,7 @@ func TestCOMB(t *testing.T) {
 }
 
 func TestCOMBAppend(t *testing.T) {
-	s := NewTestServerWithDriver(
+	s := NewTestServerWithTestDriver(
 		t,
 		&TestServerDriver{
 			Debug: false,

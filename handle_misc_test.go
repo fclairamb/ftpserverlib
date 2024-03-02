@@ -44,7 +44,7 @@ func TestSiteCommand(t *testing.T) {
 // will timeout. I handle idle timeout myself in SFTPGo but you could be
 // interested to fix this bug
 func TestIdleTimeout(t *testing.T) {
-	s := NewTestServerWithDriver(t, &TestServerDriver{Debug: false, Settings: &Settings{IdleTimeout: 2}})
+	s := NewTestServerWithTestDriver(t, &TestServerDriver{Debug: false, Settings: &Settings{IdleTimeout: 2}})
 	conf := goftp.Config{
 		User:     authUser,
 		Password: authPass,
@@ -151,7 +151,7 @@ func TestOPTSUTF8(t *testing.T) {
 }
 
 func TestOPTSHASH(t *testing.T) {
-	s := NewTestServerWithDriver(
+	s := NewTestServerWithTestDriver(
 		t,
 		&TestServerDriver{
 			Debug: false,
@@ -247,7 +247,7 @@ func TestAVBL(t *testing.T) {
 }
 
 func TestQuit(t *testing.T) {
-	s := NewTestServerWithDriver(t, &TestServerDriver{
+	s := NewTestServerWithTestDriver(t, &TestServerDriver{
 		Debug: false,
 		TLS:   true,
 	})
@@ -276,7 +276,7 @@ func TestQuit(t *testing.T) {
 }
 
 func TestQuitWithCustomMessage(_t *testing.T) {
-	s := NewTestServerWithDriver(_t, &TestServerDriver{
+	s := NewTestServerWithTestDriver(_t, &TestServerDriver{
 		Debug:             true,
 		TLS:               true,
 		customQuitMessage: true,
@@ -306,7 +306,7 @@ func TestQuitWithCustomMessage(_t *testing.T) {
 }
 
 func TestQuitWithTransferInProgress(t *testing.T) {
-	s := NewTestServerWithDriver(t, &TestServerDriver{
+	s := NewTestServerWithTestDriver(t, &TestServerDriver{
 		Debug: false,
 	})
 	conf := goftp.Config{

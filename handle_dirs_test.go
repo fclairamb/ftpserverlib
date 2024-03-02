@@ -40,7 +40,7 @@ func TestGetRelativePaths(t *testing.T) {
 
 func TestDirListing(t *testing.T) {
 	// MLSD is disabled we relies on LIST of files listing
-	s := NewTestServerWithDriver(t, &TestServerDriver{Debug: false, Settings: &Settings{DisableMLSD: true}})
+	s := NewTestServerWithTestDriver(t, &TestServerDriver{Debug: false, Settings: &Settings{DisableMLSD: true}})
 	conf := goftp.Config{
 		User:     authUser,
 		Password: authPass,
@@ -82,7 +82,7 @@ func TestDirListing(t *testing.T) {
 
 func TestDirListingPathArg(t *testing.T) {
 	// MLSD is disabled we relies on LIST of files listing
-	s := NewTestServerWithDriver(t, &TestServerDriver{Debug: false, Settings: &Settings{DisableMLSD: true}})
+	s := NewTestServerWithTestDriver(t, &TestServerDriver{Debug: false, Settings: &Settings{DisableMLSD: true}})
 	conf := goftp.Config{
 		User:     authUser,
 		Password: authPass,
@@ -366,7 +366,7 @@ func TestCleanPath(t *testing.T) {
 }
 
 func TestTLSTransfer(t *testing.T) {
-	s := NewTestServerWithDriver(t, &TestServerDriver{
+	s := NewTestServerWithTestDriver(t, &TestServerDriver{
 		Debug: false,
 		TLS:   true,
 	})
@@ -412,7 +412,7 @@ func TestTLSTransfer(t *testing.T) {
 }
 
 func TestPerClientTLSTransfer(t *testing.T) {
-	s := NewTestServerWithDriver(t, &TestServerDriver{
+	s := NewTestServerWithTestDriver(t, &TestServerDriver{
 		Debug:          true,
 		TLS:            true,
 		TLSRequirement: MandatoryEncryption,
@@ -494,7 +494,7 @@ func TestListArgs(t *testing.T) {
 	t.Run("without-mlsd", func(t *testing.T) {
 		testListDirArgs(
 			t,
-			NewTestServerWithDriver(t, &TestServerDriver{Debug: false, Settings: &Settings{DisableMLSD: true}}),
+			NewTestServerWithTestDriver(t, &TestServerDriver{Debug: false, Settings: &Settings{DisableMLSD: true}}),
 		)
 	})
 }
