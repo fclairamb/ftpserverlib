@@ -28,7 +28,7 @@ jobs:
       # Running golangci-lint
       - name: Linting
         if: matrix.lint
-        uses: golangci/golangci-lint-action@v4.0.0
+        uses: golangci/golangci-lint-action@v3
         with:
           version: v1.56.2
           only-new-issues: true
