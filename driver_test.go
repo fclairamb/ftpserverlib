@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	log "github.com/fclairamb/go-log"
 	"github.com/fclairamb/go-log/gokit"
 	gklog "github.com/go-kit/log"
 	"github.com/spf13/afero"
@@ -41,7 +42,6 @@ func NewTestServer(t *testing.T, debug bool) *FtpServer {
 	return NewTestServerWithTestDriver(t, &TestServerDriver{Debug: debug})
 }
 
-// NewTestServerWithTestDriver provides a server instantiated with some settings
 func NewTestServerWithTestDriver(t *testing.T, driver *TestServerDriver) *FtpServer {
 	t.Parallel()
 
@@ -64,14 +64,28 @@ func NewTestServerWithTestDriver(t *testing.T, driver *TestServerDriver) *FtpSer
 		driver.fs = afero.NewBasePathFs(afero.NewOsFs(), dir)
 	}
 
-	s := NewFtpServer(driver)
-
 	// If we are in debug mode, we should log things
+	var logger log.Logger
 	if driver.Debug {
-		s.Logger = gokit.NewWrap(gklog.NewLogfmtLogger(gklog.NewSyncWriter(os.Stdout))).With(
+		logger = gokit.NewWrap(gklog.NewLogfmtLogger(gklog.NewSyncWriter(os.Stdout))).With(
 			"ts", gokit.GKDefaultTimestampUTC,
 			"caller", gokit.GKDefaultCaller,
 		)
+	} else {
+		logger = nil
+	}
+
+	s := NewTestServerWithDriverAndLogger(t, driver, logger)
+
+	return s
+}
+
+// NewTestServerWithTestDriver provides a server instantiated with some settings
+func NewTestServerWithDriverAndLogger(t *testing.T, driver MainDriver, logger log.Logger) *FtpServer {
+	s := NewFtpServer(driver)
+
+	if logger != nil {
+		s.Logger = logger
 	}
 
 	if err := s.Listen(); err != nil {
@@ -89,6 +103,10 @@ func NewTestServerWithTestDriver(t *testing.T, driver *TestServerDriver) *FtpSer
 	}()
 
 	return s
+}
+
+func NewTestServerWithDriver(t *testing.T, driver MainDriver) *FtpServer {
+	return NewTestServerWithDriverAndLogger(t, driver, nil)
 }
 
 // TestServerDriver defines a minimal serverftp server driver
