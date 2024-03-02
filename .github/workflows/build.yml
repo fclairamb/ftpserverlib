@@ -6,7 +6,7 @@ on:
   push:
     branches:
       - main
-      - chore/lint-*
+      - chore/lint*
   pull_request:
 
 permissions:
@@ -54,12 +54,7 @@ jobs:
         run: go build -v ./...
 
       - name: Test
-        if: matrix.lint_and_test
-        # We need GCC because of the "go test -race"
-        # env:
-        #   CGO_ENABLED: 0
         run: |
-          apt-get update && apt-get install gcc -y
           go test -parallel 20 -v -race -coverprofile=coverage.txt -covermode=atomic ./...
           bash <(curl -s https://codecov.io/bash)
 
