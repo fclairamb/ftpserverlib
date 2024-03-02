@@ -360,7 +360,7 @@ func (c *clientHandler) Close() error {
 	// closing the connection from a different goroutine should be safe
 	err := c.conn.Close()
 	if err != nil {
-		err = NewNetworkError("error closing control connection", err)
+		err = newNetworkError("error closing control connection", err)
 	}
 
 	return err
@@ -650,7 +650,7 @@ func (c *clientHandler) TransferOpen(info string) (net.Conn, error) {
 
 		c.writeMessage(StatusCannotOpenDataConnection, err.Error())
 
-		err = NewNetworkError("Unable to open transfer", err)
+		err = newNetworkError("Unable to open transfer", err)
 
 		return nil, err
 	}

@@ -29,9 +29,10 @@ func TestTransferCloseStorageExceeded(t *testing.T) {
 }
 
 func TestErrorTypes(t *testing.T) {
-	a := assert.New(t)
+	// a := assert.New(t)
 	t.Run("DriverError", func(t *testing.T) {
-		var err error = NewDriverError("test", os.ErrPermission)
+		a := assert.New(t)
+		var err error = newDriverError("test", os.ErrPermission)
 		a.Equal("driver error: test: permission denied", err.Error())
 		a.ErrorIs(err, os.ErrPermission)
 
@@ -41,7 +42,8 @@ func TestErrorTypes(t *testing.T) {
 	})
 
 	t.Run("NetworkError", func(t *testing.T) {
-		var err error = NewNetworkError("test", os.ErrPermission)
+		a := assert.New(t)
+		var err error = newNetworkError("test", os.ErrPermission)
 		a.Equal("network error: test: permission denied", err.Error())
 		a.ErrorIs(err, os.ErrPermission)
 
@@ -51,7 +53,8 @@ func TestErrorTypes(t *testing.T) {
 	})
 
 	t.Run("FileAccessError", func(t *testing.T) {
-		var err error = NewFileAccessError("test", os.ErrPermission)
+		a := assert.New(t)
+		var err error = newFileAccessError("test", os.ErrPermission)
 		a.Equal("file access error: test: permission denied", err.Error())
 		a.ErrorIs(err, os.ErrPermission)
 		var specificError FileAccessError

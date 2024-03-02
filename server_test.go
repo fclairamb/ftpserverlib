@@ -89,7 +89,7 @@ func TestCannotListen(t *testing.T) {
 	portBlockerListener, err := net.Listen("tcp", "127.0.0.1:0")
 	a.NoError(err)
 
-	defer portBlockerListener.Close()
+	defer func() { a.NoError(portBlockerListener.Close()) }()
 
 	server := FtpServer{
 		Logger: lognoop.NewNoOpLogger(),
@@ -112,7 +112,7 @@ func TestListenWithBadTLSSettings(t *testing.T) {
 	portBlockerListener, err := net.Listen("tcp", "127.0.0.1:0")
 	a.NoError(err)
 
-	defer portBlockerListener.Close()
+	defer func() { a.NoError(portBlockerListener.Close()) }()
 
 	server := FtpServer{
 		Logger: lognoop.NewNoOpLogger(),

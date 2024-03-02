@@ -47,11 +47,6 @@ func (e *ipValidationError) Error() string {
 	return e.error
 }
 
-const (
-	PortSearchMinAttempts = 10
-	PortSearchMaxAttempts = 1000
-)
-
 func (c *clientHandler) getCurrentIP() ([]string, error) {
 	// Provide our external IP address so the ftp client can connect back to us
 	ip := c.server.settings.PublicHost
@@ -84,14 +79,19 @@ func (c *clientHandler) getCurrentIP() ([]string, error) {
 // ErrNoAvailableListeningPort is returned when no port could be found to accept incoming connection
 var ErrNoAvailableListeningPort = errors.New("could not find any port to listen to")
 
+const (
+	portSearchMinAttempts = 10
+	portSearchMaxAttempts = 1000
+)
+
 func (c *clientHandler) findListenerWithinPortRange(portRange *PortRange) (*net.TCPListener, error) {
 	nbAttempts := portRange.End - portRange.Start
 
 	// Making sure we trying a reasonable amount of ports before giving up
-	if nbAttempts < PortSearchMinAttempts {
-		nbAttempts = PortSearchMinAttempts
-	} else if nbAttempts > PortSearchMaxAttempts {
-		nbAttempts = PortSearchMaxAttempts
+	if nbAttempts < portSearchMinAttempts {
+		nbAttempts = portSearchMinAttempts
+	} else if nbAttempts > portSearchMaxAttempts {
+		nbAttempts = portSearchMaxAttempts
 	}
 
 	for i := 0; i < nbAttempts; i++ {
@@ -102,7 +102,7 @@ func (c *clientHandler) findListenerWithinPortRange(portRange *PortRange) (*net.
 		if errResolve != nil {
 			c.logger.Error("Problem resolving local port", "err", errResolve, "port", port)
 
-			return nil, NewNetworkError(fmt.Sprintf("could not resolve port %d", port), errResolve)
+			return nil, newNetworkError(fmt.Sprintf("could not resolve port %d", port), errResolve)
 		}
 
 		tcpListener, errListen := net.ListenTCP("tcp", laddr)

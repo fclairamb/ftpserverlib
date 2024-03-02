@@ -228,7 +228,7 @@ func (c *clientHandler) dirTransferNLST(w io.Writer, files []os.FileInfo, parent
 		_, err := w.Write([]byte(""))
 
 		if err != nil {
-			err = NewNetworkError("couldn't send NLST data", err)
+			err = newNetworkError("couldn't send NLST data", err)
 		}
 
 		return err
@@ -239,7 +239,7 @@ func (c *clientHandler) dirTransferNLST(w io.Writer, files []os.FileInfo, parent
 		// by a program to further process the files automatically.
 		// So we return paths relative to the current working directory
 		if _, err := fmt.Fprintf(w, "%s\r\n", path.Join(c.getRelativePath(parentDir), file.Name())); err != nil {
-			return NewNetworkError("couldn't send NLST data", err)
+			return newNetworkError("couldn't send NLST data", err)
 		}
 	}
 
@@ -304,7 +304,7 @@ func (c *clientHandler) dirTransferLIST(w io.Writer, files []os.FileInfo) error 
 		_, err := w.Write([]byte(""))
 
 		if err != nil {
-			err = NewNetworkError("error writing LIST entry", err)
+			err = newNetworkError("error writing LIST entry", err)
 		}
 
 		return err
@@ -325,7 +325,7 @@ func (c *clientHandler) dirTransferMLSD(w io.Writer, files []os.FileInfo) error 
 		_, err := w.Write([]byte(""))
 
 		if err != nil {
-			err = NewNetworkError("error writing MLSD entry", err)
+			err = newNetworkError("error writing MLSD entry", err)
 		}
 
 		return err
@@ -374,7 +374,7 @@ func (c *clientHandler) getFileList(param string, filePathAllowed bool) ([]os.Fi
 	// return list of single file if directoryPath points to file and filePathAllowed
 	info, err := c.driver.Stat(listPath)
 	if err != nil {
-		return nil, "", NewFileAccessError("couldn't stat", err)
+		return nil, "", newFileAccessError("couldn't stat", err)
 	}
 
 	if !info.IsDir() {
@@ -395,7 +395,7 @@ func (c *clientHandler) getFileList(param string, filePathAllowed bool) ([]os.Fi
 
 	directory, errOpenFile := c.driver.Open(listPath)
 	if errOpenFile != nil {
-		return nil, "", NewFileAccessError("couldn't open directory", errOpenFile)
+		return nil, "", newFileAccessError("couldn't open directory", errOpenFile)
 	}
 
 	defer c.closeDirectory(listPath, directory)

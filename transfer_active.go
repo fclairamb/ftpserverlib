@@ -101,7 +101,7 @@ func (a *activeTransferHandler) Open() (net.Conn, error) {
 	conn, err := dialer.Dial("tcp", a.raddr.String())
 
 	if err != nil {
-		return nil, NewNetworkError("could not establish active connection", err)
+		return nil, newNetworkError("could not establish active connection", err)
 	}
 
 	if a.tlsConfig != nil {
@@ -118,7 +118,7 @@ func (a *activeTransferHandler) Open() (net.Conn, error) {
 func (a *activeTransferHandler) Close() error {
 	if a.conn != nil {
 		if err := a.conn.Close(); err != nil {
-			return NewNetworkError("could not close active connection", err)
+			return newNetworkError("could not close active connection", err)
 		}
 	}
 
@@ -161,7 +161,7 @@ func parsePORTAddr(param string) (*net.TCPAddr, error) {
 	addr, err := net.ResolveTCPAddr("tcp", fmt.Sprintf("%s:%d", ip, port))
 
 	if err != nil {
-		err = NewNetworkError(fmt.Sprintf("could not resolve %s", param), err)
+		err = newNetworkError(fmt.Sprintf("could not resolve %s", param), err)
 	}
 
 	return addr, err
@@ -203,7 +203,7 @@ func parseEPRTAddr(param string) (addr *net.TCPAddr, err error) {
 	addr, err = net.ResolveTCPAddr("tcp", net.JoinHostPort(ip.String(), strconv.Itoa(portI)))
 
 	if err != nil {
-		err = NewNetworkError(fmt.Sprintf("could not resolve addr %v:%v", ip, portI), err)
+		err = newNetworkError(fmt.Sprintf("could not resolve addr %v:%v", ip, portI), err)
 	}
 
 	return addr, err

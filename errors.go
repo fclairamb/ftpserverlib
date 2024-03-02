@@ -31,7 +31,7 @@ type DriverError struct {
 	err error
 }
 
-func NewDriverError(str string, err error) DriverError {
+func newDriverError(str string, err error) DriverError {
 	return DriverError{str: str, err: err}
 }
 
@@ -43,12 +43,13 @@ func (e DriverError) Unwrap() error {
 	return e.err
 }
 
+// NetworkError is a wrapper for any error that occur while contacting the network
 type NetworkError struct {
 	str string
 	err error
 }
 
-func NewNetworkError(str string, err error) NetworkError {
+func newNetworkError(str string, err error) NetworkError {
 	return NetworkError{str: str, err: err}
 }
 
@@ -60,12 +61,13 @@ func (e NetworkError) Unwrap() error {
 	return e.err
 }
 
+// FileAccessError is a wrapper for any error that occur while accessing the file system
 type FileAccessError struct {
 	str string
 	err error
 }
 
-func NewFileAccessError(str string, err error) FileAccessError {
+func newFileAccessError(str string, err error) FileAccessError {
 	return FileAccessError{str: str, err: err}
 }
 

@@ -165,7 +165,7 @@ func (c *clientHandler) doFileTransfer(tr net.Conn, file io.ReadWriter, write bo
 			fileTransferError.TransferError(err)
 		}
 
-		err = NewNetworkError("error transferring data", err)
+		err = newNetworkError("error transferring data", err)
 	}
 
 	return err
@@ -700,14 +700,14 @@ func (c *clientHandler) computeHashForFile(filePath string, algo HASHAlgo, start
 	if start > 0 {
 		_, err = file.Seek(start, io.SeekStart)
 		if err != nil {
-			return "", NewFileAccessError("couldn't seek file", err)
+			return "", newFileAccessError("couldn't seek file", err)
 		}
 	}
 
 	_, err = io.CopyN(h, file, end-start)
 
 	if err != nil && err != io.EOF {
-		return "", NewFileAccessError("couldn't read file", err)
+		return "", newFileAccessError("couldn't read file", err)
 	}
 
 	return hex.EncodeToString(h.Sum(nil)), nil
@@ -717,7 +717,7 @@ func (c *clientHandler) getFileHandle(name string, flags int, offset int64) (Fil
 	if fileTransfer, ok := c.driver.(ClientDriverExtentionFileTransfer); ok {
 		ft, err := fileTransfer.GetHandle(name, flags, offset)
 		if err != nil {
-			err = NewDriverError("calling GetHandle", err)
+			err = newDriverError("calling GetHandle", err)
 		}
 
 		return ft, err
@@ -726,7 +726,7 @@ func (c *clientHandler) getFileHandle(name string, flags int, offset int64) (Fil
 	ft, err := c.driver.OpenFile(name, flags, os.ModePerm)
 
 	if err != nil {
-		err = NewDriverError("calling OpenFile", err)
+		err = newDriverError("calling OpenFile", err)
 	}
 
 	return ft, err

@@ -114,7 +114,7 @@ func (server *FtpServer) loadSettings() error {
 	s, err := server.driver.GetSettings()
 
 	if err != nil || s == nil {
-		return NewDriverError("couldn't load settings", err)
+		return newDriverError("couldn't load settings", err)
 	}
 
 	if s.PublicHost != "" {
@@ -172,7 +172,7 @@ func (server *FtpServer) Listen() error {
 		if err != nil {
 			server.Logger.Error("cannot listen on main port", "err", err, "listenAddr", server.settings.ListenAddr)
 
-			return NewNetworkError("cannot listen on main port", err)
+			return newNetworkError("cannot listen on main port", err)
 		}
 
 		if server.settings.TLSRequired == ImplicitEncryption {
@@ -183,7 +183,7 @@ func (server *FtpServer) Listen() error {
 			if err != nil || tlsConfig == nil {
 				server.Logger.Error("Cannot get tls config", "err", err)
 
-				return NewDriverError("cannot get tls config", err)
+				return newDriverError("cannot get tls config", err)
 			}
 
 			server.listener = tls.NewListener(server.listener, tlsConfig)
@@ -252,7 +252,7 @@ func (server *FtpServer) Serve() error {
 
 			server.Logger.Error("Listener accept error", "err", err)
 
-			return NewNetworkError("listener accept error", err)
+			return newNetworkError("listener accept error", err)
 		}
 
 		tempDelay = 0
@@ -301,7 +301,7 @@ func (server *FtpServer) Stop() error {
 			"err", err,
 		)
 
-		return NewNetworkError("couln't close listener", err)
+		return newNetworkError("couln't close listener", err)
 	}
 
 	return nil
