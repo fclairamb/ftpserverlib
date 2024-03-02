@@ -37,7 +37,7 @@ func (c *asciiConverter) Read(p []byte) (n int, err error) {
 	} else {
 		data, _, err = c.reader.ReadLine()
 		if err != nil {
-			return -1, err
+			return n, err
 		}
 	}
 
@@ -64,7 +64,7 @@ func (c *asciiConverter) Read(p []byte) (n int, err error) {
 	// client transfers it in ASCII mode
 	err = c.reader.UnreadByte()
 	if err != nil {
-		return -1, err
+		return n, err
 	}
 
 	lastByte, err := c.reader.ReadByte()
