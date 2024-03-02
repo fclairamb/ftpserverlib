@@ -116,7 +116,7 @@ func (c *clientHandler) findListenerWithinPortRange(portRange *PortRange) (*net.
 	return nil, ErrNoAvailableListeningPort
 }
 
-func (c *clientHandler) handlePASV(param string) error {
+func (c *clientHandler) handlePASV(_ string) error {
 	command := c.GetLastCommand()
 	addr, _ := net.ResolveTCPAddr("tcp", ":0")
 	var tcpListener *net.TCPListener

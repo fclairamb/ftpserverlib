@@ -174,6 +174,7 @@ func (server *FtpServer) Listen() error {
 
 			return err
 		}
+
 		if server.settings.TLSRequired == ImplicitEncryption {
 			// implicit TLS
 			var tlsConfig *tls.Config
@@ -184,6 +185,7 @@ func (server *FtpServer) Listen() error {
 
 				return err
 			}
+
 			server.listener = tls.NewListener(server.listener, tlsConfig)
 		}
 	}

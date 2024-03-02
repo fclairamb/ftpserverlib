@@ -33,13 +33,13 @@ func (c *clientHandler) handlePROT(param string) error {
 	return nil
 }
 
-func (c *clientHandler) handlePBSZ(param string) error {
+func (c *clientHandler) handlePBSZ(_ string) error {
 	c.writeMessage(StatusOK, "Whatever")
 
 	return nil
 }
 
-func (c *clientHandler) handleSYST(param string) error {
+func (c *clientHandler) handleSYST(_ string) error {
 	if c.server.settings.DisableSYST {
 		c.writeMessage(StatusCommandNotImplemented, "SYST is disabled")
 
@@ -177,7 +177,7 @@ func (c *clientHandler) handleOPTS(param string) error {
 	return nil
 }
 
-func (c *clientHandler) handleNOOP(param string) error {
+func (c *clientHandler) handleNOOP(_ string) error {
 	c.writeMessage(StatusOK, "OK")
 
 	return nil
@@ -190,7 +190,7 @@ func (c *clientHandler) handleCLNT(param string) error {
 	return nil
 }
 
-func (c *clientHandler) handleFEAT(param string) error {
+func (c *clientHandler) handleFEAT(_ string) error {
 	c.writeLine(fmt.Sprintf("%d- These are my features", StatusSystemStatus))
 	defer c.writeMessage(StatusSystemStatus, "end")
 
@@ -272,7 +272,7 @@ func (c *clientHandler) handleTYPE(param string) error {
 	return nil
 }
 
-func (c *clientHandler) handleQUIT(param string) error {
+func (c *clientHandler) handleQUIT(_ string) error {
 	c.transferWg.Wait()
 
 	var msg string

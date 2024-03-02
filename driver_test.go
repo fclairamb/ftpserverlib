@@ -60,6 +60,7 @@ func NewTestServerWithDriver(t *testing.T, driver *TestServerDriver) *FtpServer 
 		if err := os.MkdirAll(dir, 0750); err != nil {
 			panic(err)
 		}
+
 		driver.fs = afero.NewBasePathFs(afero.NewOsFs(), dir)
 	}
 
@@ -342,12 +343,12 @@ func (driver *TestServerDriver) GetTLSConfig() (*tls.Config, error) {
 	return nil, errNoTLS
 }
 
-func (driver *TestServerDriver) PreAuthUser(cc ClientContext, user string) error {
+func (driver *TestServerDriver) PreAuthUser(cc ClientContext, _ string) error {
 	return cc.SetTLSRequirement(driver.TLSRequirement)
 }
 
-func (driver *TestServerDriver) VerifyConnection(cc ClientContext, user string,
-	tlsConn *tls.Conn) (ClientDriver, error) {
+func (driver *TestServerDriver) VerifyConnection(_ ClientContext, _ string,
+	_ *tls.Conn) (ClientDriver, error) {
 	switch driver.TLSVerificationReply {
 	case tlsVerificationFailed:
 		return nil, errInvalidTLSCertificate

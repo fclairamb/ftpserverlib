@@ -140,7 +140,7 @@ func (c *clientHandler) handleRMDIR(params string) {
 	}
 }
 
-func (c *clientHandler) handleCDUP(param string) error {
+func (c *clientHandler) handleCDUP(_ string) error {
 	parent, _ := path.Split(c.Path())
 	if parent != "/" && strings.HasSuffix(parent, "/") {
 		parent = parent[0 : len(parent)-1]
@@ -156,7 +156,7 @@ func (c *clientHandler) handleCDUP(param string) error {
 	return nil
 }
 
-func (c *clientHandler) handlePWD(param string) error {
+func (c *clientHandler) handlePWD(_ string) error {
 	c.writeMessage(StatusPathCreated, fmt.Sprintf(`"%s" is the current directory`, quoteDoubling(c.Path())))
 
 	return nil
