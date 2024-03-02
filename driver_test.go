@@ -42,9 +42,7 @@ func NewTestServer(t *testing.T, debug bool) *FtpServer {
 	return NewTestServerWithTestDriver(t, &TestServerDriver{Debug: debug})
 }
 
-func NewTestServerWithTestDriver(t *testing.T, driver *TestServerDriver) *FtpServer {
-	t.Parallel()
-
+func (driver *TestServerDriver) Init() {
 	if driver.Settings == nil {
 		driver.Settings = &Settings{
 			DefaultTransferType: TransferTypeBinary,
@@ -63,6 +61,12 @@ func NewTestServerWithTestDriver(t *testing.T, driver *TestServerDriver) *FtpSer
 
 		driver.fs = afero.NewBasePathFs(afero.NewOsFs(), dir)
 	}
+}
+
+func NewTestServerWithTestDriver(t *testing.T, driver *TestServerDriver) *FtpServer {
+	t.Parallel()
+
+	driver.Init()
 
 	// If we are in debug mode, we should log things
 	var logger log.Logger
@@ -122,8 +126,6 @@ type TestServerDriver struct {
 	TLSVerificationReply tlsVerificationReply
 	errPassiveListener   error
 	TLSRequirement       TLSRequirement
-	customAuthMessage    bool
-	customQuitMessage    bool
 }
 
 // TestClientDriver defines a minimal serverftp client driver
@@ -258,12 +260,12 @@ func (driver *TestServerDriver) AuthUser(_ ClientContext, user, pass string) (Cl
 	return nil, errBadUserNameOrPassword
 }
 
-// PostAuthMessage returns a message displayed after authentication
-func (driver *TestServerDriver) PostAuthMessage(_ ClientContext, _ string, authErr error) string {
-	if !driver.customAuthMessage {
-		return ""
-	}
+type MesssageDriver struct {
+	TestServerDriver
+}
 
+// PostAuthMessage returns a message displayed after authentication
+func (driver *MesssageDriver) PostAuthMessage(_ ClientContext, _ string, authErr error) string {
 	if authErr != nil {
 		return "You are not welcome here"
 	}
@@ -272,11 +274,7 @@ func (driver *TestServerDriver) PostAuthMessage(_ ClientContext, _ string, authE
 }
 
 // QuitMessage returns a goodbye message
-func (driver *TestServerDriver) QuitMessage() string {
-	if !driver.customQuitMessage {
-		return ""
-	}
-
+func (driver *MesssageDriver) QuitMessage() string {
 	return "Sayonara, bye bye!"
 }
 

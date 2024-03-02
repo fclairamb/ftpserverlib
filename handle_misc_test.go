@@ -276,11 +276,14 @@ func TestQuit(t *testing.T) {
 }
 
 func TestQuitWithCustomMessage(_t *testing.T) {
-	s := NewTestServerWithTestDriver(_t, &TestServerDriver{
-		Debug:             true,
-		TLS:               true,
-		customQuitMessage: true,
-	})
+	d := &MesssageDriver{
+		TestServerDriver{
+			Debug: true,
+			TLS:   true,
+		},
+	}
+	d.Init()
+	s := NewTestServerWithDriver(_t, d)
 	t := require.New(_t)
 	conf := goftp.Config{
 		User:     authUser,

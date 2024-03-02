@@ -91,7 +91,9 @@ func TestLoginFailure(t *testing.T) {
 }
 
 func TestLoginCustom(t *testing.T) {
-	s := NewTestServerWithTestDriver(t, &TestServerDriver{Debug: true, customAuthMessage: true})
+	driver := &MesssageDriver{}
+	driver.Init()
+	s := NewTestServerWithDriver(t, driver)
 	r := require.New(t)
 
 	conf := goftp.Config{
