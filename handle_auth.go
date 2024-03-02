@@ -57,17 +57,31 @@ func (c *clientHandler) handleUSER(param string) error {
 // Handle the "PASS" command
 func (c *clientHandler) handlePASS(param string) error {
 	var err error
+	var msg string
 	c.driver, err = c.server.driver.AuthUser(c, c.user, param)
 
+	dpa, ok := c.server.driver.(MainDriverExtensionPostAuthMessage)
+	if ok {
+		msg = dpa.PostAuthMessage(c, c.user, err)
+	}
+
 	switch {
-	case err == nil:
-		c.writeMessage(StatusUserLoggedIn, "Password ok, continue")
+	case err == nil && c.driver == nil:
+		c.writeMessage(StatusNotLoggedIn, "Unexpected exception (driver is nil)")
+		c.disconnect()
 	case err != nil:
-		c.writeMessage(StatusNotLoggedIn, fmt.Sprintf("Authentication problem: %v", err))
+		if msg == "" {
+			msg = fmt.Sprintf("Authentication error: %v", err)
+		}
+
+		c.writeMessage(StatusNotLoggedIn, msg)
 		c.disconnect()
-	default:
-		c.writeMessage(StatusNotLoggedIn, "I can't deal with you (nil driver)")
-		c.disconnect()
+	case err == nil:
+		if msg == "" {
+			msg = "Password ok, continue"
+		}
+
+		c.writeMessage(StatusUserLoggedIn, msg)
 	}
 
 	return nil

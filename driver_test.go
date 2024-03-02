@@ -103,6 +103,8 @@ type TestServerDriver struct {
 	TLSVerificationReply tlsVerificationReply
 	errPassiveListener   error
 	TLSRequirement       TLSRequirement
+	customAuthMessage    bool
+	customQuitMessage    bool
 }
 
 // TestClientDriver defines a minimal serverftp client driver
@@ -229,9 +231,34 @@ func (driver *TestServerDriver) AuthUser(_ ClientContext, user, pass string) (Cl
 		clientdriver := NewTestClientDriver(driver)
 
 		return clientdriver, nil
+	} else if user == "nil" && pass == "nil" {
+		// Definitely a bad behavior (but can be done on the driver side)
+		return nil, nil
 	}
 
 	return nil, errBadUserNameOrPassword
+}
+
+// PostAuthMessage returns a message displayed after authentication
+func (driver *TestServerDriver) PostAuthMessage(_ ClientContext, _ string, authErr error) string {
+	if !driver.customAuthMessage {
+		return ""
+	}
+
+	if authErr != nil {
+		return "You are not welcome here"
+	}
+
+	return "Welcome to the FTP Server"
+}
+
+// QuitMessage returns a goodbye message
+func (driver *TestServerDriver) QuitMessage() string {
+	if !driver.customQuitMessage {
+		return ""
+	}
+
+	return "Sayonara, bye bye!"
 }
 
 // ClientDisconnected is called when the user disconnects

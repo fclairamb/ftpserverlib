@@ -58,6 +58,19 @@ type MainDriverExtensionUserVerifier interface {
 	PreAuthUser(cc ClientContext, user string) error
 }
 
+// MainDriverExtensionPostAuthMessage is an extension that allows to send a message
+// after the authentication
+type MainDriverExtensionPostAuthMessage interface {
+	// PostAuthMessage is called after the authentication
+	PostAuthMessage(cc ClientContext, user string, authErr error) string
+}
+
+// MainDriverExtensionQuitMessage is an extension that allows to control the quit message
+type MainDriverExtensionQuitMessage interface {
+	// QuitMessage returns the message to display when the user quits the server
+	QuitMessage() string
+}
+
 // ClientDriver is the base FS implementation that allows to manipulate files
 type ClientDriver interface {
 	afero.Fs
