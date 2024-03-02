@@ -145,7 +145,18 @@ linters-settings:
       allow-trailing-comment: false
       # Force newlines in end of case at this limit (0 = never).
       force-case-trailing-whitespace: 0
-  
+    depguard:
+      rules:
+        prevent_unmaintained_packages:
+          list-mode: lax # allow unless explicitely denied
+          files:
+            - $all
+            - "!$test"
+          allow:
+            - $gostd
+          deny:
+            - pkg: io/ioutil
+              desc: "replaced by io and os packages since Go 1.16: https://tip.golang.org/doc/go1.16#ioutil"
 linters:
     disable-all: true
     enable:
