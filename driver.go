@@ -58,6 +58,19 @@ type MainDriverExtensionUserVerifier interface {
 	PreAuthUser(cc ClientContext, user string) error
 }
 
+// MainDriverExtensionPostAuthMessage is an extension that allows to send a message
+// after the authentication
+type MainDriverExtensionPostAuthMessage interface {
+	// PostAuthMessage is called after the authentication
+	PostAuthMessage(cc ClientContext, user string, authErr error) string
+}
+
+// MainDriverExtensionQuitMessage is an extension that allows to control the quit message
+type MainDriverExtensionQuitMessage interface {
+	// QuitMessage returns the message to display when the user quits the server
+	QuitMessage() string
+}
+
 // ClientDriver is the base FS implementation that allows to manipulate files
 type ClientDriver interface {
 	afero.Fs
@@ -179,6 +192,12 @@ type ClientContext interface {
 	// If you want to enforce the same requirement for all
 	// clients, use the TLSRequired parameter defined in server settings instead
 	SetTLSRequirement(requirement TLSRequirement) error
+
+	// SetExtra allows to set application specific data
+	SetExtra(extra any)
+
+	// Extra returns application specific data set using SetExtra
+	Extra() any
 }
 
 // FileTransfer defines the inferface for file transfers.

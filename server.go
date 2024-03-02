@@ -185,6 +185,7 @@ func (server *FtpServer) Listen() error {
 
 				return NewDriverError("cannot get tls config", err)
 			}
+
 			server.listener = tls.NewListener(server.listener, tlsConfig)
 		}
 	}

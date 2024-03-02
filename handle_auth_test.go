@@ -90,8 +90,46 @@ func TestLoginFailure(t *testing.T) {
 	require.Error(t, err, "We should have failed to login")
 }
 
+func TestLoginCustom(t *testing.T) {
+	driver := &MesssageDriver{}
+	driver.Init()
+	s := NewTestServerWithDriver(t, driver)
+	r := require.New(t)
+
+	conf := goftp.Config{
+		User:     authUser,
+		Password: authPass + "_wrong",
+	}
+
+	c, err := goftp.DialConfig(conf, s.Addr())
+	r.NoError(err, "Couldn't connect")
+
+	defer func() { panicOnError(c.Close()) }()
+
+	_, err = c.OpenRawConn()
+	r.Error(err, "We should have failed to login")
+}
+
+func TestLoginNil(t *testing.T) {
+	s := NewTestServer(t, true)
+	r := require.New(t)
+
+	conf := goftp.Config{
+		User:     "nil",
+		Password: "nil",
+	}
+
+	c, err := goftp.DialConfig(conf, s.Addr())
+	require.NoError(t, err, "Couldn't connect")
+
+	defer func() { panicOnError(c.Close()) }()
+
+	_, err = c.OpenRawConn()
+	r.Error(err)
+}
+
 func TestAuthTLS(t *testing.T) {
-	s := NewTestServerWithDriver(t, &TestServerDriver{
+	s := NewTestServerWithTestDriver(t, &TestServerDriver{
 		Debug: false,
 		TLS:   true,
 	})
@@ -141,7 +179,7 @@ func TestAuthExplicitTLSFailure(t *testing.T) {
 }
 
 func TestAuthTLSRequired(t *testing.T) {
-	s := NewTestServerWithDriver(t, &TestServerDriver{
+	s := NewTestServerWithTestDriver(t, &TestServerDriver{
 		Debug: false,
 		TLS:   true,
 	})
@@ -181,7 +219,7 @@ func TestAuthTLSRequired(t *testing.T) {
 }
 
 func TestAuthTLSVerificationFailed(t *testing.T) {
-	s := NewTestServerWithDriver(t, &TestServerDriver{
+	s := NewTestServerWithTestDriver(t, &TestServerDriver{
 		Debug:                true,
 		TLS:                  true,
 		TLSVerificationReply: tlsVerificationFailed,
@@ -207,7 +245,7 @@ func TestAuthTLSVerificationFailed(t *testing.T) {
 }
 
 func TestAuthTLSCertificate(t *testing.T) {
-	s := NewTestServerWithDriver(t, &TestServerDriver{
+	s := NewTestServerWithTestDriver(t, &TestServerDriver{
 		Debug:                true,
 		TLS:                  true,
 		TLSVerificationReply: tlsVerificationAuthenticated,
@@ -238,7 +276,7 @@ func TestAuthTLSCertificate(t *testing.T) {
 }
 
 func TestAuthPerClientTLSRequired(t *testing.T) {
-	s := NewTestServerWithDriver(t, &TestServerDriver{
+	s := NewTestServerWithTestDriver(t, &TestServerDriver{
 		Debug:          true,
 		TLS:            true,
 		TLSRequirement: MandatoryEncryption,
@@ -277,7 +315,7 @@ func TestAuthPerClientTLSRequired(t *testing.T) {
 }
 
 func TestUserVerifierError(t *testing.T) {
-	s := NewTestServerWithDriver(t, &TestServerDriver{
+	s := NewTestServerWithTestDriver(t, &TestServerDriver{
 		Debug: false,
 		TLS:   true,
 		// setting an invalid TLS requirement will cause the test driver

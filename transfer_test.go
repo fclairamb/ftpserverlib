@@ -91,6 +91,7 @@ func ftpUpload(t *testing.T, ftp *goftp.Client, file io.ReadSeeker, filename str
 		if strings.HasSuffix(stats.Name(), filename) {
 			found = true
 		}
+
 		if !found {
 			t.Fatal("STAT: Couldn't find file !")
 		}
@@ -167,7 +168,7 @@ func ftpDelete(t *testing.T, ftp *goftp.Client, filename string) {
 }
 
 func TestTransferIPv6(t *testing.T) {
-	s := NewTestServerWithDriver(
+	s := NewTestServerWithTestDriver(
 		t,
 		&TestServerDriver{
 			Debug: false,
@@ -189,7 +190,7 @@ func TestTransferIPv6(t *testing.T) {
 // TestTransfer validates the upload of file in both active and passive mode
 func TestTransfer(t *testing.T) {
 	t.Run("without-tls", func(t *testing.T) {
-		s := NewTestServerWithDriver(
+		s := NewTestServerWithTestDriver(
 			t,
 			&TestServerDriver{
 				Debug: false,
@@ -203,7 +204,7 @@ func TestTransfer(t *testing.T) {
 		testTransferOnConnection(t, s, true, false, false)
 	})
 	t.Run("with-tls", func(t *testing.T) {
-		s := NewTestServerWithDriver(
+		s := NewTestServerWithTestDriver(
 			t,
 			&TestServerDriver{
 				Debug: false,
@@ -219,7 +220,7 @@ func TestTransfer(t *testing.T) {
 	})
 
 	t.Run("with-implicit-tls", func(t *testing.T) {
-		s := NewTestServerWithDriver(t, &TestServerDriver{
+		s := NewTestServerWithTestDriver(t, &TestServerDriver{
 			Debug: false,
 			TLS:   true,
 			Settings: &Settings{
@@ -272,7 +273,7 @@ func testTransferOnConnection(t *testing.T, server *FtpServer, active, enableTLS
 }
 
 func TestActiveModeDisabled(t *testing.T) {
-	server := NewTestServerWithDriver(t, &TestServerDriver{
+	server := NewTestServerWithTestDriver(t, &TestServerDriver{
 		Debug: false,
 		Settings: &Settings{
 			ActiveTransferPortNon20: true,
@@ -381,7 +382,7 @@ func TestFailingFileTransfer(t *testing.T) {
 	driver := &TestServerDriver{
 		Debug: false,
 	}
-	s := NewTestServerWithDriver(t, driver)
+	s := NewTestServerWithTestDriver(t, driver)
 	conf := goftp.Config{
 		User:     authUser,
 		Password: authPass,
@@ -445,7 +446,7 @@ func TestAPPEExistingFile(t *testing.T) {
 	driver := &TestServerDriver{
 		Debug: false,
 	}
-	s := NewTestServerWithDriver(t, driver)
+	s := NewTestServerWithTestDriver(t, driver)
 	conf := goftp.Config{
 		User:     authUser,
 		Password: authPass,
@@ -494,7 +495,7 @@ func TestAPPENewFile(t *testing.T) {
 	driver := &TestServerDriver{
 		Debug: false,
 	}
-	s := NewTestServerWithDriver(t, driver)
+	s := NewTestServerWithTestDriver(t, driver)
 	conf := goftp.Config{
 		User:     authUser,
 		Password: authPass,
@@ -526,7 +527,7 @@ func TestTransfersFromOffset(t *testing.T) {
 	driver := &TestServerDriver{
 		Debug: false,
 	}
-	s := NewTestServerWithDriver(t, driver)
+	s := NewTestServerWithTestDriver(t, driver)
 	conf := goftp.Config{
 		User:     authUser,
 		Password: authPass,
@@ -923,7 +924,7 @@ func TestASCIITransfersInvalidFiles(t *testing.T) {
 }
 
 func TestPASVWrappedListenerError(t *testing.T) {
-	s := NewTestServerWithDriver(t, &TestServerDriver{
+	s := NewTestServerWithTestDriver(t, &TestServerDriver{
 		Debug:              true,
 		errPassiveListener: os.ErrClosed,
 	})
@@ -959,7 +960,7 @@ func TestPASVPublicIPResolver(t *testing.T) {
 	require.NoError(t, err, "Couldn't open raw connection")
 
 	s.settings.PublicHost = ""
-	s.settings.PublicIPResolver = func(cc ClientContext) (string, error) {
+	s.settings.PublicIPResolver = func(_ ClientContext) (string, error) {
 		return "127.0.0", nil
 	}
 	// we crash if the PublicIPResolver returns an invalid IP, this must be fixed outside the lib
@@ -968,7 +969,7 @@ func TestPASVPublicIPResolver(t *testing.T) {
 	require.Equal(t, StatusServiceNotAvailable, rc)
 	require.Contains(t, resp, "invalid passive IP")
 
-	s.settings.PublicIPResolver = func(cc ClientContext) (string, error) {
+	s.settings.PublicIPResolver = func(_ ClientContext) (string, error) {
 		return "", errConnectionNotAllowed
 	}
 
@@ -1030,6 +1031,8 @@ func TestPASVConnectionWait(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+// On Mac Os X, this requires to issue the following command:
+// sudo ifconfig lo0 alias 127.0.1.1 up
 func TestPASVIPMatch(t *testing.T) {
 	s := NewTestServer(t, false)
 
@@ -1093,6 +1096,33 @@ func TestPASVIPMatch(t *testing.T) {
 		} else {
 			require.True(t, strings.HasPrefix(resp, "150 Using transfer connection"))
 		}
+	}
+}
+
+func TestPassivePortExhaustion(t *testing.T) {
+	s := NewTestServer(t, false)
+	s.settings.PassiveTransferPortRange = &PortRange{
+		Start: 40000,
+		End:   40005,
+	}
+
+	c, err := goftp.DialConfig(goftp.Config{
+		User:     authUser,
+		Password: authPass,
+	}, s.Addr())
+	require.NoError(t, err, "Couldn't connect")
+
+	defer func() { panicOnError(c.Close()) }()
+
+	raw, err := c.OpenRawConn()
+	require.NoError(t, err, "Couldn't open raw connection")
+
+	defer func() { require.NoError(t, raw.Close()) }()
+
+	for i := 0; i < 20; i++ {
+		rc, message, err := raw.SendCommand("PASV")
+		require.NoError(t, err)
+		require.Equal(t, StatusEnteringPASV, rc, message)
 	}
 }
 

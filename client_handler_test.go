@@ -125,7 +125,7 @@ func TestTLSMethods(t *testing.T) {
 	})
 
 	t.Run("with-implicit-tls", func(t *testing.T) {
-		s := NewTestServerWithDriver(t, &TestServerDriver{
+		s := NewTestServerWithTestDriver(t, &TestServerDriver{
 			Settings: &Settings{
 				TLSRequired: ImplicitEncryption,
 			},
@@ -145,7 +145,7 @@ func TestConnectionNotAllowed(t *testing.T) {
 		Debug:          true,
 		CloseOnConnect: true,
 	}
-	s := NewTestServerWithDriver(t, driver)
+	s := NewTestServerWithTestDriver(t, driver)
 
 	conn, err := net.DialTimeout("tcp", s.Addr(), 5*time.Second)
 	require.NoError(t, err)
@@ -173,7 +173,7 @@ func TestCloseConnection(t *testing.T) {
 	driver := &TestServerDriver{
 		Debug: false,
 	}
-	s := NewTestServerWithDriver(t, driver)
+	s := NewTestServerWithTestDriver(t, driver)
 
 	conf := goftp.Config{
 		User:     authUser,
@@ -214,7 +214,7 @@ func TestCloseConnection(t *testing.T) {
 
 func TestClientContextConcurrency(t *testing.T) {
 	driver := &TestServerDriver{}
-	s := NewTestServerWithDriver(t, driver)
+	s := NewTestServerWithTestDriver(t, driver)
 
 	conf := goftp.Config{
 		User:     authUser,
@@ -239,6 +239,7 @@ func TestClientContextConcurrency(t *testing.T) {
 		for counter < 100 {
 			_, err := c.Getwd()
 			assert.NoError(t, err)
+
 			counter++
 		}
 
@@ -350,11 +351,11 @@ type testNetConn struct {
 	remoteAddr net.Addr
 }
 
-func (*testNetConn) Read(b []byte) (n int, err error) {
+func (*testNetConn) Read(_ []byte) (n int, err error) {
 	return
 }
 
-func (*testNetConn) Write(b []byte) (n int, err error) {
+func (*testNetConn) Write(_ []byte) (n int, err error) {
 	return
 }
 
@@ -370,15 +371,15 @@ func (c *testNetConn) RemoteAddr() net.Addr {
 	return c.remoteAddr
 }
 
-func (*testNetConn) SetDeadline(t time.Time) error {
+func (*testNetConn) SetDeadline(_ time.Time) error {
 	return nil
 }
 
-func (*testNetConn) SetReadDeadline(t time.Time) error {
+func (*testNetConn) SetReadDeadline(_ time.Time) error {
 	return nil
 }
 
-func (*testNetConn) SetWriteDeadline(t time.Time) error {
+func (*testNetConn) SetWriteDeadline(_ time.Time) error {
 	return nil
 }
 
@@ -454,5 +455,38 @@ func TestDataConnectionRequirements(t *testing.T) {
 
 	if assert.Error(t, err) {
 		assert.Contains(t, err.Error(), "unhandled data connection requirement")
+	}
+}
+
+func TestExtraData(t *testing.T) {
+	driver := &TestServerDriver{
+		Debug: false,
+	}
+	s := NewTestServerWithTestDriver(t, driver)
+
+	conf := goftp.Config{
+		User:     authUser,
+		Password: authPass,
+	}
+
+	c, err := goftp.DialConfig(conf, s.Addr())
+	require.NoError(t, err, "Couldn't connect")
+
+	defer func() { panicOnError(c.Close()) }()
+
+	raw, err := c.OpenRawConn()
+	require.NoError(t, err)
+
+	defer func() { require.NoError(t, raw.Close()) }()
+
+	info := driver.GetClientsInfo()
+	require.Len(t, info, 1)
+
+	for k, v := range info {
+		ccInfo, ok := v.(map[string]interface{})
+		require.True(t, ok)
+		extra, ok := ccInfo["extra"].(uint32)
+		require.True(t, ok)
+		require.Equal(t, k, extra)
 	}
 }
