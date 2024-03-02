@@ -125,7 +125,7 @@ func TestTLSMethods(t *testing.T) {
 	})
 
 	t.Run("with-implicit-tls", func(t *testing.T) {
-		s := NewTestServerWithDriver(t, &TestServerDriver{
+		s := NewTestServerWithTestDriver(t, &TestServerDriver{
 			Settings: &Settings{
 				TLSRequired: ImplicitEncryption,
 			},
@@ -145,7 +145,7 @@ func TestConnectionNotAllowed(t *testing.T) {
 		Debug:          true,
 		CloseOnConnect: true,
 	}
-	s := NewTestServerWithDriver(t, driver)
+	s := NewTestServerWithTestDriver(t, driver)
 
 	conn, err := net.DialTimeout("tcp", s.Addr(), 5*time.Second)
 	require.NoError(t, err)
@@ -173,7 +173,7 @@ func TestCloseConnection(t *testing.T) {
 	driver := &TestServerDriver{
 		Debug: false,
 	}
-	s := NewTestServerWithDriver(t, driver)
+	s := NewTestServerWithTestDriver(t, driver)
 
 	conf := goftp.Config{
 		User:     authUser,
@@ -214,7 +214,7 @@ func TestCloseConnection(t *testing.T) {
 
 func TestClientContextConcurrency(t *testing.T) {
 	driver := &TestServerDriver{}
-	s := NewTestServerWithDriver(t, driver)
+	s := NewTestServerWithTestDriver(t, driver)
 
 	conf := goftp.Config{
 		User:     authUser,
@@ -462,7 +462,7 @@ func TestExtraData(t *testing.T) {
 	driver := &TestServerDriver{
 		Debug: false,
 	}
-	s := NewTestServerWithDriver(t, driver)
+	s := NewTestServerWithTestDriver(t, driver)
 
 	conf := goftp.Config{
 		User:     authUser,
