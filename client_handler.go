@@ -574,7 +574,7 @@ func (c *clientHandler) writeLine(line string) {
 		c.logger.Debug("Sending answer", "line", line)
 	}
 
-	if _, err := c.writer.WriteString(fmt.Sprintf("%s\r\n", line)); err != nil {
+	if _, err := fmt.Fprintf(c.writer, "%s\r\n", line); err != nil {
 		c.logger.Warn(
 			"Answer couldn't be sent",
 			"line", line,

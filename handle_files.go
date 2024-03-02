@@ -154,6 +154,7 @@ func (c *clientHandler) doFileTransfer(tr net.Conn, file io.ReadWriter, write bo
 			"Stream copy finished",
 			"writtenBytes", written,
 		)
+
 		if written == 0 {
 			_, err = out.Write([]byte{})
 		}
@@ -293,6 +294,7 @@ func (c *clientHandler) handleCHOWN(params string) {
 	{
 		usergroup := strings.Split(spl[0], ":")
 		userName := usergroup[0]
+
 		if id, err := strconv.ParseInt(userName, 10, 32); err == nil {
 			userID = int(id)
 		} else {
@@ -432,6 +434,7 @@ func (c *clientHandler) handleSTATFile(param string) error {
 
 					return nil
 				}
+
 				files, errList = directory.Readdir(-1)
 				c.closeDirectory(directoryPath, directory)
 			}

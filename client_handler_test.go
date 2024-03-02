@@ -239,6 +239,7 @@ func TestClientContextConcurrency(t *testing.T) {
 		for counter < 100 {
 			_, err := c.Getwd()
 			assert.NoError(t, err)
+
 			counter++
 		}
 
@@ -350,11 +351,11 @@ type testNetConn struct {
 	remoteAddr net.Addr
 }
 
-func (*testNetConn) Read(b []byte) (n int, err error) {
+func (*testNetConn) Read(_ []byte) (n int, err error) {
 	return
 }
 
-func (*testNetConn) Write(b []byte) (n int, err error) {
+func (*testNetConn) Write(_ []byte) (n int, err error) {
 	return
 }
 
@@ -370,15 +371,15 @@ func (c *testNetConn) RemoteAddr() net.Addr {
 	return c.remoteAddr
 }
 
-func (*testNetConn) SetDeadline(t time.Time) error {
+func (*testNetConn) SetDeadline(_ time.Time) error {
 	return nil
 }
 
-func (*testNetConn) SetReadDeadline(t time.Time) error {
+func (*testNetConn) SetReadDeadline(_ time.Time) error {
 	return nil
 }
 
-func (*testNetConn) SetWriteDeadline(t time.Time) error {
+func (*testNetConn) SetWriteDeadline(_ time.Time) error {
 	return nil
 }
 

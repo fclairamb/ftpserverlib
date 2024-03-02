@@ -91,6 +91,7 @@ func ftpUpload(t *testing.T, ftp *goftp.Client, file io.ReadSeeker, filename str
 		if strings.HasSuffix(stats.Name(), filename) {
 			found = true
 		}
+
 		if !found {
 			t.Fatal("STAT: Couldn't find file !")
 		}
@@ -959,7 +960,7 @@ func TestPASVPublicIPResolver(t *testing.T) {
 	require.NoError(t, err, "Couldn't open raw connection")
 
 	s.settings.PublicHost = ""
-	s.settings.PublicIPResolver = func(cc ClientContext) (string, error) {
+	s.settings.PublicIPResolver = func(_ ClientContext) (string, error) {
 		return "127.0.0", nil
 	}
 	// we crash if the PublicIPResolver returns an invalid IP, this must be fixed outside the lib
@@ -968,7 +969,7 @@ func TestPASVPublicIPResolver(t *testing.T) {
 	require.Equal(t, StatusServiceNotAvailable, rc)
 	require.Contains(t, resp, "invalid passive IP")
 
-	s.settings.PublicIPResolver = func(cc ClientContext) (string, error) {
+	s.settings.PublicIPResolver = func(_ ClientContext) (string, error) {
 		return "", errConnectionNotAllowed
 	}
 

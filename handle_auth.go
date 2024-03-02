@@ -76,7 +76,7 @@ func (c *clientHandler) handlePASS(param string) error {
 
 		c.writeMessage(StatusNotLoggedIn, msg)
 		c.disconnect()
-	case err == nil:
+	default: // err == nil && c.driver != nil
 		if msg == "" {
 			msg = "Password ok, continue"
 		}
