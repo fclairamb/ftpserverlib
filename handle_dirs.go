@@ -276,6 +276,8 @@ const (
 	dateFormatStatYear      = "Jan _2  2006"          // LIST date formatting with year
 	dateFormatStatOldSwitch = time.Hour * 24 * 30 * 6 // 6 months ago
 	dateFormatMLSD          = "20060102150405"        // MLSD date formatting
+	fakeUser                = "ftp"
+	fakeGroup               = "ftp"
 )
 
 func (c *clientHandler) fileStat(file os.FileInfo) string {
@@ -290,8 +292,10 @@ func (c *clientHandler) fileStat(file os.FileInfo) string {
 	}
 
 	return fmt.Sprintf(
-		"%s 1 ftp ftp %12d %s %s",
+		"%s 1 %s %s %12d %s %s",
 		file.Mode(),
+		fakeUser,
+		fakeGroup,
 		file.Size(),
 		file.ModTime().Format(dateFormat),
 		file.Name(),

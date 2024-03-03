@@ -160,6 +160,7 @@ linters-settings:
 linters:
     disable-all: true
     enable:
+        # https://golangci-lint.run/usage/linters/
         - asciicheck
         - asasalint
         - bidichk
@@ -168,10 +169,12 @@ linters:
         - containedctx
         # - contextcheck -> creates an odd error here: https://github.com/fclairamb/ftpserverlib/blob/4d7c663e9e0b2650673fc2e0fcdb443895f2a1b9/server.go#L234
         # - copyloopvar -> unknown in v1.56.2 ???
-        - cyclop
+        # - cyclop -> Delaying it for now (too much work)
+        - decorder
         - depguard
         - dogsled
         - dupl
+        - dupword
         - errcheck
         - exhaustive
         # - exhaustivestruct
