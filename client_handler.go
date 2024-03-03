@@ -485,7 +485,7 @@ func (c *clientHandler) handleCommandsStreamError(err error) {
 
 		c.logger.Error("Network error", "err", err)
 	default:
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			if c.debug {
 				c.logger.Debug("Client disconnected", "clean", false)
 			}

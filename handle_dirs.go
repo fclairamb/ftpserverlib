@@ -188,7 +188,7 @@ func (c *clientHandler) checkLISTArgs(args string) string {
 func (c *clientHandler) handleLIST(param string) error {
 	info := fmt.Sprintf("LIST %v", param)
 
-	if files, _, err := c.getFileList(param, true); err == nil || err == io.EOF {
+	if files, _, err := c.getFileList(param, true); err == nil || errors.Is(err, io.EOF) {
 		if tr, errTr := c.TransferOpen(info); errTr == nil {
 			err = c.dirTransferLIST(tr, files)
 			c.TransferClose(err)
@@ -207,7 +207,7 @@ func (c *clientHandler) handleLIST(param string) error {
 func (c *clientHandler) handleNLST(param string) error {
 	info := fmt.Sprintf("NLST %v", param)
 
-	if files, parentDir, err := c.getFileList(param, true); err == nil || err == io.EOF {
+	if files, parentDir, err := c.getFileList(param, true); err == nil || errors.Is(err, io.EOF) {
 		if tr, errTrOpen := c.TransferOpen(info); errTrOpen == nil {
 			err = c.dirTransferNLST(tr, files, parentDir)
 			c.TransferClose(err)

@@ -175,8 +175,12 @@ linters:
         - dogsled
         - dupl
         - dupword
+        - durationcheck
         - errcheck
         - exhaustive
+        - errchkjson
+        - errname
+        - errorlint
         # - exhaustivestruct
         - exportloopref
         - funlen
