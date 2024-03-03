@@ -195,7 +195,7 @@ func TestServerSettingsIPError(t *testing.T) {
 		}
 
 		err := server.loadSettings()
-		_, ok := err.(*ipValidationError)
+		_, ok := err.(*ipValidationError) //nolint:errorlint // Here we want to test the exact error match
 		require.True(t, ok)
 	})
 
@@ -207,7 +207,7 @@ func TestServerSettingsIPError(t *testing.T) {
 		}
 
 		err := server.loadSettings()
-		_, ok := err.(*ipValidationError)
+		_, ok := err.(*ipValidationError) //nolint:errorlint // Here we want to test the exact error match
 		require.True(t, ok)
 	})
 

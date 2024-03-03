@@ -463,12 +463,12 @@ func (c *clientHandler) readCommand() bool {
 
 func (c *clientHandler) handleCommandsStreamError(err error) {
 	// florent(2018-01-14): #58: IDLE timeout: Adding some code to deal with the deadline
-	switch err := err.(type) {
-	case net.Error:
-		if err.Timeout() {
+	var errNetError net.Error
+	if errors.As(err, &errNetError) {
+		if errNetError.Timeout() {
 			// We have to extend the deadline now
-			if err := c.conn.SetDeadline(time.Now().Add(time.Minute)); err != nil {
-				c.logger.Error("Could not set read deadline", "err", err)
+			if errSet := c.conn.SetDeadline(time.Now().Add(time.Minute)); errSet != nil {
+				c.logger.Error("Could not set read deadline", "err", errSet)
 			}
 
 			c.logger.Info("Client IDLE timeout", "err", err)
@@ -476,15 +476,15 @@ func (c *clientHandler) handleCommandsStreamError(err error) {
 				StatusServiceNotAvailable,
 				fmt.Sprintf("command timeout (%d seconds): closing control connection", c.server.settings.IdleTimeout))
 
-			if err := c.writer.Flush(); err != nil {
-				c.logger.Error("Flush error", "err", err)
+			if errFlush := c.writer.Flush(); errFlush != nil {
+				c.logger.Error("Flush error", "err", errFlush)
 			}
 
-			break
+			return
 		}
 
 		c.logger.Error("Network error", "err", err)
-	default:
+	} else {
 		if errors.Is(err, io.EOF) {
 			if c.debug {
 				c.logger.Debug("Client disconnected", "clean", false)
