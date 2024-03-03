@@ -164,7 +164,7 @@ func (c *clientHandler) handlePASV(_ string) error {
 		}
 	}
 
-	p := &passiveTransferHandler{
+	p := &passiveTransferHandler{ //nolint:forcetypeassert
 		tcpListener:   tcpListener,
 		listener:      listener,
 		Port:          tcpListener.Addr().(*net.TCPAddr).Port,

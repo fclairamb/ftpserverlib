@@ -998,7 +998,7 @@ func TestPASVConnectionWait(t *testing.T) {
 		},
 	}
 
-	p := passiveTransferHandler{
+	p := passiveTransferHandler{ //nolint:forcetypeassert
 		listener: &testNetListener{
 			conn: &testNetConn{
 				remoteAddr: &net.TCPAddr{IP: nil, Port: 21}, // invalid IP

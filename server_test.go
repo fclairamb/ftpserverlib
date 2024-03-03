@@ -2,7 +2,6 @@ package ftpserver
 
 import (
 	"errors"
-	"fmt"
 	"net"
 	"os"
 	"syscall"
@@ -18,8 +17,7 @@ func TestMain(m *testing.M) {
 	// we change the timezone to be able to test that MLSD/MLST commands write UTC timestamps
 	loc, err := time.LoadLocation("America/New_York")
 	if err != nil {
-		fmt.Printf("unable to set timezone: %v\n", err)
-		os.Exit(1)
+		panic(err)
 	}
 
 	time.Local = loc

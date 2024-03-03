@@ -13,7 +13,7 @@ import (
 	log "github.com/fclairamb/go-log"
 )
 
-// HASHAlgo is the enumerable that represents the supported HASH algorithms
+// HASHAlgo is the enumerable that represents the supported HASH algorithms.
 type HASHAlgo int8
 
 // Supported hash algorithms
@@ -25,7 +25,7 @@ const (
 	HASHAlgoSHA512
 )
 
-// TransferType is the enumerable that represents the supported transfer types
+// TransferType is the enumerable that represents the supported transfer types.
 type TransferType int8
 
 // Supported transfer type

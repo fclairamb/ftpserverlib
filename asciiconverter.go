@@ -10,6 +10,8 @@ type convertMode int8
 const (
 	convertModeToCRLF convertMode = iota
 	convertModeToLF
+
+	bufferSize = 4096
 )
 
 type asciiConverter struct {
@@ -19,7 +21,7 @@ type asciiConverter struct {
 }
 
 func newASCIIConverter(r io.Reader, mode convertMode) *asciiConverter {
-	reader := bufio.NewReaderSize(r, 4096)
+	reader := bufio.NewReaderSize(r, bufferSize)
 
 	return &asciiConverter{
 		reader:    reader,

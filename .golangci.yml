@@ -181,16 +181,24 @@ linters:
         - errchkjson
         - errname
         - errorlint
+        - execinquery
+        - exhaustive
+        # - exhaustruct --> Not convinced it's useful
         # - exhaustivestruct
         - exportloopref
         - funlen
-        # - gci
+        - forbidigo
+        - forcetypeassert
+        - gci
+        - ginkgolinter
         - gochecknoinits
+        - gochecksumtype
         # - gochecknoglobals
         - gocognit
         - goconst
         - gocritic
         - gocyclo
+        # - godot --> lots of not so useful changes
         - godox
         - goerr113
         - gofmt
@@ -198,11 +206,12 @@ linters:
         - gosimple
         # - golint --> revive
         - revive
-        # - gomnd
+        # - gomnd --> too much work
         - goprintffuncname
         - gosec
         - gosimple
         - govet
+        - grouper
         - ineffassign
         # - interfacer --> (deprecated)
         - lll
