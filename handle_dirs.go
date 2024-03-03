@@ -255,7 +255,7 @@ func (c *clientHandler) handleMLSD(param string) error {
 
 	info := fmt.Sprintf("MLSD %v", param)
 
-	if files, _, err := c.getFileList(param, false); err == nil || err == io.EOF {
+	if files, _, err := c.getFileList(param, false); err == nil || errors.Is(err, io.EOF) {
 		if tr, errTr := c.TransferOpen(info); errTr == nil {
 			err = c.dirTransferMLSD(tr, files)
 			c.TransferClose(err)

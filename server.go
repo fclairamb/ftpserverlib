@@ -225,7 +225,7 @@ func (server *FtpServer) Serve() error {
 		connection, err := server.listener.Accept()
 
 		if err != nil {
-			if errOp, ok := err.(*net.OpError); ok {
+			if errOp := (&net.OpError{}); errors.As(err, &errOp) {
 				// This means we just closed the connection and it's OK
 				if errOp.Err.Error() == "use of closed network connection" {
 					server.listener = nil
