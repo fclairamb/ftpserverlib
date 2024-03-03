@@ -161,8 +161,14 @@ linters:
     disable-all: true
     enable:
         - asciicheck
+        - asasalint
+        - bidichk
         - bodyclose
         # - deadcode -> unused
+        - containedctx
+        # - contextcheck -> creates an odd error here: https://github.com/fclairamb/ftpserverlib/blob/4d7c663e9e0b2650673fc2e0fcdb443895f2a1b9/server.go#L234
+        # - copyloopvar -> unknown in v1.56.2 ???
+        - cyclop
         - depguard
         - dogsled
         - dupl

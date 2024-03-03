@@ -118,17 +118,10 @@ func (server *FtpServer) loadSettings() error {
 	}
 
 	if s.PublicHost != "" {
-		parsedIP := net.ParseIP(s.PublicHost)
-		if parsedIP == nil {
-			return &ipValidationError{error: fmt.Sprintf("invalid passive IP %#v", s.PublicHost)}
+		s.PublicHost, err = parseIPv4(s.PublicHost)
+		if err != nil {
+			return err
 		}
-
-		parsedIP = parsedIP.To4()
-		if parsedIP == nil {
-			return &ipValidationError{error: fmt.Sprintf("invalid IPv4 passive IP %#v", s.PublicHost)}
-		}
-
-		s.PublicHost = parsedIP.String()
 	}
 
 	if s.Listener == nil && s.ListenAddr == "" {
@@ -151,6 +144,20 @@ func (server *FtpServer) loadSettings() error {
 	server.settings = s
 
 	return nil
+}
+
+func parseIPv4(publicHost string) (string, error) {
+	parsedIP := net.ParseIP(publicHost)
+	if parsedIP == nil {
+		return "", &ipValidationError{error: fmt.Sprintf("invalid passive IP %#v", publicHost)}
+	}
+
+	parsedIP = parsedIP.To4()
+	if parsedIP == nil {
+		return "", &ipValidationError{error: fmt.Sprintf("invalid IPv4 passive IP %#v", publicHost)}
+	}
+
+	return parsedIP.String(), nil
 }
 
 // Listen starts the listening

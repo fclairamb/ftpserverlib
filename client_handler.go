@@ -410,47 +410,55 @@ func (c *clientHandler) HandleCommands() {
 	}
 
 	for {
-		if c.reader == nil {
-			if c.debug {
-				c.logger.Debug("Client disconnected", "clean", true)
-			}
-
+		if c.readCommand() {
 			return
 		}
-
-		// florent(2018-01-14): #58: IDLE timeout: Preparing the deadline before we read
-		if c.server.settings.IdleTimeout > 0 {
-			if err := c.conn.SetDeadline(
-				time.Now().Add(time.Duration(time.Second.Nanoseconds() * int64(c.server.settings.IdleTimeout)))); err != nil {
-				c.logger.Error("Network error", "err", err)
-			}
-		}
-
-		lineSlice, isPrefix, err := c.reader.ReadLine()
-
-		if isPrefix {
-			if c.debug {
-				c.logger.Warn("Received line too long, disconnecting client",
-					"size", len(lineSlice))
-			}
-
-			return
-		}
-
-		if err != nil {
-			c.handleCommandsStreamError(err)
-
-			return
-		}
-
-		line := string(lineSlice)
-
-		if c.debug {
-			c.logger.Debug("Received line", "line", line)
-		}
-
-		c.handleCommand(line)
 	}
+}
+
+func (c *clientHandler) readCommand() bool {
+	if c.reader == nil {
+		if c.debug {
+			c.logger.Debug("Client disconnected", "clean", true)
+		}
+
+		return true
+	}
+
+	// florent(2018-01-14): #58: IDLE timeout: Preparing the deadline before we read
+	if c.server.settings.IdleTimeout > 0 {
+		if err := c.conn.SetDeadline(
+			time.Now().Add(time.Duration(time.Second.Nanoseconds() * int64(c.server.settings.IdleTimeout)))); err != nil {
+			c.logger.Error("Network error", "err", err)
+		}
+	}
+
+	lineSlice, isPrefix, err := c.reader.ReadLine()
+
+	if isPrefix {
+		if c.debug {
+			c.logger.Warn("Received line too long, disconnecting client",
+				"size", len(lineSlice))
+		}
+
+		return true
+	}
+
+	if err != nil {
+		c.handleCommandsStreamError(err)
+
+		return true
+	}
+
+	line := string(lineSlice)
+
+	if c.debug {
+		c.logger.Debug("Received line", "line", line)
+	}
+
+	c.handleCommand(line)
+
+	return false
 }
 
 func (c *clientHandler) handleCommandsStreamError(err error) {
