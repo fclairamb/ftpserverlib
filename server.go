@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"net"
-	"os"
 	"syscall"
 	"time"
 
@@ -203,14 +202,9 @@ func (server *FtpServer) Listen() error {
 }
 
 func temporaryError(err net.Error) bool {
-	if opErr, ok := err.(*net.OpError); ok {
-		if sysErr, ok := opErr.Err.(*os.SyscallError); ok {
-			if errno, ok := sysErr.Err.(syscall.Errno); ok {
-				if errno == syscall.ECONNABORTED ||
-					errno == syscall.ECONNRESET {
-					return true
-				}
-			}
+	if syscallErrNo := new(syscall.Errno); errors.As(err, syscallErrNo) {
+		if *syscallErrNo == syscall.ECONNABORTED || *syscallErrNo == syscall.ECONNRESET {
+			return true
 		}
 	}
 
