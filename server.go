@@ -28,7 +28,7 @@ type CommandDescription struct {
 
 // This is shared between FtpServer instances as there's no point in making the FTP commands behave differently
 // between them.
-var commandsMap = map[string]*CommandDescription{
+var commandsMap = map[string]*CommandDescription{ //nolint:gochecknoglobals
 	// Authentication
 	"USER": {Fn: (*clientHandler).handleUSER, Open: true},
 	"PASS": {Fn: (*clientHandler).handlePASS, Open: true},
@@ -96,7 +96,7 @@ var commandsMap = map[string]*CommandDescription{
 }
 
 var (
-	specialAttentionCommands = []string{"ABOR", "STAT", "QUIT"}
+	specialAttentionCommands = []string{"ABOR", "STAT", "QUIT"} //nolint:gochecknoglobals
 )
 
 // FtpServer is where everything is stored

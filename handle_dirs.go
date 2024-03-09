@@ -17,7 +17,7 @@ import (
 var errFileList = errors.New("listing a file isn't allowed")
 
 // the order matter, put parameters with more characters first
-var supportedlistArgs = []string{"-al", "-la", "-a", "-l"}
+var supportedlistArgs = []string{"-al", "-la", "-a", "-l"} //nolint:gochecknoglobals
 
 func (c *clientHandler) absPath(p string) string {
 	if path.IsAbs(p) {

@@ -193,7 +193,7 @@ linters:
         - ginkgolinter
         - gochecknoinits
         - gochecksumtype
-        # - gochecknoglobals
+        - gochecknoglobals
         - gocognit
         - goconst
         - gocritic
@@ -207,21 +207,35 @@ linters:
         # - golint --> revive
         - revive
         # - gomnd --> too much work
+        # - gomoddirectives
+        # - gomodguard
         - goprintffuncname
         - gosec
+        - gosmopolitan
         - gosimple
         - govet
         - grouper
         - ineffassign
+        - importas
+        - inamedparam
+        # - intrange --> upcoming
+        # - interfacebloat
         # - interfacer --> (deprecated)
+        # - ireturn --> I can't even see how to fix those like ClientHandler::getFileHandle
         - lll
+        - loggercheck
+        - maintidx
+        - makezero
+        - mirror
         # - maligned --> govet:fieldalignment
         - megacheck
         - misspell
+        - musttag
         - nakedret
         # - nestif
         - nlreturn
         - prealloc
+        # - nestif
         - nilerr
         - nolintlint
         - rowserrcheck
@@ -246,3 +260,8 @@ issues:
   # excluded by default patterns execute `golangci-lint run --help`.
   # Default value for this option is true.
   exclude-use-default: false
+
+  exclude-rules:
+    - path: _test\.go
+      linters:
+        - gochecknoglobals

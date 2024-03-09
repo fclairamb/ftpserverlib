@@ -21,7 +21,7 @@ type transferHandler interface {
 	Close() error
 
 	// Set info about the transfer to return in STAT response
-	SetInfo(string)
+	SetInfo(info string)
 	// Info about the transfer to return in STAT response
 	GetInfo() string
 }
