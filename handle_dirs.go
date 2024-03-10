@@ -64,7 +64,7 @@ func (c *clientHandler) handleCWD(param string) error {
 	if stat, err := c.driver.Stat(p); err == nil {
 		if stat.IsDir() {
 			c.SetPath(p)
-			c.writeMessage(StatusFileOK, fmt.Sprintf("CD worked on %s", p))
+			c.writeMessage(StatusFileOK, "CD worked on "+p)
 		} else {
 			c.writeMessage(StatusActionNotTaken, fmt.Sprintf("Can't change directory to %s: Not a Directory", p))
 		}
@@ -98,7 +98,7 @@ func (c *clientHandler) handleMKDIR(params string) {
 	p := c.absPath(params)
 
 	if err := c.driver.MkdirAll(p, 0755); err == nil {
-		c.writeMessage(StatusFileOK, fmt.Sprintf("Created dir %s", p))
+		c.writeMessage(StatusFileOK, "Created dir "+p)
 	} else {
 		c.writeMessage(StatusActionNotTaken, fmt.Sprintf("Couldn't create dir %s: %v", p, err))
 	}
@@ -116,7 +116,7 @@ func (c *clientHandler) handleRMD(param string) error {
 	}
 
 	if err == nil {
-		c.writeMessage(StatusFileOK, fmt.Sprintf("Deleted dir %s", p))
+		c.writeMessage(StatusFileOK, "Deleted dir "+p)
 	} else {
 		c.writeMessage(StatusActionNotTaken, fmt.Sprintf("Could not delete dir %s: %v", p, err))
 	}
@@ -134,7 +134,7 @@ func (c *clientHandler) handleRMDIR(params string) {
 	p := c.absPath(params)
 
 	if err := c.driver.RemoveAll(p); err == nil {
-		c.writeMessage(StatusFileOK, fmt.Sprintf("Removed dir %s", p))
+		c.writeMessage(StatusFileOK, "Removed dir "+p)
 	} else {
 		c.writeMessage(StatusActionNotTaken, fmt.Sprintf("Couldn't remove dir %s: %v", p, err))
 	}
@@ -148,7 +148,7 @@ func (c *clientHandler) handleCDUP(_ string) error {
 
 	if _, err := c.driver.Stat(parent); err == nil {
 		c.SetPath(parent)
-		c.writeMessage(StatusFileOK, fmt.Sprintf("CDUP worked on %s", parent))
+		c.writeMessage(StatusFileOK, "CDUP worked on "+parent)
 	} else {
 		c.writeMessage(StatusActionNotTaken, fmt.Sprintf("CDUP issue: %v", err))
 	}

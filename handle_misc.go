@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -89,7 +90,7 @@ func (c *clientHandler) handleSITE(param string) error {
 	case "RMDIR":
 		c.handleRMDIR(params)
 	default:
-		c.writeMessage(StatusSyntaxErrorNotRecognised, fmt.Sprintf("Unknown SITE subcommand: %s", cmd))
+		c.writeMessage(StatusSyntaxErrorNotRecognised, "Unknown SITE subcommand: "+cmd)
 	}
 
 	return nil
@@ -121,7 +122,7 @@ func (c *clientHandler) handleSTATServer() error {
 	))
 
 	if c.user != "" {
-		c.writeLine(fmt.Sprintf("Logged in as %s", c.user))
+		c.writeLine("Logged in as " + c.user)
 	} else {
 		c.writeLine("Not logged in yet")
 	}
@@ -344,7 +345,7 @@ func (c *clientHandler) handleAVBL(param string) error {
 		}
 
 		if !info.IsDir() {
-			c.writeMessage(StatusActionNotTaken, fmt.Sprintf("%s: is not a directory", path))
+			c.writeMessage(StatusActionNotTaken, path+": is not a directory")
 
 			return nil
 		}
@@ -356,7 +357,7 @@ func (c *clientHandler) handleAVBL(param string) error {
 			return nil
 		}
 
-		c.writeMessage(StatusFileStatus, fmt.Sprintf("%d", available))
+		c.writeMessage(StatusFileStatus, strconv.FormatInt(available, 10))
 	} else {
 		c.writeMessage(StatusNotImplemented, "This extension hasn't been implemented !")
 	}

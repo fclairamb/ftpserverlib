@@ -107,37 +107,39 @@ func ftpDownloadAndHash(t *testing.T, ftp *goftp.Client, filename string) string
 }
 
 func ftpDownloadAndHashWithRawConnection(t *testing.T, raw goftp.RawConn, fileName string) string {
+	r := require.New(t)
 	hasher := sha256.New()
 
 	dcGetter, err := raw.PrepareDataConn()
-	assert.NoError(t, err)
+	r.NoError(err)
 
 	rc, response, err := raw.SendCommand(fmt.Sprintf("RETR %v", fileName))
 	require.NoError(t, err)
-	require.Equal(t, StatusFileStatusOK, rc, response)
+	r.Equal(StatusFileStatusOK, rc, response)
 
 	dc, err := dcGetter()
-	assert.NoError(t, err)
+	r.NoError(err)
 
 	_, err = io.Copy(hasher, dc)
-	assert.NoError(t, err)
+	r.NoError(err)
 
 	err = dc.Close()
-	assert.NoError(t, err)
+	r.NoError(err)
 
 	rc, response, err = raw.ReadResponse()
-	assert.NoError(t, err)
-	assert.Equal(t, StatusClosingDataConn, rc, response)
+	r.NoError(err)
+	r.Equal(StatusClosingDataConn, rc, response)
 
 	return hex.EncodeToString(hasher.Sum(nil))
 }
 
-func ftpUploadWithRawConnection(t *testing.T, raw goftp.RawConn, file io.Reader, fileName string, append bool) {
+func ftpUploadWithRawConnection(t *testing.T, raw goftp.RawConn, file io.Reader, fileName string, appendFile bool) {
+	r := require.New(t)
 	dcGetter, err := raw.PrepareDataConn()
-	assert.NoError(t, err)
+	r.NoError(err)
 
 	cmd := "STOR"
-	if append {
+	if appendFile {
 		cmd = "APPE"
 	}
 
@@ -146,16 +148,16 @@ func ftpUploadWithRawConnection(t *testing.T, raw goftp.RawConn, file io.Reader,
 	require.Equal(t, StatusFileStatusOK, rc, response)
 
 	dc, err := dcGetter()
-	assert.NoError(t, err)
+	r.NoError(err)
 
 	_, err = io.Copy(dc, file)
-	assert.NoError(t, err)
+	r.NoError(err)
 
 	err = dc.Close()
-	assert.NoError(t, err)
+	r.NoError(err)
 
 	rc, response, err = raw.ReadResponse()
-	assert.NoError(t, err)
+	r.NoError(err)
 	assert.Equal(t, StatusClosingDataConn, rc, response)
 }
 

@@ -243,11 +243,31 @@ linters:
         - noctx
         - nonamedreturns
         # - scopelint --> exportloopref
+        - nosprintfhostport
         - exportloopref 
         - staticcheck
         # - structcheck -> unused
         - stylecheck
+        # - paralleltest -> buggy, doesn't work with subtests
         - typecheck
+        - perfsprint
+        - prealloc
+        - predeclared
+        - reassign
+        - promlinter
+        - protogetter
+        - rowserrcheck
+        - sloglint
+        - spancheck
+        - sqlclosecheck
+        - stylecheck
+        - tagalign
+        - tagliatelle
+        - tenv
+        - testableexamples
+        - testifylint
+        # - testpackage -> too late for that
+        # - thelper
         - unconvert
         - unparam
         - unused

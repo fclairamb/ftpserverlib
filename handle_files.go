@@ -43,7 +43,7 @@ func (c *clientHandler) handleRETR(param string) error {
 
 // File transfer, read or write, seek or not, is basically the same.
 // To make sure we don't miss any step, we execute everything in order
-func (c *clientHandler) transferFile(write bool, append bool, param, info string) {
+func (c *clientHandler) transferFile(write bool, appendFile bool, param, info string) {
 	var file FileTransfer
 	var err error
 	var fileFlag int
@@ -53,7 +53,7 @@ func (c *clientHandler) transferFile(write bool, append bool, param, info string
 	// We try to open the file
 	if write { //nolint:nestif // too much effort to change for now
 		fileFlag = os.O_WRONLY
-		if append {
+		if appendFile {
 			fileFlag |= os.O_CREATE | os.O_APPEND
 			// ignore the seek position for append mode
 			c.ctxRest = 0
@@ -353,7 +353,7 @@ func (c *clientHandler) handleSYMLINK(params string) {
 func (c *clientHandler) handleDELE(param string) error {
 	path := c.absPath(param)
 	if err := c.driver.Remove(path); err == nil {
-		c.writeMessage(StatusFileOK, fmt.Sprintf("Removed file %s", path))
+		c.writeMessage(StatusFileOK, "Removed file "+path)
 	} else {
 		c.writeMessage(StatusActionNotTaken, fmt.Sprintf("Couldn't delete %s: %v", path, err))
 	}
@@ -408,7 +408,7 @@ func (c *clientHandler) handleSIZE(param string) error {
 
 	path := c.absPath(param)
 	if info, err := c.driver.Stat(path); err == nil {
-		c.writeMessage(StatusFileStatus, fmt.Sprintf("%d", info.Size()))
+		c.writeMessage(StatusFileStatus, strconv.FormatInt(info.Size(), 10))
 	} else {
 		c.writeMessage(StatusActionNotTaken, fmt.Sprintf("Couldn't access %s: %v", path, err))
 	}
@@ -430,7 +430,7 @@ func (c *clientHandler) handleSTATFile(param string) error {
 	if !info.IsDir() {
 		defer c.multilineAnswer(StatusFileStatus, fmt.Sprintf("STAT %v", param))()
 
-		c.writeLine(fmt.Sprintf(" %s", c.fileStat(info)))
+		c.writeLine(" " + c.fileStat(info))
 
 		return nil
 	}
@@ -459,7 +459,7 @@ func (c *clientHandler) handleSTATFile(param string) error {
 		defer c.multilineAnswer(StatusDirectoryStatus, fmt.Sprintf("STAT %v", param))()
 
 		for _, f := range files {
-			c.writeLine(fmt.Sprintf(" %s", c.fileStat(f)))
+			c.writeLine(" %s" + c.fileStat(f))
 		}
 	} else {
 		c.writeMessage(StatusFileActionNotTaken, fmt.Sprintf("Could not list: %v", errList))
@@ -548,8 +548,9 @@ func (c *clientHandler) handleMDTM(param string) error {
 func (c *clientHandler) handleMFMT(param string) error {
 	params := strings.SplitN(param, " ", 2)
 	if len(params) != 2 {
-		c.writeMessage(StatusSyntaxErrorNotRecognised, fmt.Sprintf(
-			"Couldn't set mtime, not enough params, given: %s", param))
+		c.writeMessage(StatusSyntaxErrorNotRecognised,
+			"Couldn't set mtime, not enough params, given: "+param,
+		)
 
 		return nil
 	}

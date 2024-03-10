@@ -405,6 +405,7 @@ func (*testNetListener) Addr() net.Addr {
 }
 
 func TestDataConnectionRequirements(t *testing.T) {
+	r := require.New(t)
 	controlConnIP := net.ParseIP("192.168.1.1")
 
 	c := clientHandler{
@@ -420,7 +421,7 @@ func TestDataConnectionRequirements(t *testing.T) {
 	}
 
 	err := c.checkDataConnectionRequirement(controlConnIP, DataChannelPassive)
-	assert.NoError(t, err) // ip match
+	r.NoError(err) // ip match
 
 	err = c.checkDataConnectionRequirement(net.ParseIP("192.168.1.2"), DataChannelActive)
 	if assert.Error(t, err) {
@@ -432,12 +433,12 @@ func TestDataConnectionRequirements(t *testing.T) {
 	}
 
 	err = c.checkDataConnectionRequirement(controlConnIP, DataChannelPassive)
-	assert.Error(t, err)
+	r.Error(err)
 
 	// nil remote address
 	c.conn = &testNetConn{}
 	err = c.checkDataConnectionRequirement(controlConnIP, DataChannelActive)
-	assert.Error(t, err)
+	r.Error(err)
 
 	// invalid IP
 	c.conn = &testNetConn{

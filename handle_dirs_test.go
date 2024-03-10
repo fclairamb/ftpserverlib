@@ -297,10 +297,10 @@ func TestDirListingWithSpace(t *testing.T) {
 
 	defer func() { require.NoError(t, raw.Close()) }()
 
-	rc, response, err := raw.SendCommand(fmt.Sprintf("CWD /%s", dirName))
+	rc, response, err := raw.SendCommand("CWD /" + dirName)
 	require.NoError(t, err)
 	require.Equal(t, StatusFileOK, rc)
-	require.Equal(t, fmt.Sprintf("CD worked on /%s", dirName), response)
+	require.Equal(t, "CD worked on /"+dirName, response)
 
 	dcGetter, err := raw.PrepareDataConn()
 	require.NoError(t, err)
@@ -354,7 +354,7 @@ func TestCleanPath(t *testing.T) {
 		"/./",
 		"/././.",
 	} {
-		rc, response, err := raw.SendCommand(fmt.Sprintf("CWD %s", dir))
+		rc, response, err := raw.SendCommand("CWD " + dir)
 		require.NoError(t, err)
 		require.Equal(t, StatusFileOK, rc)
 		require.Equal(t, "CD worked on /", response)
@@ -389,7 +389,7 @@ func TestTLSTransfer(t *testing.T) {
 
 	contents, err := c.ReadDir("/")
 	require.NoError(t, err)
-	require.Len(t, contents, 0)
+	require.Empty(t, contents)
 
 	raw, err := c.OpenRawConn()
 	require.NoError(t, err, "Couldn't open raw connection")
@@ -500,6 +500,8 @@ func TestListArgs(t *testing.T) {
 }
 
 func testListDirArgs(t *testing.T, s *FtpServer) {
+	r := require.New(t)
+
 	conf := goftp.Config{
 		User:     authUser,
 		Password: authPass,
@@ -507,7 +509,7 @@ func testListDirArgs(t *testing.T, s *FtpServer) {
 	testDir := "testdir"
 
 	c, err := goftp.DialConfig(conf, s.Addr())
-	require.NoError(t, err, "Couldn't connect")
+	r.NoError(err, "Couldn't connect")
 
 	defer func() { panicOnError(c.Close()) }()
 
@@ -520,31 +522,31 @@ func testListDirArgs(t *testing.T, s *FtpServer) {
 		s.settings.DisableLISTArgs = false
 
 		contents, err := c.ReadDir(arg)
-		require.NoError(t, err)
-		require.Len(t, contents, 0)
+		r.NoError(err)
+		r.Empty(contents)
 
 		_, err = c.Mkdir(arg)
-		require.NoError(t, err)
+		r.NoError(err)
 
 		_, err = c.Mkdir(fmt.Sprintf("%v/%v", arg, testDir))
-		require.NoError(t, err)
+		r.NoError(err)
 
 		contents, err = c.ReadDir(arg)
-		require.NoError(t, err)
-		require.Len(t, contents, 1)
-		require.Equal(t, contents[0].Name(), testDir)
+		r.NoError(err)
+		r.Len(contents, 1)
+		r.Equal(contents[0].Name(), testDir)
 
 		contents, err = c.ReadDir(fmt.Sprintf("%v %v", arg, arg))
-		require.NoError(t, err)
-		require.Len(t, contents, 1)
-		require.Equal(t, contents[0].Name(), testDir)
+		r.NoError(err)
+		r.Len(contents, 1)
+		r.Equal(contents[0].Name(), testDir)
 
 		// cleanup
 		err = c.Rmdir(fmt.Sprintf("%v/%v", arg, testDir))
-		require.NoError(t, err)
+		r.NoError(err)
 
 		err = c.Rmdir(arg)
-		require.NoError(t, err)
+		r.NoError(err)
 	}
 }
 

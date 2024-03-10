@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"regexp"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -662,7 +663,7 @@ func TestCOMB(t *testing.T) {
 		createTemporaryFile(t, partSize), createTemporaryFile(t, partSize))
 
 	for idx, part := range parts {
-		ftpUpload(t, c, part, fmt.Sprintf("%d", idx))
+		ftpUpload(t, c, part, strconv.Itoa(idx))
 		_, err = part.Seek(0, io.SeekStart)
 		require.NoError(t, err)
 		_, err = io.Copy(hasher, part)

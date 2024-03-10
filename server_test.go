@@ -82,12 +82,12 @@ func newFakeListener(err error) net.Listener {
 }
 
 func TestCannotListen(t *testing.T) {
-	a := assert.New(t)
+	r := require.New(t)
 
 	portBlockerListener, err := net.Listen("tcp", "127.0.0.1:0")
-	a.NoError(err)
+	r.NoError(err)
 
-	defer func() { a.NoError(portBlockerListener.Close()) }()
+	defer func() { r.NoError(portBlockerListener.Close()) }()
 
 	server := FtpServer{
 		Logger: lognoop.NewNoOpLogger(),
@@ -100,17 +100,17 @@ func TestCannotListen(t *testing.T) {
 
 	err = server.Listen()
 	var ne NetworkError
-	a.ErrorAs(err, &ne)
-	a.Equal("cannot listen on main port", ne.str)
+	r.ErrorAs(err, &ne)
+	r.Equal("cannot listen on main port", ne.str)
 }
 
 func TestListenWithBadTLSSettings(t *testing.T) {
-	a := assert.New(t)
+	r := require.New(t)
 
 	portBlockerListener, err := net.Listen("tcp", "127.0.0.1:0")
-	a.NoError(err)
+	r.NoError(err)
 
-	defer func() { a.NoError(portBlockerListener.Close()) }()
+	defer func() { r.NoError(portBlockerListener.Close()) }()
 
 	server := FtpServer{
 		Logger: lognoop.NewNoOpLogger(),
@@ -124,8 +124,8 @@ func TestListenWithBadTLSSettings(t *testing.T) {
 
 	err = server.Listen()
 	var drvErr DriverError
-	a.ErrorAs(err, &drvErr)
-	a.Equal("cannot get tls config", drvErr.str)
+	r.ErrorAs(err, &drvErr)
+	r.Equal("cannot get tls config", drvErr.str)
 }
 
 func TestListenerAcceptErrors(t *testing.T) {
@@ -222,7 +222,7 @@ func TestServerSettingsIPError(t *testing.T) {
 }
 
 func TestServerSettingsNilSettings(t *testing.T) {
-	a := assert.New(t)
+	r := require.New(t)
 	server := FtpServer{
 		Logger: lognoop.NewNoOpLogger(),
 		driver: &TestServerDriver{
@@ -231,11 +231,11 @@ func TestServerSettingsNilSettings(t *testing.T) {
 	}
 
 	err := server.loadSettings()
-	a.Error(err)
+	r.Error(err)
 
 	drvErr := DriverError{}
-	a.ErrorAs(err, &drvErr)
-	a.ErrorContains(drvErr, "couldn't load settings")
+	r.ErrorAs(err, &drvErr)
+	r.ErrorContains(drvErr, "couldn't load settings")
 }
 
 func TestTemporaryError(t *testing.T) {

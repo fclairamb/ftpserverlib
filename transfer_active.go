@@ -161,7 +161,7 @@ func parsePORTAddr(param string) (*net.TCPAddr, error) {
 	addr, err := net.ResolveTCPAddr("tcp", fmt.Sprintf("%s:%d", ip, port))
 
 	if err != nil {
-		err = newNetworkError(fmt.Sprintf("could not resolve %s", param), err)
+		err = newNetworkError("could not resolve "+param, err)
 	}
 
 	return addr, err
