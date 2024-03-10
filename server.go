@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"net"
-	"os"
 	"syscall"
 	"time"
 
@@ -14,10 +13,8 @@ import (
 	lognoop "github.com/fclairamb/go-log/noop"
 )
 
-var (
-	// ErrNotListening is returned when we are performing an action that is only valid while listening
-	ErrNotListening = errors.New("we aren't listening")
-)
+// ErrNotListening is returned when we are performing an action that is only valid while listening
+var ErrNotListening = errors.New("we aren't listening")
 
 // CommandDescription defines which function should be used and if it should be open to anyone or only logged in users
 type CommandDescription struct {
@@ -29,7 +26,7 @@ type CommandDescription struct {
 
 // This is shared between FtpServer instances as there's no point in making the FTP commands behave differently
 // between them.
-var commandsMap = map[string]*CommandDescription{
+var commandsMap = map[string]*CommandDescription{ //nolint:gochecknoglobals
 	// Authentication
 	"USER": {Fn: (*clientHandler).handleUSER, Open: true},
 	"PASS": {Fn: (*clientHandler).handlePASS, Open: true},
@@ -96,9 +93,7 @@ var commandsMap = map[string]*CommandDescription{
 	"EPRT": {Fn: (*clientHandler).handlePORT},
 }
 
-var (
-	specialAttentionCommands = []string{"ABOR", "STAT", "QUIT"}
-)
+var specialAttentionCommands = []string{"ABOR", "STAT", "QUIT"} //nolint:gochecknoglobals
 
 // FtpServer is where everything is stored
 // We want to keep it as simple as possible
@@ -111,53 +106,59 @@ type FtpServer struct {
 }
 
 func (server *FtpServer) loadSettings() error {
-	s, err := server.driver.GetSettings()
+	settings, err := server.driver.GetSettings()
 
-	if err != nil {
-		return err
+	if err != nil || settings == nil {
+		return newDriverError("couldn't load settings", err)
 	}
 
-	if s.PublicHost != "" {
-		parsedIP := net.ParseIP(s.PublicHost)
-		if parsedIP == nil {
-			return &ipValidationError{error: fmt.Sprintf("invalid passive IP %#v", s.PublicHost)}
+	if settings.PublicHost != "" {
+		settings.PublicHost, err = parseIPv4(settings.PublicHost)
+		if err != nil {
+			return err
 		}
-
-		parsedIP = parsedIP.To4()
-		if parsedIP == nil {
-			return &ipValidationError{error: fmt.Sprintf("invalid IPv4 passive IP %#v", s.PublicHost)}
-		}
-
-		s.PublicHost = parsedIP.String()
 	}
 
-	if s.Listener == nil && s.ListenAddr == "" {
-		s.ListenAddr = "0.0.0.0:2121"
+	if settings.Listener == nil && settings.ListenAddr == "" {
+		settings.ListenAddr = "0.0.0.0:2121"
 	}
 
 	// florent(2018-01-14): #58: IDLE timeout: Default idle timeout will be set at 900 seconds
-	if s.IdleTimeout == 0 {
-		s.IdleTimeout = 900
+	if settings.IdleTimeout == 0 {
+		settings.IdleTimeout = 900
 	}
 
-	if s.ConnectionTimeout == 0 {
-		s.ConnectionTimeout = 30
+	if settings.ConnectionTimeout == 0 {
+		settings.ConnectionTimeout = 30
 	}
 
-	if s.Banner == "" {
-		s.Banner = "ftpserver - golang FTP server"
+	if settings.Banner == "" {
+		settings.Banner = "ftpserver - golang FTP server"
 	}
 
-	server.settings = s
+	server.settings = settings
 
 	return nil
+}
+
+func parseIPv4(publicHost string) (string, error) {
+	parsedIP := net.ParseIP(publicHost)
+	if parsedIP == nil {
+		return "", &ipValidationError{error: fmt.Sprintf("invalid passive IP %#v", publicHost)}
+	}
+
+	parsedIP = parsedIP.To4()
+	if parsedIP == nil {
+		return "", &ipValidationError{error: fmt.Sprintf("invalid IPv4 passive IP %#v", publicHost)}
+	}
+
+	return parsedIP.String(), nil
 }
 
 // Listen starts the listening
 // It's not a blocking call
 func (server *FtpServer) Listen() error {
 	err := server.loadSettings()
-
 	if err != nil {
 		return fmt.Errorf("could not load settings: %w", err)
 	}
@@ -167,43 +168,46 @@ func (server *FtpServer) Listen() error {
 		server.listener = server.settings.Listener
 	} else {
 		// Otherwise, it's what we currently use
-		server.listener, err = net.Listen("tcp", server.settings.ListenAddr)
-
+		server.listener, err = server.createListener()
 		if err != nil {
-			server.Logger.Error("Cannot listen", "err", err)
-
-			return err
-		}
-
-		if server.settings.TLSRequired == ImplicitEncryption {
-			// implicit TLS
-			var tlsConfig *tls.Config
-
-			tlsConfig, err = server.driver.GetTLSConfig()
-			if err != nil {
-				server.Logger.Error("Cannot get tls config", "err", err)
-
-				return err
-			}
-
-			server.listener = tls.NewListener(server.listener, tlsConfig)
+			return fmt.Errorf("could not create listener: %w", err)
 		}
 	}
 
 	server.Logger.Info("Listening...", "address", server.listener.Addr())
 
-	return err
+	return nil
+}
+
+func (server *FtpServer) createListener() (net.Listener, error) {
+	listener, err := net.Listen("tcp", server.settings.ListenAddr)
+	if err != nil {
+		server.Logger.Error("cannot listen on main port", "err", err, "listenAddr", server.settings.ListenAddr)
+
+		return nil, newNetworkError("cannot listen on main port", err)
+	}
+
+	if server.settings.TLSRequired == ImplicitEncryption {
+		// implicit TLS
+		var tlsConfig *tls.Config
+
+		tlsConfig, err = server.driver.GetTLSConfig()
+		if err != nil || tlsConfig == nil {
+			server.Logger.Error("Cannot get tls config", "err", err)
+
+			return nil, newDriverError("cannot get tls config", err)
+		}
+
+		listener = tls.NewListener(listener, tlsConfig)
+	}
+
+	return listener, nil
 }
 
 func temporaryError(err net.Error) bool {
-	if opErr, ok := err.(*net.OpError); ok {
-		if sysErr, ok := opErr.Err.(*os.SyscallError); ok {
-			if errno, ok := sysErr.Err.(syscall.Errno); ok {
-				if errno == syscall.ECONNABORTED ||
-					errno == syscall.ECONNRESET {
-					return true
-				}
-			}
+	if syscallErrNo := new(syscall.Errno); errors.As(err, syscallErrNo) {
+		if *syscallErrNo == syscall.ECONNABORTED || *syscallErrNo == syscall.ECONNRESET {
+			return true
 		}
 	}
 
@@ -216,49 +220,62 @@ func (server *FtpServer) Serve() error {
 
 	for {
 		connection, err := server.listener.Accept()
-
 		if err != nil {
-			if errOp, ok := err.(*net.OpError); ok {
-				// This means we just closed the connection and it's OK
-				if errOp.Err.Error() == "use of closed network connection" {
-					server.listener = nil
-
-					return nil
-				}
+			if ok, finalErr := server.handleAcceptError(err, &tempDelay); ok {
+				return finalErr
 			}
 
-			// see https://github.com/golang/go/blob/4aa1efed4853ea067d665a952eee77c52faac774/src/net/http/server.go#L3046
-			// & https://github.com/fclairamb/ftpserverlib/pull/352#pullrequestreview-1077459896
-			// The temporaryError method should replace net.Error.Temporary() when the go team
-			// will have provided us a better way to detect temporary errors.
-			if ne, ok := err.(net.Error); ok && ne.Temporary() { //nolint:staticcheck
-				if tempDelay == 0 {
-					tempDelay = 5 * time.Millisecond
-				} else {
-					tempDelay *= 2
-				}
-
-				if max := 1 * time.Second; tempDelay > max {
-					tempDelay = max
-				}
-
-				server.Logger.Warn(
-					"accept error", err,
-					"retry delay", tempDelay)
-				time.Sleep(tempDelay)
-
-				continue
-			}
-
-			server.Logger.Error("Listener accept error", "err", err)
-
-			return err
+			continue
 		}
 
 		tempDelay = 0
 
 		server.clientArrival(connection)
 	}
+}
+
+// handleAcceptError handles the error that occurred when accepting a new connection
+// It returns a boolean indicating if the error should stop the server and the error itself or none if it's a standard
+// scenario (e.g. a closed listener)
+func (server *FtpServer) handleAcceptError(err error, tempDelay *time.Duration) (bool, error) {
+	server.Logger.Error("Serve error", "err", err)
+
+	if errOp := (&net.OpError{}); errors.As(err, &errOp) {
+		// This means we just closed the connection and it's OK
+		if errOp.Err.Error() == "use of closed network connection" {
+			server.listener = nil
+
+			return true, nil
+		}
+	}
+
+	// see https://github.com/golang/go/blob/4aa1efed4853ea067d665a952eee77c52faac774/src/net/http/server.go#L3046
+	// & https://github.com/fclairamb/ftpserverlib/pull/352#pullrequestreview-1077459896
+	// The temporaryError method should replace net.Error.Temporary() when the go team
+	// will have provided us a better way to detect temporary errors.
+	var ne net.Error
+	if errors.Is(err, ne) && ne.Temporary() { //nolint:staticcheck
+		if *tempDelay == 0 {
+			*tempDelay = 5 * time.Millisecond
+		} else {
+			*tempDelay *= 2
+		}
+
+		if max := 1 * time.Second; *tempDelay > max {
+			*tempDelay = max
+		}
+
+		server.Logger.Warn(
+			"accept error", err,
+			"retry delay", tempDelay)
+		time.Sleep(*tempDelay)
+
+		return false, nil
+	}
+
+	server.Logger.Error("Listener accept error", "err", err)
+
+	return true, newNetworkError("listener accept error", err)
 }
 
 // ListenAndServe simply chains the Listen and Serve method calls
@@ -295,15 +312,16 @@ func (server *FtpServer) Stop() error {
 		return ErrNotListening
 	}
 
-	err := server.listener.Close()
-	if err != nil {
+	if err := server.listener.Close(); err != nil {
 		server.Logger.Warn(
 			"Could not close listener",
 			"err", err,
 		)
+
+		return newNetworkError("couln't close listener", err)
 	}
 
-	return err
+	return nil
 }
 
 // When a client connects, the server could refuse the connection

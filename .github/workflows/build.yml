@@ -6,7 +6,7 @@ on:
   push:
     branches:
       - main
-      - chore/lint-*
+      - chore/lint*
   pull_request:
 
 permissions:
@@ -26,7 +26,7 @@ jobs:
 
     strategy:
       matrix:
-        go: [ '1.22', '1.21', '1.20' ]
+        go: [ '1.22', '1.21' ]
         include:
           - go: '1.22'
             lint: true
@@ -54,11 +54,7 @@ jobs:
         run: go build -v ./...
 
       - name: Test
-        # We need GCC because of the "go test -race"
-        # env:
-        #   CGO_ENABLED: 0
         run: |
-          apt-get update && apt-get install gcc -y
           go test -parallel 20 -v -race -coverprofile=coverage.txt -covermode=atomic ./...
           bash <(curl -s https://codecov.io/bash)
 

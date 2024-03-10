@@ -97,14 +97,10 @@ func (a *activeTransferHandler) Open() (net.Conn, error) {
 		dialer.LocalAddr, _ = net.ResolveTCPAddr("tcp", ":20")
 		dialer.Control = Control
 	}
-	// TODO(mgenov): support dialing with timeout
-	// Issues:
-	//	https://github.com/golang/go/issues/3097
-	// 	https://github.com/golang/go/issues/4842
-	conn, err := dialer.Dial("tcp", a.raddr.String())
 
+	conn, err := dialer.Dial("tcp", a.raddr.String())
 	if err != nil {
-		return nil, fmt.Errorf("could not establish active connection: %w", err)
+		return nil, newNetworkError("could not establish active connection", err)
 	}
 
 	if a.tlsConfig != nil {
@@ -120,7 +116,9 @@ func (a *activeTransferHandler) Open() (net.Conn, error) {
 // Close closes only if connection is established
 func (a *activeTransferHandler) Close() error {
 	if a.conn != nil {
-		return a.conn.Close()
+		if err := a.conn.Close(); err != nil {
+			return newNetworkError("could not close active connection", err)
+		}
 	}
 
 	return nil
@@ -144,28 +142,35 @@ func parsePORTAddr(param string) (*net.TCPAddr, error) {
 
 	params := strings.Split(param, ",")
 
-	ip := strings.Join(params[0:4], ".")
+	ipParts := strings.Join(params[0:4], ".")
 
-	p1, err := strconv.Atoi(params[4])
+	portByte1, err := strconv.Atoi(params[4])
 	if err != nil {
-		return nil, err
+		return nil, ErrRemoteAddrFormat
 	}
 
-	p2, err := strconv.Atoi(params[5])
-
+	portByte2, err := strconv.Atoi(params[5])
 	if err != nil {
-		return nil, err
+		return nil, ErrRemoteAddrFormat
 	}
 
-	port := p1<<8 + p2
+	port := portByte1<<8 + portByte2
 
-	return net.ResolveTCPAddr("tcp", fmt.Sprintf("%s:%d", ip, port))
+	addr, err := net.ResolveTCPAddr("tcp", fmt.Sprintf("%s:%d", ipParts, port))
+	if err != nil {
+		err = newNetworkError("could not resolve "+param, err)
+	}
+
+	return addr, err
 }
 
 // Parse EPRT parameter. Full EPRT command format:
 // - IPv4 : "EPRT |1|h1.h2.h3.h4|port|\r\n"
 // - IPv6 : "EPRT |2|h1::h2:h3:h4:h5|port|\r\n"
-func parseEPRTAddr(param string) (addr *net.TCPAddr, err error) {
+func parseEPRTAddr(param string) (*net.TCPAddr, error) {
+	var addr *net.TCPAddr
+	var err error
+
 	params := strings.Split(param, "|")
 	if len(params) != 5 {
 		return nil, ErrRemoteAddrFormat
@@ -181,13 +186,13 @@ func parseEPRTAddr(param string) (addr *net.TCPAddr, err error) {
 		return nil, ErrRemoteAddrFormat
 	}
 
-	var ip net.IP
+	var ipAddress net.IP
 
 	switch netProtocol {
 	case "1", "2":
 		// use protocol 1 means IPv4. 2 means IPv6
 		// net.ParseIP for validate IP
-		if ip = net.ParseIP(remoteIP); ip == nil {
+		if ipAddress = net.ParseIP(remoteIP); ipAddress == nil {
 			return nil, ErrRemoteAddrFormat
 		}
 	default:
@@ -195,5 +200,10 @@ func parseEPRTAddr(param string) (addr *net.TCPAddr, err error) {
 		return nil, ErrRemoteAddrFormat
 	}
 
-	return net.ResolveTCPAddr("tcp", net.JoinHostPort(ip.String(), strconv.Itoa(portI)))
+	addr, err = net.ResolveTCPAddr("tcp", net.JoinHostPort(ipAddress.String(), strconv.Itoa(portI)))
+	if err != nil {
+		err = newNetworkError(fmt.Sprintf("could not resolve addr %v:%v", ipAddress, portI), err)
+	}
+
+	return addr, err
 }

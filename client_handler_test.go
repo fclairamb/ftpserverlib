@@ -27,18 +27,16 @@ func TestConcurrency(t *testing.T) {
 				Password: authPass,
 			}
 
-			var err error
-			var c *goftp.Client
-
-			if c, err = goftp.DialConfig(conf, server.Addr()); err != nil {
+			client, err := goftp.DialConfig(conf, server.Addr())
+			if err != nil {
 				panic(fmt.Sprintf("Couldn't connect: %v", err))
 			}
 
-			if _, err = c.ReadDir("/"); err != nil {
+			if _, err = client.ReadDir("/"); err != nil {
 				panic(fmt.Sprintf("Couldn't list dir: %v", err))
 			}
 
-			defer func() { panicOnError(c.Close()) }()
+			defer func() { panicOnError(client.Close()) }()
 
 			waitGroup.Done()
 		}()
@@ -48,8 +46,8 @@ func TestConcurrency(t *testing.T) {
 }
 
 func TestDOS(t *testing.T) {
-	s := NewTestServer(t, true)
-	conn, err := net.DialTimeout("tcp", s.Addr(), 5*time.Second)
+	server := NewTestServer(t, true)
+	conn, err := net.DialTimeout("tcp", server.Addr(), 5*time.Second)
 	require.NoError(t, err)
 
 	defer func() {
@@ -58,24 +56,24 @@ func TestDOS(t *testing.T) {
 	}()
 
 	buf := make([]byte, 128)
-	n, err := conn.Read(buf)
+	readBytes, err := conn.Read(buf)
 	require.NoError(t, err)
 
-	response := string(buf[:n])
+	response := string(buf[:readBytes])
 	require.Equal(t, "220 TEST Server\r\n", response)
 
 	written := 0
 
 	for {
-		n, err = conn.Write([]byte("some text without line ending"))
-		written += n
+		readBytes, err = conn.Write([]byte("some text without line ending"))
+		written += readBytes
 
 		if err != nil {
 			break
 		}
 
 		if written > 4096 {
-			s.Logger.Warn("test DOS",
+			server.Logger.Warn("test DOS",
 				"bytes written", written)
 		}
 	}
@@ -92,18 +90,18 @@ func TestLastDataChannel(t *testing.T) {
 }
 
 func TestTransferOpenError(t *testing.T) {
-	s := NewTestServer(t, false)
+	server := NewTestServer(t, false)
 	conf := goftp.Config{
 		User:     authUser,
 		Password: authPass,
 	}
 
-	c, err := goftp.DialConfig(conf, s.Addr())
+	client, err := goftp.DialConfig(conf, server.Addr())
 	require.NoError(t, err, "Couldn't connect")
 
-	defer func() { panicOnError(c.Close()) }()
+	defer func() { panicOnError(client.Close()) }()
 
-	raw, err := c.OpenRawConn()
+	raw, err := client.OpenRawConn()
 	require.NoError(t, err, "Couldn't open raw connection")
 
 	defer func() { require.NoError(t, raw.Close()) }()
@@ -116,7 +114,10 @@ func TestTransferOpenError(t *testing.T) {
 }
 
 func TestTLSMethods(t *testing.T) {
+	t.Parallel()
+
 	t.Run("without-tls", func(t *testing.T) {
+		t.Parallel()
 		cc := clientHandler{
 			server: NewTestServer(t, false),
 		}
@@ -125,7 +126,8 @@ func TestTLSMethods(t *testing.T) {
 	})
 
 	t.Run("with-implicit-tls", func(t *testing.T) {
-		s := NewTestServerWithTestDriver(t, &TestServerDriver{
+		t.Parallel()
+		server := NewTestServerWithTestDriver(t, &TestServerDriver{
 			Settings: &Settings{
 				TLSRequired: ImplicitEncryption,
 			},
@@ -133,7 +135,7 @@ func TestTLSMethods(t *testing.T) {
 			Debug: false,
 		})
 		cc := clientHandler{
-			server: s,
+			server: server,
 		}
 		require.True(t, cc.HasTLSForControl())
 		require.True(t, cc.HasTLSForTransfers())
@@ -173,24 +175,24 @@ func TestCloseConnection(t *testing.T) {
 	driver := &TestServerDriver{
 		Debug: false,
 	}
-	s := NewTestServerWithTestDriver(t, driver)
+	server := NewTestServerWithTestDriver(t, driver)
 
 	conf := goftp.Config{
 		User:     authUser,
 		Password: authPass,
 	}
 
-	c, err := goftp.DialConfig(conf, s.Addr())
+	client, err := goftp.DialConfig(conf, server.Addr())
 	require.NoError(t, err, "Couldn't connect")
 
-	ftpUpload(t, c, createTemporaryFile(t, 1024*1024), "file.bin")
+	ftpUpload(t, client, createTemporaryFile(t, 1024*1024), "file.bin")
 
 	require.Len(t, driver.GetClientsInfo(), 1)
 
-	err = c.Rename("file.bin", "delay-io.bin")
+	err = client.Rename("file.bin", "delay-io.bin")
 	require.NoError(t, err)
 
-	raw, err := c.OpenRawConn()
+	raw, err := client.OpenRawConn()
 	require.NoError(t, err)
 
 	defer func() { require.NoError(t, raw.Close()) }()
@@ -214,30 +216,30 @@ func TestCloseConnection(t *testing.T) {
 
 func TestClientContextConcurrency(t *testing.T) {
 	driver := &TestServerDriver{}
-	s := NewTestServerWithTestDriver(t, driver)
+	server := NewTestServerWithTestDriver(t, driver)
 
 	conf := goftp.Config{
 		User:     authUser,
 		Password: authPass,
 	}
 
-	c, err := goftp.DialConfig(conf, s.Addr())
+	client, err := goftp.DialConfig(conf, server.Addr())
 	require.NoError(t, err, "Couldn't connect")
 
-	defer func() { panicOnError(c.Close()) }()
+	defer func() { panicOnError(client.Close()) }()
 
 	done := make(chan bool, 1)
 	connected := make(chan bool, 1)
 
 	go func() {
-		_, err := c.Getwd()
+		_, err := client.Getwd()
 		assert.NoError(t, err)
 		connected <- true
 
 		counter := 0
 
 		for counter < 100 {
-			_, err := c.Getwd()
+			_, err := client.Getwd()
 			assert.NoError(t, err)
 
 			counter++
@@ -323,13 +325,13 @@ func isStringInSlice(s string, list []string) bool {
 }
 
 func TestUnknownCommand(t *testing.T) {
-	s := NewTestServer(t, false)
+	server := NewTestServer(t, false)
 	conf := goftp.Config{
 		User:     authUser,
 		Password: authPass,
 	}
 
-	c, err := goftp.DialConfig(conf, s.Addr())
+	c, err := goftp.DialConfig(conf, server.Addr())
 	require.NoError(t, err, "Couldn't connect")
 
 	defer func() { panicOnError(c.Close()) }()
@@ -351,12 +353,12 @@ type testNetConn struct {
 	remoteAddr net.Addr
 }
 
-func (*testNetConn) Read(_ []byte) (n int, err error) {
-	return
+func (*testNetConn) Read(_ []byte) (int, error) {
+	return 0, nil
 }
 
-func (*testNetConn) Write(_ []byte) (n int, err error) {
-	return
+func (*testNetConn) Write(_ []byte) (int, error) {
+	return 0, nil
 }
 
 func (*testNetConn) Close() error {
@@ -405,9 +407,10 @@ func (*testNetListener) Addr() net.Addr {
 }
 
 func TestDataConnectionRequirements(t *testing.T) {
+	req := require.New(t)
 	controlConnIP := net.ParseIP("192.168.1.1")
 
-	c := clientHandler{
+	cltHandler := clientHandler{
 		conn: &testNetConn{
 			remoteAddr: &net.TCPAddr{IP: controlConnIP, Port: 21},
 		},
@@ -419,39 +422,39 @@ func TestDataConnectionRequirements(t *testing.T) {
 		},
 	}
 
-	err := c.checkDataConnectionRequirement(controlConnIP, DataChannelPassive)
-	assert.NoError(t, err) // ip match
+	err := cltHandler.checkDataConnectionRequirement(controlConnIP, DataChannelPassive)
+	req.NoError(err) // ip match
 
-	err = c.checkDataConnectionRequirement(net.ParseIP("192.168.1.2"), DataChannelActive)
+	err = cltHandler.checkDataConnectionRequirement(net.ParseIP("192.168.1.2"), DataChannelActive)
 	if assert.Error(t, err) {
 		assert.Contains(t, err.Error(), "does not match control connection ip address")
 	}
 
-	c.conn = &testNetConn{
+	cltHandler.conn = &testNetConn{
 		remoteAddr: &net.IPAddr{IP: controlConnIP},
 	}
 
-	err = c.checkDataConnectionRequirement(controlConnIP, DataChannelPassive)
-	assert.Error(t, err)
+	err = cltHandler.checkDataConnectionRequirement(controlConnIP, DataChannelPassive)
+	req.Error(err)
 
 	// nil remote address
-	c.conn = &testNetConn{}
-	err = c.checkDataConnectionRequirement(controlConnIP, DataChannelActive)
-	assert.Error(t, err)
+	cltHandler.conn = &testNetConn{}
+	err = cltHandler.checkDataConnectionRequirement(controlConnIP, DataChannelActive)
+	req.Error(err)
 
 	// invalid IP
-	c.conn = &testNetConn{
+	cltHandler.conn = &testNetConn{
 		remoteAddr: &net.TCPAddr{IP: nil, Port: 21},
 	}
 
-	err = c.checkDataConnectionRequirement(controlConnIP, DataChannelPassive)
+	err = cltHandler.checkDataConnectionRequirement(controlConnIP, DataChannelPassive)
 	if assert.Error(t, err) {
 		assert.Contains(t, err.Error(), "invalid remote IP")
 	}
 
 	// invalid setting
-	c.server.settings.PasvConnectionsCheck = 100
-	err = c.checkDataConnectionRequirement(controlConnIP, DataChannelPassive)
+	cltHandler.server.settings.PasvConnectionsCheck = 100
+	err = cltHandler.checkDataConnectionRequirement(controlConnIP, DataChannelPassive)
 
 	if assert.Error(t, err) {
 		assert.Contains(t, err.Error(), "unhandled data connection requirement")
@@ -462,14 +465,14 @@ func TestExtraData(t *testing.T) {
 	driver := &TestServerDriver{
 		Debug: false,
 	}
-	s := NewTestServerWithTestDriver(t, driver)
+	server := NewTestServerWithTestDriver(t, driver)
 
 	conf := goftp.Config{
 		User:     authUser,
 		Password: authPass,
 	}
 
-	c, err := goftp.DialConfig(conf, s.Addr())
+	c, err := goftp.DialConfig(conf, server.Addr())
 	require.NoError(t, err, "Couldn't connect")
 
 	defer func() { panicOnError(c.Close()) }()

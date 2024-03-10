@@ -43,7 +43,7 @@ func (c *clientHandler) handleRETR(param string) error {
 
 // File transfer, read or write, seek or not, is basically the same.
 // To make sure we don't miss any step, we execute everything in order
-func (c *clientHandler) transferFile(write bool, append bool, param, info string) {
+func (c *clientHandler) transferFile(write bool, appendFile bool, param, info string) {
 	var file FileTransfer
 	var err error
 	var fileFlag int
@@ -51,9 +51,9 @@ func (c *clientHandler) transferFile(write bool, append bool, param, info string
 	path := c.absPath(param)
 
 	// We try to open the file
-	if write {
+	if write { //nolint:nestif // too much effort to change for now
 		fileFlag = os.O_WRONLY
-		if append {
+		if appendFile {
 			fileFlag |= os.O_CREATE | os.O_APPEND
 			// ignore the seek position for append mode
 			c.ctxRest = 0
@@ -70,7 +70,6 @@ func (c *clientHandler) transferFile(write bool, append bool, param, info string
 	}
 
 	file, err = c.getFileHandle(path, fileFlag, c.ctxRest)
-
 	// If this fail, can stop right here and reset the seek position
 	if err != nil {
 		if !c.isCommandAborted() {
@@ -100,7 +99,7 @@ func (c *clientHandler) transferFile(write bool, append bool, param, info string
 		}
 	}
 
-	tr, err := c.TransferOpen(info)
+	fileTransferConn, err := c.TransferOpen(info)
 	if err != nil {
 		if fileTransferError, ok := file.(FileTransferError); ok {
 			fileTransferError.TransferError(err)
@@ -112,7 +111,7 @@ func (c *clientHandler) transferFile(write bool, append bool, param, info string
 		return
 	}
 
-	err = c.doFileTransfer(tr, file, write)
+	err = c.doFileTransfer(fileTransferConn, file, write)
 	// we ignore close error for reads
 	if errClose := file.Close(); errClose != nil && err == nil && write {
 		err = errClose
@@ -122,32 +121,32 @@ func (c *clientHandler) transferFile(write bool, append bool, param, info string
 	c.TransferClose(err)
 }
 
-func (c *clientHandler) doFileTransfer(tr net.Conn, file io.ReadWriter, write bool) error {
+func (c *clientHandler) doFileTransfer(transferConn net.Conn, file io.ReadWriter, write bool) error {
 	var err error
-	var in io.Reader
-	var out io.Writer
+	var reader io.Reader
+	var writer io.Writer
 
 	conversionMode := convertModeToCRLF
 
 	// Copy the data
 	if write { // ... from the connection to the file
-		in = tr
-		out = file
+		reader = transferConn
+		writer = file
 
 		if runtime.GOOS != "windows" {
 			conversionMode = convertModeToLF
 		}
 	} else { // ... from the file to the connection
-		in = file
-		out = tr
+		reader = file
+		writer = transferConn
 	}
 
 	if c.currentTransferType == TransferTypeASCII {
-		in = newASCIIConverter(in, conversionMode)
+		reader = newASCIIConverter(reader, conversionMode)
 	}
 
 	// for reads io.EOF isn't an error, for writes it must be considered an error
-	if written, errCopy := io.Copy(out, in); errCopy != nil && (errCopy != io.EOF || write) {
+	if written, errCopy := io.Copy(writer, reader); errCopy != nil && (errors.Is(errCopy, io.EOF) || write) {
 		err = errCopy
 	} else {
 		c.logger.Debug(
@@ -156,7 +155,7 @@ func (c *clientHandler) doFileTransfer(tr net.Conn, file io.ReadWriter, write bo
 		)
 
 		if written == 0 {
-			_, err = out.Write([]byte{})
+			_, err = writer.Write([]byte{})
 		}
 	}
 
@@ -164,6 +163,8 @@ func (c *clientHandler) doFileTransfer(tr net.Conn, file io.ReadWriter, write bo
 		if fileTransferError, ok := file.(FileTransferError); ok {
 			fileTransferError.TransferError(err)
 		}
+
+		err = newNetworkError("error transferring data", err)
 	}
 
 	return err
@@ -351,7 +352,7 @@ func (c *clientHandler) handleSYMLINK(params string) {
 func (c *clientHandler) handleDELE(param string) error {
 	path := c.absPath(param)
 	if err := c.driver.Remove(path); err == nil {
-		c.writeMessage(StatusFileOK, fmt.Sprintf("Removed file %s", path))
+		c.writeMessage(StatusFileOK, "Removed file "+path)
 	} else {
 		c.writeMessage(StatusActionNotTaken, fmt.Sprintf("Couldn't delete %s: %v", path, err))
 	}
@@ -406,7 +407,7 @@ func (c *clientHandler) handleSIZE(param string) error {
 
 	path := c.absPath(param)
 	if info, err := c.driver.Stat(path); err == nil {
-		c.writeMessage(StatusFileStatus, fmt.Sprintf("%d", info.Size()))
+		c.writeMessage(StatusFileStatus, strconv.FormatInt(info.Size(), 10))
 	} else {
 		c.writeMessage(StatusActionNotTaken, fmt.Sprintf("Couldn't access %s: %v", path, err))
 	}
@@ -417,44 +418,49 @@ func (c *clientHandler) handleSIZE(param string) error {
 func (c *clientHandler) handleSTATFile(param string) error {
 	path := c.absPath(param)
 
-	if info, err := c.driver.Stat(path); err == nil {
-		if info.IsDir() {
-			var files []os.FileInfo
-			var errList error
+	info, err := c.driver.Stat(path)
+	if err != nil {
+		c.writeMessage(StatusFileActionNotTaken, fmt.Sprintf("Could not STAT: %v", err))
 
-			directoryPath := c.absPath(param)
+		return nil
+	}
 
-			if fileList, ok := c.driver.(ClientDriverExtensionFileList); ok {
-				files, errList = fileList.ReadDir(directoryPath)
-			} else {
-				directory, errOpenFile := c.driver.Open(c.absPath(param))
+	if !info.IsDir() {
+		defer c.multilineAnswer(StatusFileStatus, fmt.Sprintf("STAT %v", param))()
 
-				if errOpenFile != nil {
-					c.writeMessage(StatusFileActionNotTaken, fmt.Sprintf("Could not list: %v", errOpenFile))
+		c.writeLine(" " + c.fileStat(info))
 
-					return nil
-				}
+		return nil
+	}
 
-				files, errList = directory.Readdir(-1)
-				c.closeDirectory(directoryPath, directory)
-			}
+	var files []os.FileInfo
+	var errList error
 
-			if errList == nil {
-				defer c.multilineAnswer(StatusDirectoryStatus, fmt.Sprintf("STAT %v", param))()
+	directoryPath := c.absPath(param)
 
-				for _, f := range files {
-					c.writeLine(fmt.Sprintf(" %s", c.fileStat(f)))
-				}
-			} else {
-				c.writeMessage(StatusFileActionNotTaken, fmt.Sprintf("Could not list: %v", errList))
-			}
-		} else {
-			defer c.multilineAnswer(StatusFileStatus, fmt.Sprintf("STAT %v", param))()
+	if fileList, ok := c.driver.(ClientDriverExtensionFileList); ok {
+		files, errList = fileList.ReadDir(directoryPath)
+	} else {
+		directory, errOpenFile := c.driver.Open(c.absPath(param))
 
-			c.writeLine(fmt.Sprintf(" %s", c.fileStat(info)))
+		if errOpenFile != nil {
+			c.writeMessage(StatusFileActionNotTaken, fmt.Sprintf("Could not list: %v", errOpenFile))
+
+			return nil
+		}
+
+		files, errList = directory.Readdir(-1)
+		c.closeDirectory(directoryPath, directory)
+	}
+
+	if errList == nil {
+		defer c.multilineAnswer(StatusDirectoryStatus, fmt.Sprintf("STAT %v", param))()
+
+		for _, f := range files {
+			c.writeLine(" %s" + c.fileStat(f))
 		}
 	} else {
-		c.writeMessage(StatusFileActionNotTaken, fmt.Sprintf("Could not STAT: %v", err))
+		c.writeMessage(StatusFileActionNotTaken, fmt.Sprintf("Could not list: %v", errList))
 	}
 
 	return nil
@@ -487,18 +493,21 @@ func (c *clientHandler) handleMLST(param string) error {
 
 func (c *clientHandler) handleALLO(param string) error {
 	// We should probably add a method in the driver
-	if size, err := strconv.Atoi(param); err == nil {
-		if alloInt, ok := c.driver.(ClientDriverExtensionAllocate); !ok {
-			c.writeMessage(StatusNotImplemented, "This extension hasn't been implemented !")
-		} else {
-			if errAllocate := alloInt.AllocateSpace(size); errAllocate != nil {
-				c.writeMessage(StatusActionNotTaken, fmt.Sprintf("Couldn't alloInt: %v", errAllocate))
-			} else {
-				c.writeMessage(StatusOK, "Done !")
-			}
-		}
-	} else {
+	size, err := strconv.Atoi(param)
+	if err != nil {
 		c.writeMessage(StatusSyntaxErrorParameters, fmt.Sprintf("Couldn't parse size: %v", err))
+
+		return nil
+	}
+
+	if alloInt, ok := c.driver.(ClientDriverExtensionAllocate); !ok {
+		c.writeMessage(StatusNotImplemented, "This extension hasn't been implemented !")
+	} else {
+		if errAllocate := alloInt.AllocateSpace(size); errAllocate != nil {
+			c.writeMessage(StatusActionNotTaken, fmt.Sprintf("Couldn't alloInt: %v", errAllocate))
+		} else {
+			c.writeMessage(StatusOK, "Done !")
+		}
 	}
 
 	return nil
@@ -536,8 +545,9 @@ func (c *clientHandler) handleMDTM(param string) error {
 func (c *clientHandler) handleMFMT(param string) error {
 	params := strings.SplitN(param, " ", 2)
 	if len(params) != 2 {
-		c.writeMessage(StatusSyntaxErrorNotRecognised, fmt.Sprintf(
-			"Couldn't set mtime, not enough params, given: %s", param))
+		c.writeMessage(StatusSyntaxErrorNotRecognised,
+			"Couldn't set mtime, not enough params, given: "+param,
+		)
 
 		return nil
 	}
@@ -617,7 +627,7 @@ func (c *clientHandler) handleGenericHash(param string, algo HASHAlgo, isCustomM
 	// to support partial hash also for the HASH command, we should implement RANG,
 	// but it applies also to uploads/downloads and so it complicates their handling,
 	// we'll add this support in future improvements
-	if isCustomMode {
+	if isCustomMode { //nolint:nestif // too much effort to change for now
 		// for custom command the range can be specified in this way:
 		// XSHA1 <file> <start> <end>
 		if len(args) > 1 {
@@ -668,27 +678,26 @@ func (c *clientHandler) handleGenericHash(param string, algo HASHAlgo, isCustomM
 }
 
 func (c *clientHandler) computeHashForFile(filePath string, algo HASHAlgo, start, end int64) (string, error) {
-	var h hash.Hash
+	var chosenHashAlgo hash.Hash
 	var file FileTransfer
 	var err error
 
 	switch algo {
 	case HASHAlgoCRC32:
-		h = crc32.NewIEEE()
+		chosenHashAlgo = crc32.NewIEEE()
 	case HASHAlgoMD5:
-		h = md5.New() //nolint:gosec
+		chosenHashAlgo = md5.New() //nolint:gosec
 	case HASHAlgoSHA1:
-		h = sha1.New() //nolint:gosec
+		chosenHashAlgo = sha1.New() //nolint:gosec
 	case HASHAlgoSHA256:
-		h = sha256.New()
+		chosenHashAlgo = sha256.New()
 	case HASHAlgoSHA512:
-		h = sha512.New()
+		chosenHashAlgo = sha512.New()
 	default:
 		return "", errUnknowHash
 	}
 
 	file, err = c.getFileHandle(filePath, os.O_RDONLY, start)
-
 	if err != nil {
 		return "", err
 	}
@@ -698,25 +707,35 @@ func (c *clientHandler) computeHashForFile(filePath string, algo HASHAlgo, start
 	if start > 0 {
 		_, err = file.Seek(start, io.SeekStart)
 		if err != nil {
-			return "", err
+			return "", newFileAccessError("couldn't seek file", err)
 		}
 	}
 
-	_, err = io.CopyN(h, file, end-start)
+	_, err = io.CopyN(chosenHashAlgo, file, end-start)
 
-	if err != nil && err != io.EOF {
-		return "", err
+	if err != nil && errors.Is(err, io.EOF) {
+		return "", newFileAccessError("couldn't read file", err)
 	}
 
-	return hex.EncodeToString(h.Sum(nil)), nil
+	return hex.EncodeToString(chosenHashAlgo.Sum(nil)), nil
 }
 
 func (c *clientHandler) getFileHandle(name string, flags int, offset int64) (FileTransfer, error) {
 	if fileTransfer, ok := c.driver.(ClientDriverExtentionFileTransfer); ok {
-		return fileTransfer.GetHandle(name, flags, offset)
+		ft, err := fileTransfer.GetHandle(name, flags, offset)
+		if err != nil {
+			err = newDriverError("calling GetHandle", err)
+		}
+
+		return ft, err
 	}
 
-	return c.driver.OpenFile(name, flags, os.ModePerm)
+	file, err := c.driver.OpenFile(name, flags, os.ModePerm)
+	if err != nil {
+		err = newDriverError("calling OpenFile", err)
+	}
+
+	return file, err
 }
 
 func (c *clientHandler) closeUnchecked(file io.Closer) {
@@ -740,5 +759,10 @@ func unquoteSpaceSeparatedParams(params string) ([]string, error) {
 	reader := csv.NewReader(strings.NewReader(params))
 	reader.Comma = ' ' // space
 
-	return reader.Read()
+	spl, err := reader.Read()
+	if err != nil {
+		return nil, fmt.Errorf("error parsing params: %w", err)
+	}
+
+	return spl, nil
 }

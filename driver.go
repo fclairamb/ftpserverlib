@@ -78,23 +78,12 @@ type ClientDriver interface {
 
 // ClientDriverExtensionAllocate is an extension to support the "ALLO" - file allocation - command
 type ClientDriverExtensionAllocate interface {
-
 	// AllocateSpace reserves the space necessary to upload files
 	AllocateSpace(size int) error
 }
 
-/*
-// ClientDriverExtensionChown is an extension to support the "CHOWN" - owner change - command
-type ClientDriverExtensionChown interface {
-
-	// Chown changes the owner of a file
-	Chown(name string, user string, group string) error
-}
-*/
-
 // ClientDriverExtensionSymlink is an extension to support the "SITE SYMLINK" - symbolic link creation - command
 type ClientDriverExtensionSymlink interface {
-
 	// Symlink creates a symlink
 	Symlink(oldname, newname string) error
 
@@ -105,7 +94,6 @@ type ClientDriverExtensionSymlink interface {
 // ClientDriverExtensionFileList is a convenience extension to allow to return file listing
 // without requiring to implement the methods Open/Readdir for your custom afero.File
 type ClientDriverExtensionFileList interface {
-
 	// ReadDir reads the directory named by name and return a list of directory entries.
 	ReadDir(name string) ([]os.FileInfo, error)
 }
@@ -113,7 +101,6 @@ type ClientDriverExtensionFileList interface {
 // ClientDriverExtentionFileTransfer is a convenience extension to allow to transfer files
 // without requiring to implement the methods Create/Open/OpenFile for your custom afero.File.
 type ClientDriverExtentionFileTransfer interface {
-
 	// GetHandle return an handle to upload or download a file based on flags:
 	// os.O_RDONLY indicates a download
 	// os.O_WRONLY indicates an upload and can be combined with os.O_APPEND (resume) or

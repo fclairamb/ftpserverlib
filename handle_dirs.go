@@ -17,7 +17,7 @@ import (
 var errFileList = errors.New("listing a file isn't allowed")
 
 // the order matter, put parameters with more characters first
-var supportedlistArgs = []string{"-al", "-la", "-a", "-l"}
+var supportedlistArgs = []string{"-al", "-la", "-a", "-l"} //nolint:gochecknoglobals
 
 func (c *clientHandler) absPath(p string) string {
 	if path.IsAbs(p) {
@@ -29,44 +29,44 @@ func (c *clientHandler) absPath(p string) string {
 
 // getRelativePath returns the specified path as relative to the
 // current working directory. The specified path must be cleaned
-func (c *clientHandler) getRelativePath(p string) string {
-	var sb strings.Builder
+func (c *clientHandler) getRelativePath(inputPath string) string {
+	var builder strings.Builder
 	base := c.Path()
 
 	for {
-		if base == p {
-			return sb.String()
+		if base == inputPath {
+			return builder.String()
 		}
 
 		if !strings.HasSuffix(base, "/") {
 			base += "/"
 		}
 
-		if strings.HasPrefix(p, base) {
-			sb.WriteString(strings.TrimPrefix(p, base))
+		if strings.HasPrefix(inputPath, base) {
+			builder.WriteString(strings.TrimPrefix(inputPath, base))
 
-			return sb.String()
+			return builder.String()
 		}
 
 		if base == "/" || base == "./" {
-			return p
+			return inputPath
 		}
 
-		sb.WriteString("../")
+		builder.WriteString("../")
 
 		base = path.Dir(path.Clean(base))
 	}
 }
 
 func (c *clientHandler) handleCWD(param string) error {
-	p := c.absPath(param)
+	pathAbsolute := c.absPath(param)
 
-	if stat, err := c.driver.Stat(p); err == nil {
+	if stat, err := c.driver.Stat(pathAbsolute); err == nil {
 		if stat.IsDir() {
-			c.SetPath(p)
-			c.writeMessage(StatusFileOK, fmt.Sprintf("CD worked on %s", p))
+			c.SetPath(pathAbsolute)
+			c.writeMessage(StatusFileOK, "CD worked on "+pathAbsolute)
 		} else {
-			c.writeMessage(StatusActionNotTaken, fmt.Sprintf("Can't change directory to %s: Not a Directory", p))
+			c.writeMessage(StatusActionNotTaken, fmt.Sprintf("Can't change directory to %s: Not a Directory", pathAbsolute))
 		}
 	} else {
 		c.writeMessage(StatusActionNotTaken, fmt.Sprintf("CD issue: %v", err))
@@ -76,13 +76,13 @@ func (c *clientHandler) handleCWD(param string) error {
 }
 
 func (c *clientHandler) handleMKD(param string) error {
-	p := c.absPath(param)
-	if err := c.driver.Mkdir(p, 0755); err == nil {
+	pathAbsolute := c.absPath(param)
+	if err := c.driver.Mkdir(pathAbsolute, 0o755); err == nil {
 		// handleMKD confirms to "quote-doubling"
 		// https://tools.ietf.org/html/rfc959 , page 63
-		c.writeMessage(StatusPathCreated, fmt.Sprintf(`Created dir "%s"`, quoteDoubling(p)))
+		c.writeMessage(StatusPathCreated, fmt.Sprintf(`Created dir "%s"`, quoteDoubling(pathAbsolute)))
 	} else {
-		c.writeMessage(StatusActionNotTaken, fmt.Sprintf(`Could not create "%s" : %v`, quoteDoubling(p), err))
+		c.writeMessage(StatusActionNotTaken, fmt.Sprintf(`Could not create "%s" : %v`, quoteDoubling(pathAbsolute), err))
 	}
 
 	return nil
@@ -97,8 +97,8 @@ func (c *clientHandler) handleMKDIR(params string) {
 
 	p := c.absPath(params)
 
-	if err := c.driver.MkdirAll(p, 0755); err == nil {
-		c.writeMessage(StatusFileOK, fmt.Sprintf("Created dir %s", p))
+	if err := c.driver.MkdirAll(p, 0o755); err == nil {
+		c.writeMessage(StatusFileOK, "Created dir "+p)
 	} else {
 		c.writeMessage(StatusActionNotTaken, fmt.Sprintf("Couldn't create dir %s: %v", p, err))
 	}
@@ -107,18 +107,18 @@ func (c *clientHandler) handleMKDIR(params string) {
 func (c *clientHandler) handleRMD(param string) error {
 	var err error
 
-	p := c.absPath(param)
+	pathAbsolute := c.absPath(param)
 
 	if rmd, ok := c.driver.(ClientDriverExtensionRemoveDir); ok {
-		err = rmd.RemoveDir(p)
+		err = rmd.RemoveDir(pathAbsolute)
 	} else {
-		err = c.driver.Remove(p)
+		err = c.driver.Remove(pathAbsolute)
 	}
 
 	if err == nil {
-		c.writeMessage(StatusFileOK, fmt.Sprintf("Deleted dir %s", p))
+		c.writeMessage(StatusFileOK, "Deleted dir "+pathAbsolute)
 	} else {
-		c.writeMessage(StatusActionNotTaken, fmt.Sprintf("Could not delete dir %s: %v", p, err))
+		c.writeMessage(StatusActionNotTaken, fmt.Sprintf("Could not delete dir %s: %v", pathAbsolute, err))
 	}
 
 	return nil
@@ -134,7 +134,7 @@ func (c *clientHandler) handleRMDIR(params string) {
 	p := c.absPath(params)
 
 	if err := c.driver.RemoveAll(p); err == nil {
-		c.writeMessage(StatusFileOK, fmt.Sprintf("Removed dir %s", p))
+		c.writeMessage(StatusFileOK, "Removed dir "+p)
 	} else {
 		c.writeMessage(StatusActionNotTaken, fmt.Sprintf("Couldn't remove dir %s: %v", p, err))
 	}
@@ -148,7 +148,7 @@ func (c *clientHandler) handleCDUP(_ string) error {
 
 	if _, err := c.driver.Stat(parent); err == nil {
 		c.SetPath(parent)
-		c.writeMessage(StatusFileOK, fmt.Sprintf("CDUP worked on %s", parent))
+		c.writeMessage(StatusFileOK, "CDUP worked on "+parent)
 	} else {
 		c.writeMessage(StatusActionNotTaken, fmt.Sprintf("CDUP issue: %v", err))
 	}
@@ -188,7 +188,7 @@ func (c *clientHandler) checkLISTArgs(args string) string {
 func (c *clientHandler) handleLIST(param string) error {
 	info := fmt.Sprintf("LIST %v", param)
 
-	if files, _, err := c.getFileList(param, true); err == nil || err == io.EOF {
+	if files, _, err := c.getFileList(param, true); err == nil || errors.Is(err, io.EOF) {
 		if tr, errTr := c.TransferOpen(info); errTr == nil {
 			err = c.dirTransferLIST(tr, files)
 			c.TransferClose(err)
@@ -207,7 +207,7 @@ func (c *clientHandler) handleLIST(param string) error {
 func (c *clientHandler) handleNLST(param string) error {
 	info := fmt.Sprintf("NLST %v", param)
 
-	if files, parentDir, err := c.getFileList(param, true); err == nil || err == io.EOF {
+	if files, parentDir, err := c.getFileList(param, true); err == nil || errors.Is(err, io.EOF) {
 		if tr, errTrOpen := c.TransferOpen(info); errTrOpen == nil {
 			err = c.dirTransferNLST(tr, files, parentDir)
 			c.TransferClose(err)
@@ -223,9 +223,12 @@ func (c *clientHandler) handleNLST(param string) error {
 	return nil
 }
 
-func (c *clientHandler) dirTransferNLST(w io.Writer, files []os.FileInfo, parentDir string) error {
+func (c *clientHandler) dirTransferNLST(writer io.Writer, files []os.FileInfo, parentDir string) error {
 	if len(files) == 0 {
-		_, err := w.Write([]byte(""))
+		_, err := writer.Write([]byte(""))
+		if err != nil {
+			err = newNetworkError("couldn't send NLST data", err)
+		}
 
 		return err
 	}
@@ -234,8 +237,8 @@ func (c *clientHandler) dirTransferNLST(w io.Writer, files []os.FileInfo, parent
 		// Based on RFC 959 NLST is intended to return information that can be used
 		// by a program to further process the files automatically.
 		// So we return paths relative to the current working directory
-		if _, err := fmt.Fprintf(w, "%s\r\n", path.Join(c.getRelativePath(parentDir), file.Name())); err != nil {
-			return err
+		if _, err := fmt.Fprintf(writer, "%s\r\n", path.Join(c.getRelativePath(parentDir), file.Name())); err != nil {
+			return newNetworkError("couldn't send NLST data", err)
 		}
 	}
 
@@ -251,7 +254,7 @@ func (c *clientHandler) handleMLSD(param string) error {
 
 	info := fmt.Sprintf("MLSD %v", param)
 
-	if files, _, err := c.getFileList(param, false); err == nil || err == io.EOF {
+	if files, _, err := c.getFileList(param, false); err == nil || errors.Is(err, io.EOF) {
 		if tr, errTr := c.TransferOpen(info); errTr == nil {
 			err = c.dirTransferMLSD(tr, files)
 			c.TransferClose(err)
@@ -272,6 +275,8 @@ const (
 	dateFormatStatYear      = "Jan _2  2006"          // LIST date formatting with year
 	dateFormatStatOldSwitch = time.Hour * 24 * 30 * 6 // 6 months ago
 	dateFormatMLSD          = "20060102150405"        // MLSD date formatting
+	fakeUser                = "ftp"
+	fakeGroup               = "ftp"
 )
 
 func (c *clientHandler) fileStat(file os.FileInfo) string {
@@ -286,8 +291,10 @@ func (c *clientHandler) fileStat(file os.FileInfo) string {
 	}
 
 	return fmt.Sprintf(
-		"%s 1 ftp ftp %12d %s %s",
+		"%s 1 %s %s %12d %s %s",
 		file.Mode(),
+		fakeUser,
+		fakeGroup,
 		file.Size(),
 		file.ModTime().Format(dateFormat),
 		file.Name(),
@@ -295,16 +302,19 @@ func (c *clientHandler) fileStat(file os.FileInfo) string {
 }
 
 // fclairamb (2018-02-13): #64: Removed extra empty line
-func (c *clientHandler) dirTransferLIST(w io.Writer, files []os.FileInfo) error {
+func (c *clientHandler) dirTransferLIST(writer io.Writer, files []os.FileInfo) error {
 	if len(files) == 0 {
-		_, err := w.Write([]byte(""))
+		_, err := writer.Write([]byte(""))
+		if err != nil {
+			err = newNetworkError("error writing LIST entry", err)
+		}
 
 		return err
 	}
 
 	for _, file := range files {
-		if _, err := fmt.Fprintf(w, "%s\r\n", c.fileStat(file)); err != nil {
-			return err
+		if _, err := fmt.Fprintf(writer, "%s\r\n", c.fileStat(file)); err != nil {
+			return fmt.Errorf("error writing LIST entry: %w", err)
 		}
 	}
 
@@ -312,22 +322,26 @@ func (c *clientHandler) dirTransferLIST(w io.Writer, files []os.FileInfo) error 
 }
 
 // fclairamb (2018-02-13): #64: Removed extra empty line
-func (c *clientHandler) dirTransferMLSD(w io.Writer, files []os.FileInfo) error {
+func (c *clientHandler) dirTransferMLSD(writer io.Writer, files []os.FileInfo) error {
 	if len(files) == 0 {
-		_, err := w.Write([]byte(""))
+		_, err := writer.Write([]byte(""))
+		if err != nil {
+			err = newNetworkError("error writing MLSD entry", err)
+		}
 
 		return err
 	}
 
 	for _, file := range files {
-		if err := c.writeMLSxEntry(w, file); err != nil {
+		if err := c.writeMLSxEntry(writer, file); err != nil {
 			return err
 		}
 	}
 
 	return nil
 }
-func (c *clientHandler) writeMLSxEntry(w io.Writer, file os.FileInfo) error {
+
+func (c *clientHandler) writeMLSxEntry(writer io.Writer, file os.FileInfo) error {
 	var listType string
 	if file.IsDir() {
 		listType = "dir"
@@ -336,13 +350,16 @@ func (c *clientHandler) writeMLSxEntry(w io.Writer, file os.FileInfo) error {
 	}
 
 	_, err := fmt.Fprintf(
-		w,
+		writer,
 		"Type=%s;Size=%d;Modify=%s; %s\r\n",
 		listType,
 		file.Size(),
 		file.ModTime().UTC().Format(dateFormatMLSD),
 		file.Name(),
 	)
+	if err != nil {
+		err = fmt.Errorf("error writing MLSD entry: %w", err)
+	}
 
 	return err
 }
@@ -358,7 +375,7 @@ func (c *clientHandler) getFileList(param string, filePathAllowed bool) ([]os.Fi
 	// return list of single file if directoryPath points to file and filePathAllowed
 	info, err := c.driver.Stat(listPath)
 	if err != nil {
-		return nil, "", err
+		return nil, "", newFileAccessError("couldn't stat", err)
 	}
 
 	if !info.IsDir() {
@@ -379,7 +396,7 @@ func (c *clientHandler) getFileList(param string, filePathAllowed bool) ([]os.Fi
 
 	directory, errOpenFile := c.driver.Open(listPath)
 	if errOpenFile != nil {
-		return nil, "", errOpenFile
+		return nil, "", newFileAccessError("couldn't open directory", errOpenFile)
 	}
 
 	defer c.closeDirectory(listPath, directory)

@@ -6,10 +6,9 @@ import (
 )
 
 // Handle the "USER" command
-func (c *clientHandler) handleUSER(param string) error {
+func (c *clientHandler) handleUSER(user string) error {
 	if verifier, ok := c.server.driver.(MainDriverExtensionUserVerifier); ok {
-		err := verifier.PreAuthUser(c, param)
-
+		err := verifier.PreAuthUser(c, user)
 		if err != nil {
 			c.writeMessage(StatusNotLoggedIn, fmt.Sprintf("User rejected: %v", err))
 			c.disconnect()
@@ -26,32 +25,47 @@ func (c *clientHandler) handleUSER(param string) error {
 	}
 
 	if c.HasTLSForControl() {
-		if verifier, ok := c.server.driver.(MainDriverExtensionTLSVerifier); ok {
-			if tlsConn, ok := c.conn.(*tls.Conn); ok {
-				driver, err := verifier.VerifyConnection(c, param, tlsConn)
-
-				if err != nil {
-					c.writeMessage(StatusNotLoggedIn, fmt.Sprintf("TLS verification failed: %v", err))
-					c.disconnect()
-
-					return nil
-				}
-
-				if driver != nil {
-					c.user = param
-					c.driver = driver
-					c.writeMessage(StatusUserLoggedIn, "TLS certificate ok, continue")
-
-					return nil
-				}
-			}
+		if c.handleUserTLS(user) {
+			return nil
 		}
 	}
 
-	c.user = param
+	c.user = user
 	c.writeMessage(StatusUserOK, "OK")
 
 	return nil
+}
+
+func (c *clientHandler) handleUserTLS(user string) bool {
+	verifier, interfaceFound := c.server.driver.(MainDriverExtensionTLSVerifier)
+
+	if !interfaceFound {
+		return false
+	}
+
+	tlsConn, interfaceFound := c.conn.(*tls.Conn)
+
+	if !interfaceFound {
+		return false
+	}
+
+	driver, err := verifier.VerifyConnection(c, user, tlsConn)
+	if err != nil {
+		c.writeMessage(StatusNotLoggedIn, fmt.Sprintf("TLS verification failed: %v", err))
+		c.disconnect()
+
+		return true
+	}
+
+	if driver != nil {
+		c.user = user
+		c.driver = driver
+		c.writeMessage(StatusUserLoggedIn, "TLS certificate ok, continue")
+
+		return true
+	}
+
+	return false
 }
 
 // Handle the "PASS" command

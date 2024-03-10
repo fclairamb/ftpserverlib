@@ -3,5 +3,5 @@ ftpserver
 .idea
 .vscode
 debug
-__debug_bin
+__debug_bin*
 *.toml

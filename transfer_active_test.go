@@ -11,6 +11,8 @@ import (
 )
 
 func testRegexMatch(t *testing.T, regexp *regexp.Regexp, strings []string, expectedMatch bool) {
+	t.Helper()
+
 	for _, s := range strings {
 		if regexp.MatchString(s) != expectedMatch {
 			t.Errorf("Invalid match result: %s", s)
@@ -44,15 +46,15 @@ func TestActiveTransferFromPort20(t *testing.T) {
 		Password:        authPass,
 		ActiveTransfers: true,
 	}
-	c, err := goftp.DialConfig(conf, server.Addr())
+	client, err := goftp.DialConfig(conf, server.Addr())
 	require.NoError(t, err, "Couldn't connect")
 
-	defer func() { panicOnError(c.Close()) }()
+	defer func() { panicOnError(client.Close()) }()
 
-	_, err = c.ReadDir("/")
+	_, err = client.ReadDir("/")
 	require.NoError(t, err)
 
 	// the second ReadDir fails if we don't se the SO_REUSEPORT/SO_REUSEADDR socket options
-	_, err = c.ReadDir("/")
+	_, err = client.ReadDir("/")
 	require.NoError(t, err)
 }

@@ -13,7 +13,7 @@ import (
 	log "github.com/fclairamb/go-log"
 )
 
-// HASHAlgo is the enumerable that represents the supported HASH algorithms
+// HASHAlgo is the enumerable that represents the supported HASH algorithms.
 type HASHAlgo int8
 
 // Supported hash algorithms
@@ -25,7 +25,7 @@ const (
 	HASHAlgoSHA512
 )
 
-// TransferType is the enumerable that represents the supported transfer types
+// TransferType is the enumerable that represents the supported transfer types.
 type TransferType int8
 
 // Supported transfer type
@@ -111,21 +111,23 @@ type clientHandler struct {
 }
 
 // newClientHandler initializes a client handler when someone connects
-func (server *FtpServer) newClientHandler(connection net.Conn, id uint32, transferType TransferType) *clientHandler {
-	p := &clientHandler{
+func (server *FtpServer) newClientHandler(
+	connection net.Conn,
+	clientID uint32,
+	transferType TransferType,
+) *clientHandler {
+	return &clientHandler{
 		server:              server,
 		conn:                connection,
-		id:                  id,
+		id:                  clientID,
 		writer:              bufio.NewWriter(connection),
 		reader:              bufio.NewReaderSize(connection, maxCommandSize),
 		connectedAt:         time.Now().UTC(),
 		path:                "/",
 		selectedHashAlgo:    HASHAlgoSHA256,
 		currentTransferType: transferType,
-		logger:              server.Logger.With("clientId", id),
+		logger:              server.Logger.With("clientId", clientID),
 	}
-
-	return p
 }
 
 func (c *clientHandler) disconnect() {
@@ -328,6 +330,10 @@ func (c *clientHandler) closeTransfer() error {
 		}
 	}
 
+	if err != nil {
+		err = fmt.Errorf("error closing transfer connection: %w", err)
+	}
+
 	return err
 }
 
@@ -354,7 +360,12 @@ func (c *clientHandler) Close() error {
 	// 2) the client could wait for another response and so we break the protocol
 	//
 	// closing the connection from a different goroutine should be safe
-	return c.conn.Close()
+	err := c.conn.Close()
+	if err != nil {
+		err = newNetworkError("error closing control connection", err)
+	}
+
+	return err
 }
 
 func (c *clientHandler) end() {
@@ -379,13 +390,11 @@ func (c *clientHandler) end() {
 	}
 }
 
-func (c *clientHandler) isCommandAborted() (aborted bool) {
+func (c *clientHandler) isCommandAborted() bool {
 	c.transferMu.Lock()
 	defer c.transferMu.Unlock()
 
-	aborted = c.isTransferAborted
-
-	return
+	return c.isTransferAborted
 }
 
 // HandleCommands reads the stream of commands
@@ -401,57 +410,65 @@ func (c *clientHandler) HandleCommands() {
 	}
 
 	for {
-		if c.reader == nil {
-			if c.debug {
-				c.logger.Debug("Client disconnected", "clean", true)
-			}
-
+		if c.readCommand() {
 			return
 		}
-
-		// florent(2018-01-14): #58: IDLE timeout: Preparing the deadline before we read
-		if c.server.settings.IdleTimeout > 0 {
-			if err := c.conn.SetDeadline(
-				time.Now().Add(time.Duration(time.Second.Nanoseconds() * int64(c.server.settings.IdleTimeout)))); err != nil {
-				c.logger.Error("Network error", "err", err)
-			}
-		}
-
-		lineSlice, isPrefix, err := c.reader.ReadLine()
-
-		if isPrefix {
-			if c.debug {
-				c.logger.Warn("Received line too long, disconnecting client",
-					"size", len(lineSlice))
-			}
-
-			return
-		}
-
-		if err != nil {
-			c.handleCommandsStreamError(err)
-
-			return
-		}
-
-		line := string(lineSlice)
-
-		if c.debug {
-			c.logger.Debug("Received line", "line", line)
-		}
-
-		c.handleCommand(line)
 	}
+}
+
+func (c *clientHandler) readCommand() bool {
+	if c.reader == nil {
+		if c.debug {
+			c.logger.Debug("Client disconnected", "clean", true)
+		}
+
+		return true
+	}
+
+	// florent(2018-01-14): #58: IDLE timeout: Preparing the deadline before we read
+	if c.server.settings.IdleTimeout > 0 {
+		if err := c.conn.SetDeadline(
+			time.Now().Add(time.Duration(time.Second.Nanoseconds() * int64(c.server.settings.IdleTimeout)))); err != nil {
+			c.logger.Error("Network error", "err", err)
+		}
+	}
+
+	lineSlice, isPrefix, err := c.reader.ReadLine()
+
+	if isPrefix {
+		if c.debug {
+			c.logger.Warn("Received line too long, disconnecting client",
+				"size", len(lineSlice))
+		}
+
+		return true
+	}
+
+	if err != nil {
+		c.handleCommandsStreamError(err)
+
+		return true
+	}
+
+	line := string(lineSlice)
+
+	if c.debug {
+		c.logger.Debug("Received line", "line", line)
+	}
+
+	c.handleCommand(line)
+
+	return false
 }
 
 func (c *clientHandler) handleCommandsStreamError(err error) {
 	// florent(2018-01-14): #58: IDLE timeout: Adding some code to deal with the deadline
-	switch err := err.(type) {
-	case net.Error:
-		if err.Timeout() {
+	var errNetError net.Error
+	if errors.As(err, &errNetError) { //nolint:nestif // too much effort to change for now
+		if errNetError.Timeout() {
 			// We have to extend the deadline now
-			if err := c.conn.SetDeadline(time.Now().Add(time.Minute)); err != nil {
-				c.logger.Error("Could not set read deadline", "err", err)
+			if errSet := c.conn.SetDeadline(time.Now().Add(time.Minute)); errSet != nil {
+				c.logger.Error("Could not set read deadline", "err", errSet)
 			}
 
 			c.logger.Info("Client IDLE timeout", "err", err)
@@ -459,16 +476,16 @@ func (c *clientHandler) handleCommandsStreamError(err error) {
 				StatusServiceNotAvailable,
 				fmt.Sprintf("command timeout (%d seconds): closing control connection", c.server.settings.IdleTimeout))
 
-			if err := c.writer.Flush(); err != nil {
-				c.logger.Error("Flush error", "err", err)
+			if errFlush := c.writer.Flush(); errFlush != nil {
+				c.logger.Error("Flush error", "err", errFlush)
 			}
 
-			break
+			return
 		}
 
 		c.logger.Error("Network error", "err", err)
-	default:
-		if err == io.EOF {
+	} else {
+		if errors.Is(err, io.EOF) {
 			if c.debug {
 				c.logger.Debug("Client disconnected", "clean", false)
 			}
@@ -641,6 +658,8 @@ func (c *clientHandler) TransferOpen(info string) (net.Conn, error) {
 
 		c.writeMessage(StatusCannotOpenDataConnection, err.Error())
 
+		err = newNetworkError("Unable to open transfer", err)
+
 		return nil, err
 	}
 
@@ -656,7 +675,7 @@ func (c *clientHandler) TransferOpen(info string) (net.Conn, error) {
 			"localAddr", conn.LocalAddr().String())
 	}
 
-	return conn, err
+	return conn, nil
 }
 
 func (c *clientHandler) TransferClose(err error) {
@@ -725,14 +744,14 @@ func getIPFromRemoteAddr(remoteAddr net.Addr) (net.IP, error) {
 		return nil, &ipValidationError{error: "nil remote address"}
 	}
 
-	ip, _, err := net.SplitHostPort(remoteAddr.String())
+	ipAddress, _, err := net.SplitHostPort(remoteAddr.String())
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error parsing remote address: %w", err)
 	}
 
-	remoteIP := net.ParseIP(ip)
+	remoteIP := net.ParseIP(ipAddress)
 	if remoteIP == nil {
-		return nil, &ipValidationError{error: fmt.Sprintf("invalid remote IP: %v", ip)}
+		return nil, &ipValidationError{error: fmt.Sprintf("invalid remote IP: %v", ipAddress)}
 	}
 
 	return remoteIP, nil

@@ -21,7 +21,7 @@ type transferHandler interface {
 	Close() error
 
 	// Set info about the transfer to return in STAT response
-	SetInfo(string)
+	SetInfo(info string)
 	// Info about the transfer to return in STAT response
 	GetInfo() string
 }
@@ -49,28 +49,28 @@ func (e *ipValidationError) Error() string {
 
 func (c *clientHandler) getCurrentIP() ([]string, error) {
 	// Provide our external IP address so the ftp client can connect back to us
-	ip := c.server.settings.PublicHost
+	ipParts := c.server.settings.PublicHost
 
 	// If we don't have an IP address, we can take the one that was used for the current connection
-	if ip == "" {
+	if ipParts == "" {
 		// Defer to the user-provided resolver.
 		if c.server.settings.PublicIPResolver != nil {
 			var err error
-			ip, err = c.server.settings.PublicIPResolver(c)
+			ipParts, err = c.server.settings.PublicIPResolver(c)
 
 			if err != nil {
 				return nil, fmt.Errorf("couldn't fetch public IP: %w", err)
 			}
 		} else {
-			ip = strings.Split(c.conn.LocalAddr().String(), ":")[0]
+			ipParts = strings.Split(c.conn.LocalAddr().String(), ":")[0]
 		}
 	}
 
-	quads := strings.Split(ip, ".")
+	quads := strings.Split(ipParts, ".")
 	if len(quads) != 4 {
-		c.logger.Warn("Invalid passive IP", "IP", ip)
+		c.logger.Warn("Invalid passive IP", "IP", ipParts)
 
-		return nil, &ipValidationError{error: fmt.Sprintf("invalid passive IP %#v", ip)}
+		return nil, &ipValidationError{error: fmt.Sprintf("invalid passive IP %#v", ipParts)}
 	}
 
 	return quads, nil
@@ -79,14 +79,19 @@ func (c *clientHandler) getCurrentIP() ([]string, error) {
 // ErrNoAvailableListeningPort is returned when no port could be found to accept incoming connection
 var ErrNoAvailableListeningPort = errors.New("could not find any port to listen to")
 
+const (
+	portSearchMinAttempts = 10
+	portSearchMaxAttempts = 1000
+)
+
 func (c *clientHandler) findListenerWithinPortRange(portRange *PortRange) (*net.TCPListener, error) {
 	nbAttempts := portRange.End - portRange.Start
 
 	// Making sure we trying a reasonable amount of ports before giving up
-	if nbAttempts < 10 {
-		nbAttempts = 10
-	} else if nbAttempts > 1000 {
-		nbAttempts = 1000
+	if nbAttempts < portSearchMinAttempts {
+		nbAttempts = portSearchMinAttempts
+	} else if nbAttempts > portSearchMaxAttempts {
+		nbAttempts = portSearchMaxAttempts
 	}
 
 	for i := 0; i < nbAttempts; i++ {
@@ -97,7 +102,7 @@ func (c *clientHandler) findListenerWithinPortRange(portRange *PortRange) (*net.
 		if errResolve != nil {
 			c.logger.Error("Problem resolving local port", "err", errResolve, "port", port)
 
-			return nil, fmt.Errorf("could not resolve port %d: %w", port, errResolve)
+			return nil, newNetworkError(fmt.Sprintf("could not resolve port %d", port), errResolve)
 		}
 
 		tcpListener, errListen := net.ListenTCP("tcp", laddr)
@@ -159,7 +164,7 @@ func (c *clientHandler) handlePASV(_ string) error {
 		}
 	}
 
-	p := &passiveTransferHandler{
+	transferHandler := &passiveTransferHandler{ //nolint:forcetypeassert
 		tcpListener:   tcpListener,
 		listener:      listener,
 		Port:          tcpListener.Addr().(*net.TCPAddr).Port,
@@ -170,21 +175,11 @@ func (c *clientHandler) handlePASV(_ string) error {
 
 	// We should rewrite this part
 	if command == "PASV" {
-		p1 := p.Port / 256
-		p2 := p.Port - (p1 * 256)
-		quads, err2 := c.getCurrentIP()
-
-		if err2 != nil {
-			c.writeMessage(StatusServiceNotAvailable, fmt.Sprintf("Could not listen for passive connection: %v", err2))
-
+		if c.handlePassivePASV(transferHandler) {
 			return nil
 		}
-
-		c.writeMessage(
-			StatusEnteringPASV,
-			fmt.Sprintf("Entering Passive Mode (%s,%s,%s,%s,%d,%d)", quads[0], quads[1], quads[2], quads[3], p1, p2))
 	} else {
-		c.writeMessage(StatusEnteringEPSV, fmt.Sprintf("Entering Extended Passive Mode (|||%d|)", p.Port))
+		c.writeMessage(StatusEnteringEPSV, fmt.Sprintf("Entering Extended Passive Mode (|||%d|)", transferHandler.Port))
 	}
 
 	c.transferMu.Lock()
@@ -192,11 +187,34 @@ func (c *clientHandler) handlePASV(_ string) error {
 		c.transfer.Close() //nolint:errcheck,gosec
 	}
 
-	c.transfer = p
+	c.transfer = transferHandler
 	c.transferMu.Unlock()
 	c.setLastDataChannel(DataChannelPassive)
 
 	return nil
+}
+
+func (c *clientHandler) handlePassivePASV(transferHandler *passiveTransferHandler) bool {
+	portByte1 := transferHandler.Port / 256
+	portByte2 := transferHandler.Port - (portByte1 * 256)
+	quads, err2 := c.getCurrentIP()
+
+	if err2 != nil {
+		c.writeMessage(StatusServiceNotAvailable, fmt.Sprintf("Could not listen for passive connection: %v", err2))
+
+		return true
+	}
+
+	c.writeMessage(
+		StatusEnteringPASV,
+		fmt.Sprintf(
+			"Entering Passive Mode (%s,%s,%s,%s,%d,%d)",
+			quads[0], quads[1], quads[2], quads[3],
+			portByte1, portByte2,
+		),
+	)
+
+	return false
 }
 
 func (p *passiveTransferHandler) ConnectionWait(wait time.Duration) (net.Conn, error) {
@@ -207,19 +225,18 @@ func (p *passiveTransferHandler) ConnectionWait(wait time.Duration) (net.Conn, e
 		}
 
 		p.connection, err = p.listener.Accept()
-
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to accept passive transfer connection: %w", err)
 		}
 
-		ip, err := getIPFromRemoteAddr(p.connection.RemoteAddr())
+		ipAddress, err := getIPFromRemoteAddr(p.connection.RemoteAddr())
 		if err != nil {
 			p.logger.Warn("Could get remote passive IP address", "err", err)
 
 			return nil, err
 		}
 
-		if err := p.checkDataConn(ip, DataChannelPassive); err != nil {
+		if err := p.checkDataConn(ipAddress, DataChannelPassive); err != nil {
 			// we don't want to expose the full error to the client, we just log it
 			p.logger.Warn("Could not validate passive data connection requirement", "err", err)
 
@@ -248,19 +265,14 @@ func (p *passiveTransferHandler) Open() (net.Conn, error) {
 func (p *passiveTransferHandler) Close() error {
 	if p.tcpListener != nil {
 		if err := p.tcpListener.Close(); err != nil {
-			p.logger.Warn(
-				"Problem closing passive listener",
-				"err", err,
-			)
+			p.logger.Warn("Problem closing passive listener", "err", err)
 		}
 	}
 
 	if p.connection != nil {
 		if err := p.connection.Close(); err != nil {
 			p.logger.Warn(
-				"Problem closing passive connection",
-				"err", err,
-			)
+				"Problem closing passive connection", "err", err)
 		}
 	}
 

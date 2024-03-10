@@ -160,61 +160,128 @@ linters-settings:
 linters:
     disable-all: true
     enable:
+        # https://golangci-lint.run/usage/linters/
         - asciicheck
+        - asasalint
+        - bidichk
         - bodyclose
         # - deadcode -> unused
+        - containedctx
+        # - contextcheck -> creates an odd error here: https://github.com/fclairamb/ftpserverlib/blob/4d7c663e9e0b2650673fc2e0fcdb443895f2a1b9/server.go#L234
+        # - copyloopvar -> unknown in v1.56.2 ???
+        # - cyclop -> Delaying it for now (too much work)
+        - decorder
         - depguard
         - dogsled
         - dupl
+        - dupword
+        - durationcheck
         - errcheck
         - exhaustive
+        - errchkjson
+        - errname
+        - errorlint
+        - execinquery
+        - exhaustive
+        # - exhaustruct --> Not convinced it's useful
         # - exhaustivestruct
         - exportloopref
         - funlen
-        # - gci
+        - forbidigo
+        - forcetypeassert
+        - gci
+        - ginkgolinter
         - gochecknoinits
-        # - gochecknoglobals
+        - gochecksumtype
+        - gochecknoglobals
         - gocognit
         - goconst
         - gocritic
         - gocyclo
+        # - godot --> lots of not so useful changes
         - godox
         - goerr113
         - gofmt
+        # - gofumpt -> conflicts with wsl
         - goimports
+        - gosimple
         # - golint --> revive
         - revive
-        # - gomnd
+        # - gomnd --> too much work
+        # - gomoddirectives
+        # - gomodguard
         - goprintffuncname
         - gosec
+        - gosmopolitan
         - gosimple
         - govet
+        - grouper
         - ineffassign
+        - importas
+        - inamedparam
+        # - intrange --> upcoming
+        # - interfacebloat
         # - interfacer --> (deprecated)
+        # - ireturn --> I can't even see how to fix those like ClientHandler::getFileHandle
         - lll
+        - loggercheck
+        - maintidx
+        - makezero
+        - mirror
         # - maligned --> govet:fieldalignment
         - megacheck
         - misspell
+        - musttag
         - nakedret
         # - nestif
         - nlreturn
         - prealloc
+        - nestif
         - nilerr
+        - nilnil
         - nolintlint
+        - nlreturn
         - rowserrcheck
+        - noctx
+        - nonamedreturns
         # - scopelint --> exportloopref
+        - nosprintfhostport
         - exportloopref 
         - staticcheck
         # - structcheck -> unused
         - stylecheck
+        # - paralleltest -> buggy, doesn't work with subtests
         - typecheck
+        - perfsprint
+        - prealloc
+        - predeclared
+        - reassign
+        - promlinter
+        - protogetter
+        - rowserrcheck
+        - sloglint
+        - spancheck
+        - sqlclosecheck
+        - stylecheck
+        - tagalign
+        - tagliatelle
+        - tenv
+        - testableexamples
+        - testifylint
+        # - testpackage -> too late for that
+        - thelper
+        - tparallel
         - unconvert
         - unparam
         - unused
+        - usestdlibvars
+        - varnamelen
+        - wastedassign
         # - varcheck -> unused
         - whitespace
-        # - wrapcheck
+        # - wrapcheck -> too much effort for now
         - wsl
+        # - zerologlint -> Will most probably never use it
     fast: false
   
 issues:
@@ -224,3 +291,7 @@ issues:
   # Default value for this option is true.
   exclude-use-default: false
 
+  exclude-rules:
+    - path: _test\.go
+      linters:
+        - gochecknoglobals

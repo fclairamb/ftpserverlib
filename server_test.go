@@ -2,25 +2,21 @@ package ftpserver
 
 import (
 	"errors"
-	"fmt"
 	"net"
 	"os"
 	"syscall"
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-
 	lognoop "github.com/fclairamb/go-log/noop"
+	"github.com/stretchr/testify/require"
 )
 
 func TestMain(m *testing.M) {
 	// we change the timezone to be able to test that MLSD/MLST commands write UTC timestamps
 	loc, err := time.LoadLocation("America/New_York")
 	if err != nil {
-		fmt.Printf("unable to set timezone: %v\n", err)
-		os.Exit(1)
+		panic(err)
 	}
 
 	time.Local = loc
@@ -84,6 +80,53 @@ func newFakeListener(err error) net.Listener {
 	}
 }
 
+func TestCannotListen(t *testing.T) {
+	req := require.New(t)
+
+	portBlockerListener, err := net.Listen("tcp", "127.0.0.1:0")
+	req.NoError(err)
+
+	defer func() { req.NoError(portBlockerListener.Close()) }()
+
+	server := FtpServer{
+		Logger: lognoop.NewNoOpLogger(),
+		driver: &TestServerDriver{
+			Settings: &Settings{
+				ListenAddr: portBlockerListener.Addr().String(),
+			},
+		},
+	}
+
+	err = server.Listen()
+	var ne NetworkError
+	req.ErrorAs(err, &ne)
+	req.Equal("cannot listen on main port", ne.str)
+}
+
+func TestListenWithBadTLSSettings(t *testing.T) {
+	req := require.New(t)
+
+	portBlockerListener, err := net.Listen("tcp", "127.0.0.1:0")
+	req.NoError(err)
+
+	defer func() { req.NoError(portBlockerListener.Close()) }()
+
+	server := FtpServer{
+		Logger: lognoop.NewNoOpLogger(),
+		driver: &TestServerDriver{
+			Settings: &Settings{
+				TLSRequired: ImplicitEncryption,
+			},
+			TLS: false,
+		},
+	}
+
+	err = server.Listen()
+	var drvErr DriverError
+	req.ErrorAs(err, &drvErr)
+	req.Equal("cannot get tls config", drvErr.str)
+}
+
 func TestListenerAcceptErrors(t *testing.T) {
 	errNetFake := &fakeNetError{error: errListenerAccept}
 
@@ -92,7 +135,7 @@ func TestListenerAcceptErrors(t *testing.T) {
 		Logger:   lognoop.NewNoOpLogger(),
 	}
 	err := server.Serve()
-	require.EqualError(t, err, errListenerAccept.Error())
+	require.ErrorContains(t, err, errListenerAccept.Error())
 }
 
 func TestPortCommandFormatOK(t *testing.T) {
@@ -123,7 +166,6 @@ func TestQuoteDoubling(t *testing.T) {
 		args args
 		want string
 	}{
-		// TODO: Add test cases.
 		{"1", args{" white space"}, " white space"},
 		{"1", args{` one" quote`}, ` one"" quote`},
 		{"1", args{` two"" quote`}, ` two"""" quote`},
@@ -137,51 +179,77 @@ func TestQuoteDoubling(t *testing.T) {
 	}
 }
 
-func TestServerSettings(t *testing.T) {
+func TestServerSettingsIPError(t *testing.T) {
 	server := FtpServer{
 		Logger: lognoop.NewNoOpLogger(),
-		driver: &TestServerDriver{
+	}
+
+	t.Run("IPv4 with 3 numbers", func(t *testing.T) {
+		server.driver = &TestServerDriver{
 			Settings: &Settings{
 				PublicHost: "127.0.0",
 			},
+		}
+
+		err := server.loadSettings()
+		_, ok := err.(*ipValidationError) //nolint:errorlint // Here we want to test the exact error match
+		require.True(t, ok)
+	})
+
+	t.Run("localhost public host", func(t *testing.T) {
+		server.driver = &TestServerDriver{
+			Settings: &Settings{
+				PublicHost: "::1",
+			},
+		}
+
+		err := server.loadSettings()
+		_, ok := err.(*ipValidationError) //nolint:errorlint // Here we want to test the exact error match
+		require.True(t, ok)
+	})
+
+	t.Run("Strangely looking IPv6/IPv4 address", func(t *testing.T) {
+		server.driver = &TestServerDriver{
+			Settings: &Settings{
+				PublicHost: "::ffff:192.168.1.1",
+			},
+		}
+		err := server.loadSettings()
+		require.NoError(t, err)
+		require.Equal(t, "192.168.1.1", server.settings.PublicHost)
+	})
+}
+
+func TestServerSettingsNilSettings(t *testing.T) {
+	req := require.New(t)
+	server := FtpServer{
+		Logger: lognoop.NewNoOpLogger(),
+		driver: &TestServerDriver{
+			Settings: nil,
 		},
 	}
+
 	err := server.loadSettings()
-	_, ok := err.(*ipValidationError)
-	require.True(t, ok)
+	req.Error(err)
 
-	server.driver = &TestServerDriver{
-		Settings: &Settings{
-			PublicHost: "::1",
-		},
-	}
-	err = server.loadSettings()
-	_, ok = err.(*ipValidationError)
-	require.True(t, ok)
-
-	server.driver = &TestServerDriver{
-		Settings: &Settings{
-			PublicHost: "::ffff:192.168.1.1",
-		},
-	}
-	err = server.loadSettings()
-	require.NoError(t, err)
-	require.Equal(t, "192.168.1.1", server.settings.PublicHost)
+	drvErr := DriverError{}
+	req.ErrorAs(err, &drvErr)
+	req.ErrorContains(drvErr, "couldn't load settings")
 }
 
 func TestTemporaryError(t *testing.T) {
-	a := assert.New(t)
+	req := require.New(t)
 
 	// Test the temporaryError function
-	a.False(temporaryError(nil))
-	a.False(temporaryError(&fakeNetError{error: errListenerAccept}))
-	a.False(temporaryError(&net.OpError{
+	req.False(temporaryError(nil))
+	req.False(temporaryError(&fakeNetError{error: errListenerAccept}))
+	req.False(temporaryError(&net.OpError{
 		Err: &fakeNetError{error: errListenerAccept},
 	}))
 
 	for _, serr := range []syscall.Errno{syscall.ECONNABORTED, syscall.ECONNRESET} {
-		a.True(temporaryError(&net.OpError{Err: &os.SyscallError{Err: serr}}))
+		req.True(temporaryError(&net.OpError{Err: &os.SyscallError{Err: serr}}))
 	}
 
-	a.False(temporaryError(&net.OpError{Err: &os.SyscallError{Err: syscall.EAGAIN}}))
+	req.False(temporaryError(&net.OpError{Err: &os.SyscallError{Err: syscall.EAGAIN}}))
 }

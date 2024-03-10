@@ -47,7 +47,7 @@ If you're interested in a fully featured FTP server, you should use [sftpgo](htt
 The easiest way to test this library is to use [ftpserver](https://github.com/fclairamb/ftpserver).
 
 ## The driver
-The simplest way to get a good understanding of how the driver shall be implemented, you can have a look at the [tests driver](https://github.com/fclairamb/ftpserverlib/blob/master/driver_test.go).
+The simplest way to get a good understanding of how the driver shall be implemented is to look at the [tests driver](https://github.com/fclairamb/ftpserverlib/blob/master/driver_test.go).
 
 ### The base API
 

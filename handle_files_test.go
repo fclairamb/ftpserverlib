@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"regexp"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -100,23 +101,23 @@ func TestALLO(t *testing.T) {
 	defer func() { require.NoError(t, raw.Close()) }()
 
 	// Asking for too much (2MB)
-	rc, _, err := raw.SendCommand("ALLO 2000000")
+	returnCode, _, err := raw.SendCommand("ALLO 2000000")
 	require.NoError(t, err)
-	require.Equal(t, StatusActionNotTaken, rc, "Should have been refused")
+	require.Equal(t, StatusActionNotTaken, returnCode, "Should have been refused")
 
 	// Asking for the right amount of space (500KB)
-	rc, _, err = raw.SendCommand("ALLO 500000")
+	returnCode, _, err = raw.SendCommand("ALLO 500000")
 	require.NoError(t, err)
-	require.Equal(t, StatusOK, rc, "Should have been accepted")
+	require.Equal(t, StatusOK, returnCode, "Should have been accepted")
 
 	// Wrong size
-	rc, _, err = raw.SendCommand("ALLO 500000a")
+	returnCode, _, err = raw.SendCommand("ALLO 500000a")
 	require.NoError(t, err)
-	require.Equal(t, StatusSyntaxErrorParameters, rc, "Should have been refused")
+	require.Equal(t, StatusSyntaxErrorParameters, returnCode, "Should have been refused")
 }
 
 func TestCHMOD(t *testing.T) {
-	s := NewTestServerWithTestDriver(t, &TestServerDriver{
+	server := NewTestServerWithTestDriver(t, &TestServerDriver{
 		Debug: false,
 		TLS:   true,
 	})
@@ -129,78 +130,78 @@ func TestCHMOD(t *testing.T) {
 		},
 		TLSMode: goftp.TLSExplicit,
 	}
-	c, err := goftp.DialConfig(conf, s.Addr())
+	client, err := goftp.DialConfig(conf, server.Addr())
 	require.NoError(t, err, "Couldn't connect")
 
 	// Creating a tiny file
-	ftpUpload(t, c, createTemporaryFile(t, 10), "file")
+	ftpUpload(t, client, createTemporaryFile(t, 10), "file")
 
-	raw, err := c.OpenRawConn()
+	raw, err := client.OpenRawConn()
 	require.NoError(t, err, "Couldn't open raw connection")
 
 	defer func() { require.NoError(t, raw.Close()) }()
 
-	rc, _, err := raw.SendCommand("SITE CHMOD a file")
+	returnCode, _, err := raw.SendCommand("SITE CHMOD a file")
 	require.NoError(t, err)
-	require.Equal(t, StatusActionNotTaken, rc, "Should have been refused")
+	require.Equal(t, StatusActionNotTaken, returnCode, "Should have been refused")
 
-	rc, _, err = raw.SendCommand("SITE CHMOD 600 file")
+	returnCode, _, err = raw.SendCommand("SITE CHMOD 600 file")
 	require.NoError(t, err)
-	require.Equal(t, StatusOK, rc, "Should have been accepted")
+	require.Equal(t, StatusOK, returnCode, "Should have been accepted")
 }
 
 func TestCHOWN(t *testing.T) {
-	s := NewTestServer(t, false)
+	server := NewTestServer(t, false)
 	conf := goftp.Config{
 		User:     authUser,
 		Password: authPass,
 	}
-	c, err := goftp.DialConfig(conf, s.Addr())
+	client, err := goftp.DialConfig(conf, server.Addr())
 	require.NoError(t, err, "Couldn't connect")
 
-	defer func() { panicOnError(c.Close()) }()
+	defer func() { panicOnError(client.Close()) }()
 
 	// Creating a tiny file
-	ftpUpload(t, c, createTemporaryFile(t, 10), "file")
+	ftpUpload(t, client, createTemporaryFile(t, 10), "file")
 
-	raw, err := c.OpenRawConn()
+	raw, err := client.OpenRawConn()
 	require.NoError(t, err, "Couldn't open raw connection")
 
 	defer func() { require.NoError(t, raw.Close()) }()
 
 	// Asking for a chown user change that isn't authorized
-	rc, _, err := raw.SendCommand("SITE CHOWN 1001:500 file")
+	returnCode, _, err := raw.SendCommand("SITE CHOWN 1001:500 file")
 	require.NoError(t, err)
-	require.Equal(t, StatusActionNotTaken, rc, "Should have been refused")
+	require.Equal(t, StatusActionNotTaken, returnCode, "Should have been refused")
 
 	// Asking for a chown user change that isn't authorized
-	rc, _, err = raw.SendCommand("SITE CHOWN 1001 file")
+	returnCode, _, err = raw.SendCommand("SITE CHOWN 1001 file")
 	require.NoError(t, err)
-	require.Equal(t, StatusActionNotTaken, rc, "Should have been refused")
+	require.Equal(t, StatusActionNotTaken, returnCode, "Should have been refused")
 
 	// Asking for the right chown user
-	rc, _, err = raw.SendCommand("SITE CHOWN 1000:500 file")
+	returnCode, _, err = raw.SendCommand("SITE CHOWN 1000:500 file")
 	require.NoError(t, err)
-	require.Equal(t, StatusOK, rc, "Should have been accepted")
+	require.Equal(t, StatusOK, returnCode, "Should have been accepted")
 
 	// Asking for the right chown user
-	rc, _, err = raw.SendCommand("SITE CHOWN 1000 file")
+	returnCode, _, err = raw.SendCommand("SITE CHOWN 1000 file")
 	require.NoError(t, err)
-	require.Equal(t, StatusOK, rc, "Should have been accepted")
+	require.Equal(t, StatusOK, returnCode, "Should have been accepted")
 
 	// Asking for a chown on a file that doesn't exist
-	rc, _, err = raw.SendCommand("SITE CHOWN test file2")
+	returnCode, _, err = raw.SendCommand("SITE CHOWN test file2")
 	require.NoError(t, err)
-	require.Equal(t, StatusActionNotTaken, rc, "Should NOT have been accepted")
+	require.Equal(t, StatusActionNotTaken, returnCode, "Should NOT have been accepted")
 
 	// Asking for a chown with a missing parameter
-	rc, _, err = raw.SendCommand("SITE CHOWN 1000")
+	returnCode, _, err = raw.SendCommand("SITE CHOWN 1000")
 	require.NoError(t, err)
-	require.Equal(t, StatusSyntaxErrorParameters, rc, "Should NOT have been accepted")
+	require.Equal(t, StatusSyntaxErrorParameters, returnCode, "Should NOT have been accepted")
 }
 
 func TestMFMT(t *testing.T) {
-	s := NewTestServerWithTestDriver(t, &TestServerDriver{
+	server := NewTestServerWithTestDriver(t, &TestServerDriver{
 		Debug: false,
 		TLS:   true,
 	})
@@ -213,179 +214,180 @@ func TestMFMT(t *testing.T) {
 		},
 		TLSMode: goftp.TLSExplicit,
 	}
-	c, err := goftp.DialConfig(conf, s.Addr())
+	client, err := goftp.DialConfig(conf, server.Addr())
 	require.NoError(t, err, "Couldn't connect")
 
-	defer func() { panicOnError(c.Close()) }()
+	defer func() { panicOnError(client.Close()) }()
 
 	// Creating a tiny file
-	ftpUpload(t, c, createTemporaryFile(t, 10), "file")
+	ftpUpload(t, client, createTemporaryFile(t, 10), "file")
 
-	raw, err := c.OpenRawConn()
+	raw, err := client.OpenRawConn()
 	require.NoError(t, err, "Couldn't open raw connection")
 
 	defer func() { require.NoError(t, raw.Close()) }()
 
 	// Good
-	rc, _, err := raw.SendCommand("MFMT 20201209211059 file")
+	returnCode, _, err := raw.SendCommand("MFMT 20201209211059 file")
 	require.NoError(t, err)
-	require.Equal(t, StatusFileStatus, rc, "Should have succeeded")
+	require.Equal(t, StatusFileStatus, returnCode, "Should have succeeded")
 
 	// 3 params instead of 2
-	rc, _, err = raw.SendCommand("MFMT 20201209211059 file somethingelse")
+	returnCode, _, err = raw.SendCommand("MFMT 20201209211059 file somethingelse")
 	require.NoError(t, err)
-	require.NotEqual(t, StatusFileStatus, rc, "Should have failed")
+	require.NotEqual(t, StatusFileStatus, returnCode, "Should have failed")
 
 	// 1 param instead of 2
-	rc, _, err = raw.SendCommand("MFMT 202012092110 file")
+	returnCode, _, err = raw.SendCommand("MFMT 202012092110 file")
 	require.NoError(t, err)
-	require.Equal(t, StatusSyntaxErrorParameters, rc, "Should have failed")
+	require.Equal(t, StatusSyntaxErrorParameters, returnCode, "Should have failed")
 
 	// no parameters
-	rc, _, err = raw.SendCommand("MFMT")
+	returnCode, _, err = raw.SendCommand("MFMT")
 	require.NoError(t, err)
-	require.Equal(t, StatusSyntaxErrorNotRecognised, rc, "Should have failed")
+	require.Equal(t, StatusSyntaxErrorNotRecognised, returnCode, "Should have failed")
 
 	// Good (to make sure we are still in sync)
-	rc, _, err = raw.SendCommand("MFMT 20201209211059 file")
+	returnCode, _, err = raw.SendCommand("MFMT 20201209211059 file")
 	require.NoError(t, err)
-	require.Equal(t, StatusFileStatus, rc, "Should have succeeded")
+	require.Equal(t, StatusFileStatus, returnCode, "Should have succeeded")
 }
 
 func TestSYMLINK(t *testing.T) {
-	s := NewTestServer(t, false)
+	server := NewTestServer(t, false)
 	conf := goftp.Config{
 		User:     authUser,
 		Password: authPass,
 	}
-	c, err := goftp.DialConfig(conf, s.Addr())
+	client, err := goftp.DialConfig(conf, server.Addr())
 	require.NoError(t, err, "Couldn't connect")
 
-	defer func() { panicOnError(c.Close()) }()
+	defer func() { panicOnError(client.Close()) }()
 
 	// Creating a tiny file
-	ftpUpload(t, c, createTemporaryFile(t, 10), "file")
+	ftpUpload(t, client, createTemporaryFile(t, 10), "file")
 
-	raw, err := c.OpenRawConn()
+	raw, err := client.OpenRawConn()
 	require.NoError(t, err, "Couldn't open raw connection")
 
 	defer func() { require.NoError(t, raw.Close()) }()
 
 	// Bad syntaxes
-	rc, _, err := raw.SendCommand("SITE SYMLINK")
+	returnCode, _, err := raw.SendCommand("SITE SYMLINK")
 	require.NoError(t, err)
-	require.Equal(t, StatusSyntaxErrorParameters, rc, "Should have been refused")
+	require.Equal(t, StatusSyntaxErrorParameters, returnCode, "Should have been refused")
 
-	rc, _, err = raw.SendCommand("SITE SYMLINK ")
+	returnCode, _, err = raw.SendCommand("SITE SYMLINK ")
 	require.NoError(t, err)
-	require.Equal(t, StatusSyntaxErrorParameters, rc, "Should have been refused")
+	require.Equal(t, StatusSyntaxErrorParameters, returnCode, "Should have been refused")
 
-	rc, _, err = raw.SendCommand("SITE SYMLINK file1")
+	returnCode, _, err = raw.SendCommand("SITE SYMLINK file1")
 	require.NoError(t, err)
-	require.Equal(t, StatusSyntaxErrorParameters, rc, "Should have been refused")
+	require.Equal(t, StatusSyntaxErrorParameters, returnCode, "Should have been refused")
 
-	rc, _, err = raw.SendCommand("SITE SYMLINK file1 file2 file3")
+	returnCode, _, err = raw.SendCommand("SITE SYMLINK file1 file2 file3")
 	require.NoError(t, err)
-	require.Equal(t, StatusSyntaxErrorParameters, rc, "Should have been refused")
+	require.Equal(t, StatusSyntaxErrorParameters, returnCode, "Should have been refused")
 
 	// Creating a bad symlink is authorized
-	rc, _, err = raw.SendCommand("SITE SYMLINK file3 file4")
+	returnCode, _, err = raw.SendCommand("SITE SYMLINK file3 file4")
 	require.NoError(t, err)
-	require.Equal(t, StatusOK, rc, "Should have been accepted")
+	require.Equal(t, StatusOK, returnCode, "Should have been accepted")
 
 	// Overwriting a file is not authorized
-	rc, _, err = raw.SendCommand("SITE SYMLINK file5 file")
+	returnCode, _, err = raw.SendCommand("SITE SYMLINK file5 file")
 	require.NoError(t, err)
-	require.Equal(t, StatusActionNotTaken, rc, "Should have been refused")
+	require.Equal(t, StatusActionNotTaken, returnCode, "Should have been refused")
 
 	// disable SITE
-	s.settings.DisableSite = true
+	server.settings.DisableSite = true
 
-	rc, _, err = raw.SendCommand("SITE SYMLINK file test")
+	returnCode, _, err = raw.SendCommand("SITE SYMLINK file test")
 	require.NoError(t, err)
-	require.Equal(t, StatusSyntaxErrorNotRecognised, rc, "Should have been refused")
+	require.Equal(t, StatusSyntaxErrorNotRecognised, returnCode, "Should have been refused")
 
-	s.settings.DisableSite = false
+	server.settings.DisableSite = false
 
 	// Good symlink
-	rc, _, err = raw.SendCommand("SITE SYMLINK file test")
+	returnCode, _, err = raw.SendCommand("SITE SYMLINK file test")
 	require.NoError(t, err)
-	require.Equal(t, StatusOK, rc, "Should have been accepted")
+	require.Equal(t, StatusOK, returnCode, "Should have been accepted")
 }
 
 func TestSTATFile(t *testing.T) {
-	s := NewTestServer(t, false)
+	server := NewTestServer(t, false)
 	conf := goftp.Config{
 		User:     authUser,
 		Password: authPass,
 	}
-	c, err := goftp.DialConfig(conf, s.Addr())
+	client, err := goftp.DialConfig(conf, server.Addr())
 	require.NoError(t, err, "Couldn't connect")
 
-	defer func() { panicOnError(c.Close()) }()
+	defer func() { panicOnError(client.Close()) }()
 
 	// Creating a tiny file
-	ftpUpload(t, c, createTemporaryFile(t, 10), "file")
+	ftpUpload(t, client, createTemporaryFile(t, 10), "file")
 
 	// Create a directory with a subdir
-	_, err = c.Mkdir("dir")
+	_, err = client.Mkdir("dir")
 	require.NoError(t, err)
 
-	_, err = c.Mkdir("/dir/sub")
+	_, err = client.Mkdir("/dir/sub")
 	require.NoError(t, err)
 
-	raw, err := c.OpenRawConn()
+	raw, err := client.OpenRawConn()
 	require.NoError(t, err, "Couldn't open raw connection")
 
 	defer func() { require.NoError(t, raw.Close()) }()
 
-	rc, _, err := raw.SendCommand("STAT file")
+	returnCode, _, err := raw.SendCommand("STAT file")
 	require.NoError(t, err)
-	require.Equal(t, StatusFileStatus, rc)
+	require.Equal(t, StatusFileStatus, returnCode)
 
-	rc, _, err = raw.SendCommand("STAT dir")
+	returnCode, _, err = raw.SendCommand("STAT dir")
 	require.NoError(t, err)
-	require.Equal(t, StatusDirectoryStatus, rc)
+	require.Equal(t, StatusDirectoryStatus, returnCode)
 
 	// finally stat a missing file dir
-	rc, _, err = raw.SendCommand("STAT missing")
+	returnCode, _, err = raw.SendCommand("STAT missing")
 	require.NoError(t, err)
-	require.Equal(t, StatusFileActionNotTaken, rc)
+	require.Equal(t, StatusFileActionNotTaken, returnCode)
 
 	// the test driver will fail to open this dir
-	dirName, err := c.Mkdir("fail-to-open")
+	dirName, err := client.Mkdir("fail-to-open")
 	require.NoError(t, err)
 
-	rc, _, err = raw.SendCommand(fmt.Sprintf("STAT %v", dirName))
+	returnCode, _, err = raw.SendCommand(fmt.Sprintf("STAT %v", dirName))
 	require.NoError(t, err)
-	require.Equal(t, StatusFileActionNotTaken, rc)
+	require.Equal(t, StatusFileActionNotTaken, returnCode)
 }
 
 func TestMLST(t *testing.T) {
-	s := NewTestServer(t, false)
+	req := require.New(t)
+	server := NewTestServer(t, false)
 	conf := goftp.Config{
 		User:     authUser,
 		Password: authPass,
 	}
-	c, err := goftp.DialConfig(conf, s.Addr())
-	require.NoError(t, err, "Couldn't connect")
+	client, err := goftp.DialConfig(conf, server.Addr())
+	req.NoError(err, "Couldn't connect")
 
-	defer func() { panicOnError(c.Close()) }()
+	defer func() { panicOnError(client.Close()) }()
 
 	// Creating a tiny file
-	ftpUpload(t, c, createTemporaryFile(t, 10), "file")
+	ftpUpload(t, client, createTemporaryFile(t, 10), "file")
 
-	raw, err := c.OpenRawConn()
-	require.NoError(t, err, "Couldn't open raw connection")
+	raw, err := client.OpenRawConn()
+	req.NoError(err, "Couldn't open raw connection")
 
 	defer func() { require.NoError(t, raw.Close()) }()
 
 	rc, rsp, err := raw.SendCommand("MLST file")
-	require.NoError(t, err)
-	require.Equal(t, StatusFileOK, rc)
+	req.NoError(err)
+	req.Equal(StatusFileOK, rc)
 
 	lines := strings.Split(rsp, "\n")
-	require.Len(t, lines, 3)
+	req.Len(lines, 3)
 	path := validMLSxEntryPattern.FindStringSubmatch(lines[1] + "\r\n")
 
 	if len(path) != 2 {
@@ -401,26 +403,26 @@ func TestMDTM(t *testing.T) {
 		User:     authUser,
 		Password: authPass,
 	}
-	c, err := goftp.DialConfig(conf, s.Addr())
+	client, err := goftp.DialConfig(conf, s.Addr())
 	require.NoError(t, err, "Couldn't connect")
 
-	defer func() { panicOnError(c.Close()) }()
+	defer func() { panicOnError(client.Close()) }()
 
 	// Creating a tiny file
-	ftpUpload(t, c, createTemporaryFile(t, 10), "file")
+	ftpUpload(t, client, createTemporaryFile(t, 10), "file")
 
-	raw, err := c.OpenRawConn()
+	raw, err := client.OpenRawConn()
 	require.NoError(t, err, "Couldn't open raw connection")
 
 	defer func() { require.NoError(t, raw.Close()) }()
 
-	rc, _, err := raw.SendCommand("MDTM file")
+	returnCode, _, err := raw.SendCommand("MDTM file")
 	require.NoError(t, err)
-	require.Equal(t, StatusFileStatus, rc)
+	require.Equal(t, StatusFileStatus, returnCode)
 
-	rc, _, err = raw.SendCommand("MDTM missing")
+	returnCode, _, err = raw.SendCommand("MDTM missing")
 	require.NoError(t, err)
-	require.Equal(t, StatusActionNotTaken, rc)
+	require.Equal(t, StatusActionNotTaken, returnCode)
 }
 
 func TestRename(t *testing.T) {
@@ -429,29 +431,29 @@ func TestRename(t *testing.T) {
 		User:     authUser,
 		Password: authPass,
 	}
-	c, err := goftp.DialConfig(conf, s.Addr())
+	client, err := goftp.DialConfig(conf, s.Addr())
 	require.NoError(t, err, "Couldn't connect")
 
-	defer func() { panicOnError(c.Close()) }()
+	defer func() { panicOnError(client.Close()) }()
 
-	ftpUpload(t, c, createTemporaryFile(t, 10), "file")
+	ftpUpload(t, client, createTemporaryFile(t, 10), "file")
 
-	err = c.Rename("file", "file1")
+	err = client.Rename("file", "file1")
 	require.NoError(t, err)
 
 	// the test driver returns FileNameNotAllowedError in this case, the error code should be 553 instead of 550
-	err = c.Rename("file1", "not-allowed")
+	err = client.Rename("file1", "not-allowed")
 	if assert.Error(t, err) {
 		assert.True(t, strings.Contains(err.Error(), "553-Couldn't rename"), err.Error())
 	}
 
 	// renaming a missing file must fail
-	err = c.Rename("missingfile", "file1")
+	err = client.Rename("missingfile", "file1")
 	if assert.Error(t, err) {
 		assert.True(t, strings.Contains(err.Error(), "550-Couldn't access"), err.Error())
 	}
 
-	raw, err := c.OpenRawConn()
+	raw, err := client.OpenRawConn()
 	require.NoError(t, err, "Couldn't open raw connection")
 
 	defer func() { require.NoError(t, raw.Close()) }()
@@ -467,23 +469,23 @@ func TestUploadErrorCodes(t *testing.T) {
 		User:     authUser,
 		Password: authPass,
 	}
-	c, err := goftp.DialConfig(conf, s.Addr())
+	client, err := goftp.DialConfig(conf, s.Addr())
 	require.NoError(t, err, "Couldn't connect")
 
-	defer func() { panicOnError(c.Close()) }()
+	defer func() { panicOnError(client.Close()) }()
 
-	f := createTemporaryFile(t, 10)
-	_, err = f.Seek(0, 0)
+	tempFile := createTemporaryFile(t, 10)
+	_, err = tempFile.Seek(0, 0)
 	require.NoError(t, err, "Couldn't seek")
-	err = c.Store("quota-exceeded", f)
+	err = client.Store("quota-exceeded", tempFile)
 
 	if assert.Error(t, err) {
 		assert.Contains(t, err.Error(), "552-Could not access file")
 	}
 
-	_, err = f.Seek(0, 0)
+	_, err = tempFile.Seek(0, 0)
 	require.NoError(t, err, "Couldn't seek")
-	err = c.Store("not-allowed", f)
+	err = client.Store("not-allowed", tempFile)
 
 	if assert.Error(t, err) {
 		assert.Contains(t, err.Error(), "553-Could not access file")
@@ -491,18 +493,18 @@ func TestUploadErrorCodes(t *testing.T) {
 }
 
 func TestHASHDisabled(t *testing.T) {
-	s := NewTestServer(t, false)
+	server := NewTestServer(t, false)
 	conf := goftp.Config{
 		User:     authUser,
 		Password: authPass,
 	}
 
-	c, err := goftp.DialConfig(conf, s.Addr())
+	client, err := goftp.DialConfig(conf, server.Addr())
 	require.NoError(t, err, "Couldn't connect")
 
-	defer func() { panicOnError(c.Close()) }()
+	defer func() { panicOnError(client.Close()) }()
 
-	raw, err := c.OpenRawConn()
+	raw, err := client.OpenRawConn()
 	require.NoError(t, err, "Couldn't open raw connection")
 
 	defer func() { require.NoError(t, raw.Close()) }()
@@ -513,7 +515,7 @@ func TestHASHDisabled(t *testing.T) {
 }
 
 func TestHASHCommand(t *testing.T) {
-	s := NewTestServerWithTestDriver(
+	server := NewTestServerWithTestDriver(
 		t,
 		&TestServerDriver{
 			Debug: false,
@@ -527,12 +529,12 @@ func TestHASHCommand(t *testing.T) {
 		Password: authPass,
 	}
 
-	c, err := goftp.DialConfig(conf, s.Addr())
+	client, err := goftp.DialConfig(conf, server.Addr())
 	require.NoError(t, err, "Couldn't connect")
 
-	defer func() { panicOnError(c.Close()) }()
+	defer func() { panicOnError(client.Close()) }()
 
-	dir, err := c.Mkdir("testdir")
+	dir, err := client.Mkdir("testdir")
 	require.NoError(t, err)
 
 	tempFile, err := os.CreateTemp("", "ftpserver")
@@ -543,115 +545,115 @@ func TestHASHCommand(t *testing.T) {
 	crc32Sum := "21b0f382"
 	sha256Hash := "ceee704dd96e2b8c2ceca59c4c697bc01123fb9e66a1a3ac34dbdd2d6da9659b"
 
-	ftpUpload(t, c, tempFile, "file.txt")
+	ftpUpload(t, client, tempFile, "file.txt")
 
-	raw, err := c.OpenRawConn()
+	raw, err := client.OpenRawConn()
 	require.NoError(t, err, "Couldn't open raw connection")
 
 	defer func() { require.NoError(t, raw.Close()) }()
 
 	// ask hash for a directory
-	rc, _, err := raw.SendCommand(fmt.Sprintf("XSHA256 %v", dir))
+	returnCode, _, err := raw.SendCommand(fmt.Sprintf("XSHA256 %v", dir))
 	require.NoError(t, err)
-	require.Equal(t, StatusActionNotTakenNoFile, rc)
+	require.Equal(t, StatusActionNotTakenNoFile, returnCode)
 
 	// test the HASH command
-	rc, message, err := raw.SendCommand("HASH file.txt")
+	returnCode, message, err := raw.SendCommand("HASH file.txt")
 	require.NoError(t, err)
-	require.Equal(t, StatusFileStatus, rc)
+	require.Equal(t, StatusFileStatus, returnCode)
 	require.True(t, strings.HasSuffix(message, fmt.Sprintf("SHA-256 0-36 %v file.txt", sha256Hash)))
 
 	// change algo and request the hash again
-	rc, message, err = raw.SendCommand("OPTS HASH CRC32")
+	returnCode, message, err = raw.SendCommand("OPTS HASH CRC32")
 	require.NoError(t, err)
-	require.Equal(t, StatusOK, rc)
+	require.Equal(t, StatusOK, returnCode)
 	require.Equal(t, "CRC32", message)
 
-	rc, message, err = raw.SendCommand("HASH file.txt")
+	returnCode, message, err = raw.SendCommand("HASH file.txt")
 	require.NoError(t, err)
-	require.Equal(t, StatusFileStatus, rc)
+	require.Equal(t, StatusFileStatus, returnCode)
 	require.True(t, strings.HasSuffix(message, fmt.Sprintf("CRC32 0-36 %v file.txt", crc32Sum)))
 }
 
 func TestCustomHASHCommands(t *testing.T) {
-	s := NewTestServer(t, false)
-	s.settings.EnableHASH = true
+	server := NewTestServer(t, false)
+	server.settings.EnableHASH = true
 	conf := goftp.Config{
 		User:     authUser,
 		Password: authPass,
 	}
 
-	c, err := goftp.DialConfig(conf, s.Addr())
+	client, err := goftp.DialConfig(conf, server.Addr())
 	require.NoError(t, err, "Couldn't connect")
 
-	defer func() { panicOnError(c.Close()) }()
+	defer func() { panicOnError(client.Close()) }()
 
 	tempFile, err := os.CreateTemp("", "ftpserver")
 	require.NoError(t, err)
 	_, err = tempFile.WriteString("sample data with know checksum/hash\n")
 	require.NoError(t, err)
 
-	ftpUpload(t, c, tempFile, "file.txt")
+	ftpUpload(t, client, tempFile, "file.txt")
 
 	err = tempFile.Close()
 	require.NoError(t, err)
 
-	raw, err := c.OpenRawConn()
+	raw, err := client.OpenRawConn()
 	require.NoError(t, err, "Couldn't open raw connection")
 
 	defer func() { require.NoError(t, raw.Close()) }()
 
 	hashMapping := getKnownHASHMappings()
 
-	var rc int
+	var returnCode int
 	var message string
 
 	for cmd, expected := range hashMapping {
-		rc, message, err = raw.SendCommand(fmt.Sprintf("%v file.txt", cmd))
+		returnCode, message, err = raw.SendCommand(fmt.Sprintf("%v file.txt", cmd))
 		require.NoError(t, err)
-		require.Equal(t, StatusFileOK, rc)
+		require.Equal(t, StatusFileOK, returnCode)
 		require.True(t, strings.HasSuffix(message, expected))
 	}
 
 	// now a partial hash
-	rc, message, err = raw.SendCommand("XSHA256 file.txt 7 11")
+	returnCode, message, err = raw.SendCommand("XSHA256 file.txt 7 11")
 	require.NoError(t, err)
-	require.Equal(t, StatusFileOK, rc)
+	require.Equal(t, StatusFileOK, returnCode)
 	require.True(t, strings.HasSuffix(message, "3a6eb0790f39ac87c94f3856b2dd2c5d110e6811602261a9a923d3bb23adc8b7"))
 
 	// invalid start
-	rc, _, err = raw.SendCommand("XSHA256 file.txt a 11")
+	returnCode, _, err = raw.SendCommand("XSHA256 file.txt a 11")
 	require.NoError(t, err)
-	require.Equal(t, StatusSyntaxErrorParameters, rc)
+	require.Equal(t, StatusSyntaxErrorParameters, returnCode)
 
 	// invalid end
-	rc, _, err = raw.SendCommand("XSHA256 file.txt 7 a")
+	returnCode, _, err = raw.SendCommand("XSHA256 file.txt 7 a")
 	require.NoError(t, err)
-	require.Equal(t, StatusSyntaxErrorParameters, rc)
+	require.Equal(t, StatusSyntaxErrorParameters, returnCode)
 }
 
 func TestCOMB(t *testing.T) {
-	s := NewTestServer(t, false)
+	server := NewTestServer(t, false)
 	conf := goftp.Config{
 		User:     authUser,
 		Password: authPass,
 	}
 
-	c, err := goftp.DialConfig(conf, s.Addr())
+	client, err := goftp.DialConfig(conf, server.Addr())
 	require.NoError(t, err, "Couldn't connect")
 
-	defer func() { panicOnError(c.Close()) }()
+	defer func() { panicOnError(client.Close()) }()
 
-	raw, err := c.OpenRawConn()
+	raw, err := client.OpenRawConn()
 	require.NoError(t, err, "Couldn't open raw connection")
 
 	defer func() { require.NoError(t, raw.Close()) }()
 
-	rc, message, err := raw.SendCommand("COMB file.bin 1 2")
+	returnCode, message, err := raw.SendCommand("COMB file.bin 1 2")
 	require.NoError(t, err)
-	require.Equal(t, StatusCommandNotImplemented, rc, message)
+	require.Equal(t, StatusCommandNotImplemented, returnCode, message)
 
-	s.settings.EnableCOMB = true
+	server.settings.EnableCOMB = true
 
 	var parts []*os.File
 
@@ -662,33 +664,33 @@ func TestCOMB(t *testing.T) {
 		createTemporaryFile(t, partSize), createTemporaryFile(t, partSize))
 
 	for idx, part := range parts {
-		ftpUpload(t, c, part, fmt.Sprintf("%d", idx))
+		ftpUpload(t, client, part, strconv.Itoa(idx))
 		_, err = part.Seek(0, io.SeekStart)
 		require.NoError(t, err)
 		_, err = io.Copy(hasher, part)
 		require.NoError(t, err)
 	}
 
-	rc, message, err = raw.SendCommand("COMB file.bin 0 1 2 3")
+	returnCode, message, err = raw.SendCommand("COMB file.bin 0 1 2 3")
 	require.NoError(t, err)
-	require.Equal(t, StatusFileOK, rc, message)
+	require.Equal(t, StatusFileOK, returnCode, message)
 	require.Equal(t, "COMB succeeded!", message)
 
-	info, err := c.Stat("file.bin")
+	info, err := client.Stat("file.bin")
 	require.NoError(t, err)
 	require.Equal(t, int64(partSize*4), info.Size())
 
 	hashParts := hex.EncodeToString(hasher.Sum(nil))
-	hashCombined := ftpDownloadAndHash(t, c, "file.bin")
+	hashCombined := ftpDownloadAndHash(t, client, "file.bin")
 	require.Equal(t, hashParts, hashCombined)
 
-	contents, err := c.ReadDir("/")
+	contents, err := client.ReadDir("/")
 	require.NoError(t, err)
 	require.Len(t, contents, 1)
 }
 
 func TestCOMBAppend(t *testing.T) {
-	s := NewTestServerWithTestDriver(
+	server := NewTestServerWithTestDriver(
 		t,
 		&TestServerDriver{
 			Debug: false,
@@ -702,16 +704,16 @@ func TestCOMBAppend(t *testing.T) {
 		Password: authPass,
 	}
 
-	c, err := goftp.DialConfig(conf, s.Addr())
+	client, err := goftp.DialConfig(conf, server.Addr())
 	require.NoError(t, err, "Couldn't connect")
 
-	defer func() { panicOnError(c.Close()) }()
+	defer func() { panicOnError(client.Close()) }()
 
 	partSize := 1024
 	hasher := sha256.New()
 
 	initialFile := createTemporaryFile(t, partSize)
-	ftpUpload(t, c, initialFile, "file.bin")
+	ftpUpload(t, client, initialFile, "file.bin")
 
 	_, err = initialFile.Seek(0, io.SeekStart)
 	require.NoError(t, err)
@@ -723,14 +725,14 @@ func TestCOMBAppend(t *testing.T) {
 	parts = append(parts, createTemporaryFile(t, partSize), createTemporaryFile(t, partSize))
 
 	for idx, part := range parts {
-		ftpUpload(t, c, part, fmt.Sprintf(" %d ", idx))
+		ftpUpload(t, client, part, fmt.Sprintf(" %d ", idx))
 		_, err = part.Seek(0, io.SeekStart)
 		require.NoError(t, err)
 		_, err = io.Copy(hasher, part)
 		require.NoError(t, err)
 	}
 
-	raw, err := c.OpenRawConn()
+	raw, err := client.OpenRawConn()
 	require.NoError(t, err, "Couldn't open raw connection")
 
 	defer func() { require.NoError(t, raw.Close()) }()
@@ -740,39 +742,39 @@ func TestCOMBAppend(t *testing.T) {
 	require.Equal(t, StatusFileOK, rc, message)
 	require.Equal(t, "COMB succeeded!", message)
 
-	info, err := c.Stat("file.bin")
+	info, err := client.Stat("file.bin")
 	require.NoError(t, err)
 	require.Equal(t, int64(partSize*3), info.Size())
 
 	hashParts := hex.EncodeToString(hasher.Sum(nil))
-	hashCombined := ftpDownloadAndHash(t, c, "file.bin")
+	hashCombined := ftpDownloadAndHash(t, client, "file.bin")
 	require.Equal(t, hashParts, hashCombined)
 
-	contents, err := c.ReadDir("/")
+	contents, err := client.ReadDir("/")
 	require.NoError(t, err)
 	require.Len(t, contents, 1)
 }
 
 func TestCOMBCloseError(t *testing.T) {
-	s := NewTestServer(t, false)
+	server := NewTestServer(t, false)
 	conf := goftp.Config{
 		User:     authUser,
 		Password: authPass,
 	}
-	s.settings.EnableCOMB = true
+	server.settings.EnableCOMB = true
 
-	c, err := goftp.DialConfig(conf, s.Addr())
+	client, err := goftp.DialConfig(conf, server.Addr())
 	require.NoError(t, err, "Couldn't connect")
 
-	defer func() { panicOnError(c.Close()) }()
+	defer func() { panicOnError(client.Close()) }()
 
-	raw, err := c.OpenRawConn()
+	raw, err := client.OpenRawConn()
 	require.NoError(t, err, "Couldn't open raw connection")
 
 	defer func() { require.NoError(t, raw.Close()) }()
 
-	ftpUpload(t, c, createTemporaryFile(t, 10), "1.bin")
-	ftpUpload(t, c, createTemporaryFile(t, 10), "2.bin")
+	ftpUpload(t, client, createTemporaryFile(t, 10), "1.bin")
+	ftpUpload(t, client, createTemporaryFile(t, 10), "2.bin")
 
 	rc, message, err := raw.SendCommand("COMB fail-to-close.bin 1.bin 2.bin")
 	require.NoError(t, err)
@@ -781,116 +783,116 @@ func TestCOMBCloseError(t *testing.T) {
 }
 
 func TestREST(t *testing.T) {
-	s := NewTestServer(t, false)
+	server := NewTestServer(t, false)
 	conf := goftp.Config{
 		User:     authUser,
 		Password: authPass,
 	}
 
-	c, err := goftp.DialConfig(conf, s.Addr())
+	client, err := goftp.DialConfig(conf, server.Addr())
 	require.NoError(t, err, "Couldn't connect")
 
-	defer func() { panicOnError(c.Close()) }()
+	defer func() { panicOnError(client.Close()) }()
 
-	raw, err := c.OpenRawConn()
+	raw, err := client.OpenRawConn()
 	require.NoError(t, err, "Couldn't open raw connection")
 
 	defer func() { require.NoError(t, raw.Close()) }()
 
-	rc, response, err := raw.SendCommand("TYPE A")
+	returnCode, response, err := raw.SendCommand("TYPE A")
 	require.NoError(t, err)
-	require.Equal(t, StatusOK, rc, response)
+	require.Equal(t, StatusOK, returnCode, response)
 
-	rc, response, err = raw.SendCommand("REST 10")
+	returnCode, response, err = raw.SendCommand("REST 10")
 	require.NoError(t, err)
-	require.Equal(t, StatusSyntaxErrorParameters, rc, response)
+	require.Equal(t, StatusSyntaxErrorParameters, returnCode, response)
 
-	rc, response, err = raw.SendCommand("TYPE I")
+	returnCode, response, err = raw.SendCommand("TYPE I")
 	require.NoError(t, err)
-	require.Equal(t, StatusOK, rc, response)
+	require.Equal(t, StatusOK, returnCode, response)
 
-	rc, response, err = raw.SendCommand("REST a")
+	returnCode, response, err = raw.SendCommand("REST a")
 	require.NoError(t, err)
-	require.Equal(t, StatusActionNotTaken, rc, response)
+	require.Equal(t, StatusActionNotTaken, returnCode, response)
 	require.True(t, strings.HasPrefix(response, "Couldn't parse size"))
 }
 
 func TestSIZE(t *testing.T) {
-	s := NewTestServer(t, false)
+	server := NewTestServer(t, false)
 	conf := goftp.Config{
 		User:     authUser,
 		Password: authPass,
 	}
-	c, err := goftp.DialConfig(conf, s.Addr())
+	client, err := goftp.DialConfig(conf, server.Addr())
 	require.NoError(t, err, "Couldn't connect")
 
-	defer func() { panicOnError(c.Close()) }()
+	defer func() { panicOnError(client.Close()) }()
 
-	raw, err := c.OpenRawConn()
+	raw, err := client.OpenRawConn()
 	require.NoError(t, err, "Couldn't open raw connection")
 
 	defer func() { require.NoError(t, raw.Close()) }()
 
-	rc, response, err := raw.SendCommand("SIZE file.bin")
+	returnCode, response, err := raw.SendCommand("SIZE file.bin")
 	require.NoError(t, err)
-	require.Equal(t, StatusActionNotTaken, rc, response)
+	require.Equal(t, StatusActionNotTaken, returnCode, response)
 	require.True(t, strings.HasPrefix(response, "Couldn't access"))
 
-	ftpUpload(t, c, createTemporaryFile(t, 10), "file.bin")
+	ftpUpload(t, client, createTemporaryFile(t, 10), "file.bin")
 
-	rc, response, err = raw.SendCommand("SIZE file.bin")
+	returnCode, response, err = raw.SendCommand("SIZE file.bin")
 	require.NoError(t, err)
-	require.Equal(t, StatusFileStatus, rc, response)
+	require.Equal(t, StatusFileStatus, returnCode, response)
 	require.Equal(t, "10", response)
 
-	rc, response, err = raw.SendCommand("TYPE A")
+	returnCode, response, err = raw.SendCommand("TYPE A")
 	require.NoError(t, err)
-	require.Equal(t, StatusOK, rc, response)
+	require.Equal(t, StatusOK, returnCode, response)
 
-	rc, response, err = raw.SendCommand("SIZE file.bin")
+	returnCode, response, err = raw.SendCommand("SIZE file.bin")
 	require.NoError(t, err)
-	require.Equal(t, StatusActionNotTaken, rc, response)
+	require.Equal(t, StatusActionNotTaken, returnCode, response)
 	require.Equal(t, "SIZE not allowed in ASCII mode", response)
 }
 
 func TestCOMBErrors(t *testing.T) {
-	s := NewTestServer(t, false)
+	server := NewTestServer(t, false)
 	conf := goftp.Config{
 		User:     authUser,
 		Password: authPass,
 	}
 
-	s.settings.EnableCOMB = true
+	server.settings.EnableCOMB = true
 
-	c, err := goftp.DialConfig(conf, s.Addr())
+	client, err := goftp.DialConfig(conf, server.Addr())
 	require.NoError(t, err, "Couldn't connect")
 
-	defer func() { panicOnError(c.Close()) }()
+	defer func() { panicOnError(client.Close()) }()
 
-	raw, err := c.OpenRawConn()
+	raw, err := client.OpenRawConn()
 	require.NoError(t, err, "Couldn't open raw connection")
 
 	defer func() { require.NoError(t, raw.Close()) }()
 
-	rc, message, err := raw.SendCommand("COMB")
+	returnCode, message, err := raw.SendCommand("COMB")
 	require.NoError(t, err)
-	require.Equal(t, StatusSyntaxErrorParameters, rc, message)
+	require.Equal(t, StatusSyntaxErrorParameters, returnCode, message)
 
-	rc, message, err = raw.SendCommand("COMB file.bin")
+	returnCode, message, err = raw.SendCommand("COMB file.bin")
 	require.NoError(t, err)
-	require.Equal(t, StatusSyntaxErrorParameters, rc, message)
+	require.Equal(t, StatusSyntaxErrorParameters, returnCode, message)
 
-	rc, message, err = raw.SendCommand("COMB file.bin missing")
+	returnCode, message, err = raw.SendCommand("COMB file.bin missing")
 	require.NoError(t, err)
-	require.Equal(t, StatusActionNotTaken, rc, message)
+	require.Equal(t, StatusActionNotTaken, returnCode, message)
 
-	rc, message, err = raw.SendCommand("COMB /missing/file.bin file.bin")
+	returnCode, message, err = raw.SendCommand("COMB /missing/file.bin file.bin")
 	require.NoError(t, err)
-	require.Equal(t, StatusActionNotTaken, rc, message)
+	require.Equal(t, StatusActionNotTaken, returnCode, message)
 
-	rc, message, err = raw.SendCommand("COMB file.bin \"\"")
+	returnCode, message, err = raw.SendCommand("COMB file.bin \"\"")
 	require.NoError(t, err)
-	require.Equal(t, StatusActionNotTaken, rc, message)
+	require.Equal(t, StatusActionNotTaken, returnCode, message)
 }
 
 type quotedParams struct {
@@ -928,14 +930,14 @@ func TestUnquoteCOMBParams(t *testing.T) {
 		},
 	}
 
-	for _, p := range testQuotedParams {
-		parsed, err := unquoteSpaceSeparatedParams(p.params)
+	for _, params := range testQuotedParams {
+		parsed, err := unquoteSpaceSeparatedParams(params.params)
 
-		if p.wantError {
+		if params.wantError {
 			require.Error(t, err)
 		} else {
 			require.NoError(t, err)
-			require.Equal(t, p.parsed, parsed)
+			require.Equal(t, params.parsed, parsed)
 		}
 	}
 }

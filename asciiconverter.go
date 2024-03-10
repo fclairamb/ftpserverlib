@@ -10,6 +10,8 @@ type convertMode int8
 const (
 	convertModeToCRLF convertMode = iota
 	convertModeToLF
+
+	bufferSize = 4096
 )
 
 type asciiConverter struct {
@@ -19,7 +21,7 @@ type asciiConverter struct {
 }
 
 func newASCIIConverter(r io.Reader, mode convertMode) *asciiConverter {
-	reader := bufio.NewReaderSize(r, 4096)
+	reader := bufio.NewReaderSize(r, bufferSize)
 
 	return &asciiConverter{
 		reader:    reader,
@@ -28,8 +30,10 @@ func newASCIIConverter(r io.Reader, mode convertMode) *asciiConverter {
 	}
 }
 
-func (c *asciiConverter) Read(p []byte) (n int, err error) {
+func (c *asciiConverter) Read(bytes []byte) (int, error) {
 	var data []byte
+	var readBytes int
+	var err error
 
 	if len(c.remaining) > 0 {
 		data = c.remaining
@@ -37,21 +41,21 @@ func (c *asciiConverter) Read(p []byte) (n int, err error) {
 	} else {
 		data, _, err = c.reader.ReadLine()
 		if err != nil {
-			return n, err
+			return readBytes, err
 		}
 	}
 
-	n = len(data)
-	if n > 0 {
-		maxSize := len(p) - 2
-		if n > maxSize {
-			copy(p, data[:maxSize])
+	readBytes = len(data)
+	if readBytes > 0 {
+		maxSize := len(bytes) - 2
+		if readBytes > maxSize {
+			copy(bytes, data[:maxSize])
 			c.remaining = data[maxSize:]
 
 			return maxSize, nil
 		}
 
-		copy(p[:n], data[:n])
+		copy(bytes[:readBytes], data[:readBytes])
 	}
 
 	// we can have a partial read if the line is too long
@@ -64,7 +68,7 @@ func (c *asciiConverter) Read(p []byte) (n int, err error) {
 	// client transfers it in ASCII mode
 	err = c.reader.UnreadByte()
 	if err != nil {
-		return n, err
+		return readBytes, err
 	}
 
 	lastByte, err := c.reader.ReadByte()
@@ -72,14 +76,14 @@ func (c *asciiConverter) Read(p []byte) (n int, err error) {
 	if err == nil && lastByte == '\n' {
 		switch c.mode {
 		case convertModeToCRLF:
-			p[n] = '\r'
-			p[n+1] = '\n'
-			n += 2
+			bytes[readBytes] = '\r'
+			bytes[readBytes+1] = '\n'
+			readBytes += 2
 		case convertModeToLF:
-			p[n] = '\n'
-			n++
+			bytes[readBytes] = '\n'
+			readBytes++
 		}
 	}
 
-	return n, err
+	return readBytes, err //nolint:wrapcheck // here wrapping errors brings nothing
 }

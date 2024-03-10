@@ -39,6 +39,8 @@ var errInvalidTLSCertificate = errors.New("invalid TLS certificate")
 
 // NewTestServer provides a test server with or without debugging
 func NewTestServer(t *testing.T, debug bool) *FtpServer {
+	t.Helper()
+
 	return NewTestServerWithTestDriver(t, &TestServerDriver{Debug: debug})
 }
 
@@ -55,7 +57,7 @@ func (driver *TestServerDriver) Init() {
 
 	{
 		dir, _ := os.MkdirTemp("", "example")
-		if err := os.MkdirAll(dir, 0750); err != nil {
+		if err := os.MkdirAll(dir, 0o750); err != nil {
 			panic(err)
 		}
 
@@ -64,7 +66,7 @@ func (driver *TestServerDriver) Init() {
 }
 
 func NewTestServerWithTestDriver(t *testing.T, driver *TestServerDriver) *FtpServer {
-	t.Parallel()
+	t.Helper()
 
 	driver.Init()
 
@@ -86,30 +88,34 @@ func NewTestServerWithTestDriver(t *testing.T, driver *TestServerDriver) *FtpSer
 
 // NewTestServerWithTestDriver provides a server instantiated with some settings
 func NewTestServerWithDriverAndLogger(t *testing.T, driver MainDriver, logger log.Logger) *FtpServer {
-	s := NewFtpServer(driver)
+	t.Helper()
+
+	server := NewFtpServer(driver)
 
 	if logger != nil {
-		s.Logger = logger
+		server.Logger = logger
 	}
 
-	if err := s.Listen(); err != nil {
+	if err := server.Listen(); err != nil {
 		return nil
 	}
 
 	t.Cleanup(func() {
-		mustStopServer(s)
+		mustStopServer(server)
 	})
 
 	go func() {
-		if err := s.Serve(); err != nil && err != io.EOF {
-			s.Logger.Error("problem serving", "err", err)
+		if err := server.Serve(); err != nil && errors.Is(err, io.EOF) {
+			server.Logger.Error("problem serving", "err", err)
 		}
 	}()
 
-	return s
+	return server
 }
 
 func NewTestServerWithDriver(t *testing.T, driver MainDriver) *FtpServer {
+	t.Helper()
+
 	return NewTestServerWithDriverAndLogger(t, driver, nil)
 }
 
@@ -146,16 +152,16 @@ var (
 	errFailOpen    = errors.New("couldn't open")
 )
 
-func (f *testFile) Read(b []byte) (int, error) {
+func (f *testFile) Read(out []byte) (int, error) {
 	// simulating a slow reading allows us to test ABOR
 	if strings.Contains(f.File.Name(), "delay-io") {
 		time.Sleep(500 * time.Millisecond)
 	}
 
-	return f.File.Read(b)
+	return f.File.Read(out)
 }
 
-func (f *testFile) Write(b []byte) (int, error) {
+func (f *testFile) Write(out []byte) (int, error) {
 	if strings.Contains(f.File.Name(), "fail-to-write") {
 		return 0, errFailWrite
 	}
@@ -165,7 +171,7 @@ func (f *testFile) Write(b []byte) (int, error) {
 		time.Sleep(500 * time.Millisecond)
 	}
 
-	return f.File.Write(b)
+	return f.File.Write(out)
 }
 
 func (f *testFile) Close() error {
@@ -226,7 +232,7 @@ func mustStopServer(server *FtpServer) {
 var errConnectionNotAllowed = errors.New("connection not allowed")
 
 // ClientConnected is the very first message people will see
-func (driver *TestServerDriver) ClientConnected(cc ClientContext) (string, error) {
+func (driver *TestServerDriver) ClientConnected(cltContext ClientContext) (string, error) {
 	driver.clientMU.Lock()
 	defer driver.clientMU.Unlock()
 
@@ -236,10 +242,10 @@ func (driver *TestServerDriver) ClientConnected(cc ClientContext) (string, error
 		err = errConnectionNotAllowed
 	}
 
-	cc.SetDebug(driver.Debug)
+	cltContext.SetDebug(driver.Debug)
 	// we set the client id as extra data just for testing
-	cc.SetExtra(cc.ID())
-	driver.Clients = append(driver.Clients, cc)
+	cltContext.SetExtra(cltContext.ID())
+	driver.Clients = append(driver.Clients, cltContext)
 	// This will remain the official name for now
 	return "TEST Server", err
 }
@@ -254,7 +260,7 @@ func (driver *TestServerDriver) AuthUser(_ ClientContext, user, pass string) (Cl
 		return clientdriver, nil
 	} else if user == "nil" && pass == "nil" {
 		// Definitely a bad behavior (but can be done on the driver side)
-		return nil, nil
+		return nil, nil //nolint:nilnil
 	}
 
 	return nil, errBadUserNameOrPassword
@@ -302,20 +308,20 @@ func (driver *TestServerDriver) GetClientsInfo() map[uint32]interface{} {
 
 	info := make(map[uint32]interface{})
 
-	for _, cc := range driver.Clients {
+	for _, clientContext := range driver.Clients {
 		ccInfo := make(map[string]interface{})
 
-		ccInfo["localAddr"] = cc.LocalAddr()
-		ccInfo["remoteAddr"] = cc.RemoteAddr()
-		ccInfo["clientVersion"] = cc.GetClientVersion()
-		ccInfo["path"] = cc.Path()
-		ccInfo["hasTLSForControl"] = cc.HasTLSForControl()
-		ccInfo["hasTLSForTransfers"] = cc.HasTLSForTransfers()
-		ccInfo["lastCommand"] = cc.GetLastCommand()
-		ccInfo["debug"] = cc.Debug()
-		ccInfo["extra"] = cc.Extra()
+		ccInfo["localAddr"] = clientContext.LocalAddr()
+		ccInfo["remoteAddr"] = clientContext.RemoteAddr()
+		ccInfo["clientVersion"] = clientContext.GetClientVersion()
+		ccInfo["path"] = clientContext.Path()
+		ccInfo["hasTLSForControl"] = clientContext.HasTLSForControl()
+		ccInfo["hasTLSForTransfers"] = clientContext.HasTLSForTransfers()
+		ccInfo["lastCommand"] = clientContext.GetLastCommand()
+		ccInfo["debug"] = clientContext.Debug()
+		ccInfo["extra"] = clientContext.Extra()
 
-		info[cc.ID()] = ccInfo
+		info[clientContext.ID()] = ccInfo
 	}
 
 	return info
@@ -364,7 +370,8 @@ func (driver *TestServerDriver) PreAuthUser(cc ClientContext, _ string) error {
 }
 
 func (driver *TestServerDriver) VerifyConnection(_ ClientContext, _ string,
-	_ *tls.Conn) (ClientDriver, error) {
+	_ *tls.Conn,
+) (ClientDriver, error) {
 	switch driver.TLSVerificationReply {
 	case tlsVerificationFailed:
 		return nil, errInvalidTLSCertificate
@@ -373,10 +380,10 @@ func (driver *TestServerDriver) VerifyConnection(_ ClientContext, _ string,
 
 		return clientdriver, nil
 	case tlsVerificationOK:
-		return nil, nil
+		return nil, nil //nolint:nilnil
 	}
 
-	return nil, nil
+	return nil, nil //nolint:nilnil
 }
 
 func (driver *TestServerDriver) WrapPassiveListener(listener net.Listener) (net.Listener, error) {
@@ -452,8 +459,10 @@ func (driver *TestClientDriver) GetAvailableSpace(dirName string) (int64, error)
 	return int64(123), nil
 }
 
-var errInvalidChownUser = errors.New("invalid chown on user")
-var errInvalidChownGroup = errors.New("invalid chown on group")
+var (
+	errInvalidChownUser  = errors.New("invalid chown on user")
+	errInvalidChownGroup = errors.New("invalid chown on group")
+)
 
 func (driver *TestClientDriver) Chown(name string, uid int, gid int) error {
 	if uid != 0 && uid != authUserID {
