@@ -19,7 +19,7 @@ func TestGetRelativePaths(t *testing.T) {
 	type relativePathTest struct {
 		workingDir, path, result string
 	}
-	var tests = []relativePathTest{
+	tests := []relativePathTest{
 		{"/", "/p", "p"},
 		{"/", "/", ""},
 		{"/p", "/p", ""},
@@ -590,7 +590,7 @@ func TestMLSDAndNLSTFilePathError(t *testing.T) {
 	defer func() { panicOnError(client.Close()) }()
 
 	// MLSD shouldn't work for filePaths
-	var fileName = "testfile.ext"
+	fileName := "testfile.ext"
 
 	_, err = client.ReadDir(fileName)
 	require.Error(t, err, "MLSD for not existing filePath must fail")

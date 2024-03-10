@@ -28,7 +28,6 @@ func TestConcurrency(t *testing.T) {
 			}
 
 			client, err := goftp.DialConfig(conf, server.Addr())
-
 			if err != nil {
 				panic(fmt.Sprintf("Couldn't connect: %v", err))
 			}

@@ -202,6 +202,7 @@ linters:
         - godox
         - goerr113
         - gofmt
+        # - gofumpt -> conflicts with wsl
         - goimports
         - gosimple
         # - golint --> revive
@@ -237,6 +238,7 @@ linters:
         - prealloc
         - nestif
         - nilerr
+        - nilnil
         - nolintlint
         - nlreturn
         - rowserrcheck
@@ -274,10 +276,12 @@ linters:
         - unused
         - usestdlibvars
         - varnamelen
+        - wastedassign
         # - varcheck -> unused
         - whitespace
-        # - wrapcheck
+        # - wrapcheck -> too much effort for now
         - wsl
+        # - zerologlint -> Will most probably never use it
     fast: false
   
 issues:

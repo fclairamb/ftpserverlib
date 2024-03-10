@@ -225,7 +225,6 @@ func (p *passiveTransferHandler) ConnectionWait(wait time.Duration) (net.Conn, e
 		}
 
 		p.connection, err = p.listener.Accept()
-
 		if err != nil {
 			return nil, fmt.Errorf("failed to accept passive transfer connection: %w", err)
 		}

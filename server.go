@@ -13,10 +13,8 @@ import (
 	lognoop "github.com/fclairamb/go-log/noop"
 )
 
-var (
-	// ErrNotListening is returned when we are performing an action that is only valid while listening
-	ErrNotListening = errors.New("we aren't listening")
-)
+// ErrNotListening is returned when we are performing an action that is only valid while listening
+var ErrNotListening = errors.New("we aren't listening")
 
 // CommandDescription defines which function should be used and if it should be open to anyone or only logged in users
 type CommandDescription struct {
@@ -95,9 +93,7 @@ var commandsMap = map[string]*CommandDescription{ //nolint:gochecknoglobals
 	"EPRT": {Fn: (*clientHandler).handlePORT},
 }
 
-var (
-	specialAttentionCommands = []string{"ABOR", "STAT", "QUIT"} //nolint:gochecknoglobals
-)
+var specialAttentionCommands = []string{"ABOR", "STAT", "QUIT"} //nolint:gochecknoglobals
 
 // FtpServer is where everything is stored
 // We want to keep it as simple as possible
@@ -163,7 +159,6 @@ func parseIPv4(publicHost string) (string, error) {
 // It's not a blocking call
 func (server *FtpServer) Listen() error {
 	err := server.loadSettings()
-
 	if err != nil {
 		return fmt.Errorf("could not load settings: %w", err)
 	}
@@ -174,7 +169,6 @@ func (server *FtpServer) Listen() error {
 	} else {
 		// Otherwise, it's what we currently use
 		server.listener, err = server.createListener()
-
 		if err != nil {
 			return fmt.Errorf("could not create listener: %w", err)
 		}
@@ -187,7 +181,6 @@ func (server *FtpServer) Listen() error {
 
 func (server *FtpServer) createListener() (net.Listener, error) {
 	listener, err := net.Listen("tcp", server.settings.ListenAddr)
-
 	if err != nil {
 		server.Logger.Error("cannot listen on main port", "err", err, "listenAddr", server.settings.ListenAddr)
 
@@ -227,7 +220,6 @@ func (server *FtpServer) Serve() error {
 
 	for {
 		connection, err := server.listener.Accept()
-
 		if err != nil {
 			if ok, finalErr := server.handleAcceptError(err, &tempDelay); ok {
 				return finalErr

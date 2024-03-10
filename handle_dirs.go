@@ -77,7 +77,7 @@ func (c *clientHandler) handleCWD(param string) error {
 
 func (c *clientHandler) handleMKD(param string) error {
 	pathAbsolute := c.absPath(param)
-	if err := c.driver.Mkdir(pathAbsolute, 0755); err == nil {
+	if err := c.driver.Mkdir(pathAbsolute, 0o755); err == nil {
 		// handleMKD confirms to "quote-doubling"
 		// https://tools.ietf.org/html/rfc959 , page 63
 		c.writeMessage(StatusPathCreated, fmt.Sprintf(`Created dir "%s"`, quoteDoubling(pathAbsolute)))
@@ -97,7 +97,7 @@ func (c *clientHandler) handleMKDIR(params string) {
 
 	p := c.absPath(params)
 
-	if err := c.driver.MkdirAll(p, 0755); err == nil {
+	if err := c.driver.MkdirAll(p, 0o755); err == nil {
 		c.writeMessage(StatusFileOK, "Created dir "+p)
 	} else {
 		c.writeMessage(StatusActionNotTaken, fmt.Sprintf("Couldn't create dir %s: %v", p, err))
@@ -226,7 +226,6 @@ func (c *clientHandler) handleNLST(param string) error {
 func (c *clientHandler) dirTransferNLST(writer io.Writer, files []os.FileInfo, parentDir string) error {
 	if len(files) == 0 {
 		_, err := writer.Write([]byte(""))
-
 		if err != nil {
 			err = newNetworkError("couldn't send NLST data", err)
 		}
@@ -306,7 +305,6 @@ func (c *clientHandler) fileStat(file os.FileInfo) string {
 func (c *clientHandler) dirTransferLIST(writer io.Writer, files []os.FileInfo) error {
 	if len(files) == 0 {
 		_, err := writer.Write([]byte(""))
-
 		if err != nil {
 			err = newNetworkError("error writing LIST entry", err)
 		}
@@ -327,7 +325,6 @@ func (c *clientHandler) dirTransferLIST(writer io.Writer, files []os.FileInfo) e
 func (c *clientHandler) dirTransferMLSD(writer io.Writer, files []os.FileInfo) error {
 	if len(files) == 0 {
 		_, err := writer.Write([]byte(""))
-
 		if err != nil {
 			err = newNetworkError("error writing MLSD entry", err)
 		}
@@ -343,6 +340,7 @@ func (c *clientHandler) dirTransferMLSD(writer io.Writer, files []os.FileInfo) e
 
 	return nil
 }
+
 func (c *clientHandler) writeMLSxEntry(writer io.Writer, file os.FileInfo) error {
 	var listType string
 	if file.IsDir() {
@@ -359,7 +357,6 @@ func (c *clientHandler) writeMLSxEntry(writer io.Writer, file os.FileInfo) error
 		file.ModTime().UTC().Format(dateFormatMLSD),
 		file.Name(),
 	)
-
 	if err != nil {
 		err = fmt.Errorf("error writing MLSD entry: %w", err)
 	}

@@ -99,7 +99,6 @@ func (a *activeTransferHandler) Open() (net.Conn, error) {
 	}
 
 	conn, err := dialer.Dial("tcp", a.raddr.String())
-
 	if err != nil {
 		return nil, newNetworkError("could not establish active connection", err)
 	}
@@ -151,7 +150,6 @@ func parsePORTAddr(param string) (*net.TCPAddr, error) {
 	}
 
 	portByte2, err := strconv.Atoi(params[5])
-
 	if err != nil {
 		return nil, ErrRemoteAddrFormat
 	}
@@ -159,7 +157,6 @@ func parsePORTAddr(param string) (*net.TCPAddr, error) {
 	port := portByte1<<8 + portByte2
 
 	addr, err := net.ResolveTCPAddr("tcp", fmt.Sprintf("%s:%d", ipParts, port))
-
 	if err != nil {
 		err = newNetworkError("could not resolve "+param, err)
 	}
@@ -204,7 +201,6 @@ func parseEPRTAddr(param string) (*net.TCPAddr, error) {
 	}
 
 	addr, err = net.ResolveTCPAddr("tcp", net.JoinHostPort(ipAddress.String(), strconv.Itoa(portI)))
-
 	if err != nil {
 		err = newNetworkError(fmt.Sprintf("could not resolve addr %v:%v", ipAddress, portI), err)
 	}

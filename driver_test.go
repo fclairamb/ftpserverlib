@@ -57,7 +57,7 @@ func (driver *TestServerDriver) Init() {
 
 	{
 		dir, _ := os.MkdirTemp("", "example")
-		if err := os.MkdirAll(dir, 0750); err != nil {
+		if err := os.MkdirAll(dir, 0o750); err != nil {
 			panic(err)
 		}
 
@@ -260,7 +260,7 @@ func (driver *TestServerDriver) AuthUser(_ ClientContext, user, pass string) (Cl
 		return clientdriver, nil
 	} else if user == "nil" && pass == "nil" {
 		// Definitely a bad behavior (but can be done on the driver side)
-		return nil, nil
+		return nil, nil //nolint:nilnil
 	}
 
 	return nil, errBadUserNameOrPassword
@@ -370,7 +370,8 @@ func (driver *TestServerDriver) PreAuthUser(cc ClientContext, _ string) error {
 }
 
 func (driver *TestServerDriver) VerifyConnection(_ ClientContext, _ string,
-	_ *tls.Conn) (ClientDriver, error) {
+	_ *tls.Conn,
+) (ClientDriver, error) {
 	switch driver.TLSVerificationReply {
 	case tlsVerificationFailed:
 		return nil, errInvalidTLSCertificate
@@ -379,10 +380,10 @@ func (driver *TestServerDriver) VerifyConnection(_ ClientContext, _ string,
 
 		return clientdriver, nil
 	case tlsVerificationOK:
-		return nil, nil
+		return nil, nil //nolint:nilnil
 	}
 
-	return nil, nil
+	return nil, nil //nolint:nilnil
 }
 
 func (driver *TestServerDriver) WrapPassiveListener(listener net.Listener) (net.Listener, error) {
@@ -458,8 +459,10 @@ func (driver *TestClientDriver) GetAvailableSpace(dirName string) (int64, error)
 	return int64(123), nil
 }
 
-var errInvalidChownUser = errors.New("invalid chown on user")
-var errInvalidChownGroup = errors.New("invalid chown on group")
+var (
+	errInvalidChownUser  = errors.New("invalid chown on user")
+	errInvalidChownGroup = errors.New("invalid chown on group")
+)
 
 func (driver *TestClientDriver) Chown(name string, uid int, gid int) error {
 	if uid != 0 && uid != authUserID {

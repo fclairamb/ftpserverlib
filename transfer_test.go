@@ -263,7 +263,8 @@ func TestTransfer(t *testing.T) {
 			Settings: &Settings{
 				ActiveTransferPortNon20: true,
 				TLSRequired:             ImplicitEncryption,
-			}})
+			},
+		})
 
 		testTransferOnConnection(t, server, false, true, true)
 		testTransferOnConnection(t, server, true, true, true)
@@ -747,8 +748,10 @@ func TestABORWithoutOpenTransfer(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, StatusFileActionPending, returnCode, response)
 
-	for _, cmd := range []string{"RETR delay-io-fail-to-seek.bin", "LIST delay-io-fail-to-readdir",
-		"NLST delay-io-fail-to-readdir", "MLSD delay-io-fail-to-readdir"} {
+	for _, cmd := range []string{
+		"RETR delay-io-fail-to-seek.bin", "LIST delay-io-fail-to-readdir",
+		"NLST delay-io-fail-to-readdir", "MLSD delay-io-fail-to-readdir",
+	} {
 		_, err = raw.PrepareDataConn()
 		require.NoError(t, err)
 

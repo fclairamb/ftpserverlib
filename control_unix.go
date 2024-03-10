@@ -25,7 +25,6 @@ func Control(_, _ string, c syscall.RawConn) error {
 			return
 		}
 	})
-
 	if err != nil {
 		return fmt.Errorf("unable to set control options: %w", err)
 	}

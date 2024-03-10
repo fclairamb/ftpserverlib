@@ -9,7 +9,6 @@ import (
 func (c *clientHandler) handleUSER(user string) error {
 	if verifier, ok := c.server.driver.(MainDriverExtensionUserVerifier); ok {
 		err := verifier.PreAuthUser(c, user)
-
 		if err != nil {
 			c.writeMessage(StatusNotLoggedIn, fmt.Sprintf("User rejected: %v", err))
 			c.disconnect()
@@ -51,7 +50,6 @@ func (c *clientHandler) handleUserTLS(user string) bool {
 	}
 
 	driver, err := verifier.VerifyConnection(c, user, tlsConn)
-
 	if err != nil {
 		c.writeMessage(StatusNotLoggedIn, fmt.Sprintf("TLS verification failed: %v", err))
 		c.disconnect()

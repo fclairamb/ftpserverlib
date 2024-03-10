@@ -70,7 +70,6 @@ func (c *clientHandler) transferFile(write bool, appendFile bool, param, info st
 	}
 
 	file, err = c.getFileHandle(path, fileFlag, c.ctxRest)
-
 	// If this fail, can stop right here and reset the seek position
 	if err != nil {
 		if !c.isCommandAborted() {
@@ -420,7 +419,6 @@ func (c *clientHandler) handleSTATFile(param string) error {
 	path := c.absPath(param)
 
 	info, err := c.driver.Stat(path)
-
 	if err != nil {
 		c.writeMessage(StatusFileActionNotTaken, fmt.Sprintf("Could not STAT: %v", err))
 
@@ -496,7 +494,6 @@ func (c *clientHandler) handleMLST(param string) error {
 func (c *clientHandler) handleALLO(param string) error {
 	// We should probably add a method in the driver
 	size, err := strconv.Atoi(param)
-
 	if err != nil {
 		c.writeMessage(StatusSyntaxErrorParameters, fmt.Sprintf("Couldn't parse size: %v", err))
 
@@ -701,7 +698,6 @@ func (c *clientHandler) computeHashForFile(filePath string, algo HASHAlgo, start
 	}
 
 	file, err = c.getFileHandle(filePath, os.O_RDONLY, start)
-
 	if err != nil {
 		return "", err
 	}
@@ -735,7 +731,6 @@ func (c *clientHandler) getFileHandle(name string, flags int, offset int64) (Fil
 	}
 
 	file, err := c.driver.OpenFile(name, flags, os.ModePerm)
-
 	if err != nil {
 		err = newDriverError("calling OpenFile", err)
 	}
