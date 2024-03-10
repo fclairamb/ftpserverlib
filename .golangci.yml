@@ -268,6 +268,7 @@ linters:
         - testifylint
         # - testpackage -> too late for that
         - thelper
+        - tparallel
         - unconvert
         - unparam
         - unused

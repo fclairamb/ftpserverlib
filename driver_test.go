@@ -67,7 +67,6 @@ func (driver *TestServerDriver) Init() {
 
 func NewTestServerWithTestDriver(t *testing.T, driver *TestServerDriver) *FtpServer {
 	t.Helper()
-	t.Parallel()
 
 	driver.Init()
 

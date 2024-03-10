@@ -116,7 +116,10 @@ func TestTransferOpenError(t *testing.T) {
 }
 
 func TestTLSMethods(t *testing.T) {
+	t.Parallel()
+
 	t.Run("without-tls", func(t *testing.T) {
+		t.Parallel()
 		cc := clientHandler{
 			server: NewTestServer(t, false),
 		}
@@ -125,6 +128,7 @@ func TestTLSMethods(t *testing.T) {
 	})
 
 	t.Run("with-implicit-tls", func(t *testing.T) {
+		t.Parallel()
 		s := NewTestServerWithTestDriver(t, &TestServerDriver{
 			Settings: &Settings{
 				TLSRequired: ImplicitEncryption,

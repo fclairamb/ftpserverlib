@@ -484,7 +484,10 @@ func TestDirListingBeforeLogin(t *testing.T) {
 }
 
 func TestListArgs(t *testing.T) {
+	t.Parallel()
+
 	t.Run("with-mlsd", func(t *testing.T) {
+		t.Parallel()
 		testListDirArgs(
 			t,
 			NewTestServer(t, false),
@@ -492,6 +495,7 @@ func TestListArgs(t *testing.T) {
 	})
 
 	t.Run("without-mlsd", func(t *testing.T) {
+		t.Parallel()
 		testListDirArgs(
 			t,
 			NewTestServerWithTestDriver(t, &TestServerDriver{Debug: false, Settings: &Settings{DisableMLSD: true}}),

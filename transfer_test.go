@@ -184,28 +184,47 @@ func ftpDelete(t *testing.T, ftp *goftp.Client, filename string) {
 }
 
 func TestTransferIPv6(t *testing.T) {
-	s := NewTestServerWithTestDriver(
-		t,
-		&TestServerDriver{
-			Debug: false,
-			Settings: &Settings{
-				ActiveTransferPortNon20: true,
-				ListenAddr:              "[::1]:0",
-			},
-		},
-	)
+	t.Parallel()
 
-	if s == nil {
-		t.Skip("IPv6 is not supported here")
+	createServer := func() *FtpServer {
+		s := NewTestServerWithTestDriver(
+			t,
+			&TestServerDriver{
+				Debug: false,
+				Settings: &Settings{
+					ActiveTransferPortNon20: true,
+					ListenAddr:              "[::1]:0",
+				},
+			},
+		)
+
+		if s == nil {
+			t.Skip("IPv6 is not supported here")
+		}
+
+		return s
 	}
 
-	t.Run("active", func(t *testing.T) { testTransferOnConnection(t, s, true, false, false) })
-	t.Run("passive", func(t *testing.T) { testTransferOnConnection(t, s, false, false, false) })
+	t.Run("active", func(t *testing.T) {
+		t.Parallel()
+
+		s := createServer()
+		testTransferOnConnection(t, s, true, false, false)
+	})
+	t.Run("passive", func(t *testing.T) {
+		t.Parallel()
+
+		s := createServer()
+		testTransferOnConnection(t, s, false, false, false)
+	})
 }
 
 // TestTransfer validates the upload of file in both active and passive mode
 func TestTransfer(t *testing.T) {
+	t.Parallel()
+
 	t.Run("without-tls", func(t *testing.T) {
+		t.Parallel()
 		s := NewTestServerWithTestDriver(
 			t,
 			&TestServerDriver{
@@ -220,6 +239,7 @@ func TestTransfer(t *testing.T) {
 		testTransferOnConnection(t, s, true, false, false)
 	})
 	t.Run("with-tls", func(t *testing.T) {
+		t.Parallel()
 		s := NewTestServerWithTestDriver(
 			t,
 			&TestServerDriver{
@@ -236,6 +256,7 @@ func TestTransfer(t *testing.T) {
 	})
 
 	t.Run("with-implicit-tls", func(t *testing.T) {
+		t.Parallel()
 		s := NewTestServerWithTestDriver(t, &TestServerDriver{
 			Debug: false,
 			TLS:   true,
@@ -397,35 +418,49 @@ func TestBogusTransferStart(t *testing.T) {
 }
 
 func TestFailingFileTransfer(t *testing.T) {
-	driver := &TestServerDriver{
-		Debug: false,
+	t.Parallel()
+
+	createClientOnServer := func(t *testing.T) (*goftp.Client, *os.File) {
+		t.Helper()
+
+		driver := &TestServerDriver{
+			Debug: false,
+		}
+
+		s := NewTestServerWithTestDriver(t, driver)
+		conf := goftp.Config{
+			User:     authUser,
+			Password: authPass,
+		}
+
+		file := createTemporaryFile(t, 1*1024)
+
+		c, err := goftp.DialConfig(conf, s.Addr())
+		require.NoError(t, err)
+		t.Cleanup(func() { panicOnError(c.Close()) })
+
+		return c, file
 	}
-	s := NewTestServerWithTestDriver(t, driver)
-	conf := goftp.Config{
-		User:     authUser,
-		Password: authPass,
-	}
-
-	file := createTemporaryFile(t, 1*1024)
-
-	c, err := goftp.DialConfig(conf, s.Addr())
-	require.NoError(t, err)
-
-	defer func() { require.NoError(t, c.Close()) }()
 
 	t.Run("on write", func(t *testing.T) {
-		err = c.Store("fail-to-write.bin", file)
+		t.Parallel()
+		c, file := createClientOnServer(t)
+		err := c.Store("fail-to-write.bin", file)
 		require.Error(t, err)
 		require.True(t, strings.Contains(err.Error(), errFailWrite.Error()), err)
 	})
 
 	t.Run("on close", func(t *testing.T) {
-		err = c.Store("fail-to-close.bin", file)
+		t.Parallel()
+		c, file := createClientOnServer(t)
+		err := c.Store("fail-to-close.bin", file)
 		require.Error(t, err)
 		require.True(t, strings.Contains(err.Error(), errFailClose.Error()), err)
 	})
 
 	t.Run("on seek", func(t *testing.T) {
+		t.Parallel()
+		c, _ := createClientOnServer(t)
 		initialData := []byte("initial data")
 		appendFile, err := os.CreateTemp("", "ftpserver")
 		require.NoError(t, err)
@@ -456,6 +491,8 @@ func TestFailingFileTransfer(t *testing.T) {
 	})
 
 	t.Run("check for sync", func(t *testing.T) {
+		t.Parallel()
+		c, file := createClientOnServer(t)
 		require.NoError(t, c.Store("ok", file))
 	})
 }
