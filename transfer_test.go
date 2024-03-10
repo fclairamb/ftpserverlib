@@ -32,6 +32,8 @@ func getABORCmd() string {
 }
 
 func createTemporaryFile(t *testing.T, targetSize int) *os.File {
+	t.Helper()
+
 	var file *os.File
 
 	var fileErr error
@@ -55,6 +57,8 @@ func createTemporaryFile(t *testing.T, targetSize int) *os.File {
 }
 
 func hashFile(t *testing.T, file *os.File) string {
+	t.Helper()
+
 	_, err := file.Seek(0, 0)
 	require.NoError(t, err, "Couldn't seek")
 
@@ -71,6 +75,8 @@ func hashFile(t *testing.T, file *os.File) string {
 }
 
 func ftpUpload(t *testing.T, ftp *goftp.Client, file io.ReadSeeker, filename string) {
+	t.Helper()
+
 	_, err := file.Seek(0, 0)
 	require.NoError(t, err, "Couldn't seek")
 
@@ -99,6 +105,8 @@ func ftpUpload(t *testing.T, ftp *goftp.Client, file io.ReadSeeker, filename str
 }
 
 func ftpDownloadAndHash(t *testing.T, ftp *goftp.Client, filename string) string {
+	t.Helper()
+
 	hasher := sha256.New()
 	err := ftp.Retrieve(filename, hasher)
 	require.NoError(t, err, "Couldn't fetch file")
@@ -107,6 +115,8 @@ func ftpDownloadAndHash(t *testing.T, ftp *goftp.Client, filename string) string
 }
 
 func ftpDownloadAndHashWithRawConnection(t *testing.T, raw goftp.RawConn, fileName string) string {
+	t.Helper()
+
 	r := require.New(t)
 	hasher := sha256.New()
 
@@ -134,6 +144,8 @@ func ftpDownloadAndHashWithRawConnection(t *testing.T, raw goftp.RawConn, fileNa
 }
 
 func ftpUploadWithRawConnection(t *testing.T, raw goftp.RawConn, file io.Reader, fileName string, appendFile bool) {
+	t.Helper()
+
 	r := require.New(t)
 	dcGetter, err := raw.PrepareDataConn()
 	r.NoError(err)
@@ -162,6 +174,8 @@ func ftpUploadWithRawConnection(t *testing.T, raw goftp.RawConn, file io.Reader,
 }
 
 func ftpDelete(t *testing.T, ftp *goftp.Client, filename string) {
+	t.Helper()
+
 	err := ftp.Delete(filename)
 	require.NoError(t, err, "Couldn't delete file "+filename)
 
@@ -236,6 +250,8 @@ func TestTransfer(t *testing.T) {
 }
 
 func testTransferOnConnection(t *testing.T, server *FtpServer, active, enableTLS, implicitTLS bool) {
+	t.Helper()
+
 	conf := goftp.Config{
 		User:            authUser,
 		Password:        authPass,
@@ -752,6 +768,8 @@ func TestABORBeforeOpenTransfer(t *testing.T) {
 }
 
 func aborTransfer(t *testing.T, c *goftp.Client) {
+	t.Helper()
+
 	file := createTemporaryFile(t, 1*1024)
 	err := c.Store("file.bin", file)
 	require.NoError(t, err)
@@ -799,6 +817,8 @@ func aborTransfer(t *testing.T, c *goftp.Client) {
 }
 
 func aborBeforeOpenTransfer(t *testing.T, c *goftp.Client) {
+	t.Helper()
+
 	file := createTemporaryFile(t, 1*1024)
 	err := c.Store("file.bin", file)
 	require.NoError(t, err)
@@ -1129,6 +1149,8 @@ func TestPassivePortExhaustion(t *testing.T) {
 }
 
 func loginConnection(t *testing.T, conn net.Conn) {
+	t.Helper()
+
 	buf := make([]byte, 1024)
 	_, err := fmt.Fprintf(conn, "USER %v\r\n", authUser)
 	require.NoError(t, err)
@@ -1150,6 +1172,8 @@ func loginConnection(t *testing.T, conn net.Conn) {
 }
 
 func getPortFromPASVResponse(t *testing.T, resp string) int {
+	t.Helper()
+
 	port := 0
 	resp = strings.Replace(resp, "227 Entering Passive Mode", "", 1)
 	resp = strings.Replace(resp, "(", "", 1)

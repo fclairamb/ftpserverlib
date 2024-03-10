@@ -500,6 +500,8 @@ func TestListArgs(t *testing.T) {
 }
 
 func testListDirArgs(t *testing.T, s *FtpServer) {
+	t.Helper()
+
 	r := require.New(t)
 
 	conf := goftp.Config{

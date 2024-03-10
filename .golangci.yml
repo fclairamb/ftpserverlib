@@ -267,7 +267,7 @@ linters:
         - testableexamples
         - testifylint
         # - testpackage -> too late for that
-        # - thelper
+        - thelper
         - unconvert
         - unparam
         - unused

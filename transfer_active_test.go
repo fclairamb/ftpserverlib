@@ -11,6 +11,8 @@ import (
 )
 
 func testRegexMatch(t *testing.T, regexp *regexp.Regexp, strings []string, expectedMatch bool) {
+	t.Helper()
+
 	for _, s := range strings {
 		if regexp.MatchString(s) != expectedMatch {
 			t.Errorf("Invalid match result: %s", s)
