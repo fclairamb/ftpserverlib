@@ -388,13 +388,11 @@ func (c *clientHandler) end() {
 	}
 }
 
-func (c *clientHandler) isCommandAborted() (aborted bool) {
+func (c *clientHandler) isCommandAborted() bool {
 	c.transferMu.Lock()
 	defer c.transferMu.Unlock()
 
-	aborted = c.isTransferAborted
-
-	return
+	return c.isTransferAborted
 }
 
 // HandleCommands reads the stream of commands
@@ -464,7 +462,7 @@ func (c *clientHandler) readCommand() bool {
 func (c *clientHandler) handleCommandsStreamError(err error) {
 	// florent(2018-01-14): #58: IDLE timeout: Adding some code to deal with the deadline
 	var errNetError net.Error
-	if errors.As(err, &errNetError) {
+	if errors.As(err, &errNetError) { //nolint:nestif // too much effort to change for now
 		if errNetError.Timeout() {
 			// We have to extend the deadline now
 			if errSet := c.conn.SetDeadline(time.Now().Add(time.Minute)); errSet != nil {

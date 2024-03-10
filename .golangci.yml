@@ -235,10 +235,13 @@ linters:
         # - nestif
         - nlreturn
         - prealloc
-        # - nestif
+        - nestif
         - nilerr
         - nolintlint
+        - nlreturn
         - rowserrcheck
+        - noctx
+        - nonamedreturns
         # - scopelint --> exportloopref
         - exportloopref 
         - staticcheck

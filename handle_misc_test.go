@@ -176,7 +176,7 @@ func TestOPTSHASH(t *testing.T) {
 
 	rc, message, err := raw.SendCommand("OPTS HASH")
 	require.NoError(t, err)
-	require.Equal(t, StatusOK, rc)
+	require.Equal(t, StatusOK, rc, message)
 	require.Equal(t, "SHA-256", message)
 
 	rc, message, err = raw.SendCommand("OPTS HASH MD5")

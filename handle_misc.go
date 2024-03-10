@@ -136,40 +136,50 @@ func (c *clientHandler) handleSTATServer() error {
 	return nil
 }
 
-func (c *clientHandler) handleOPTS(param string) error {
-	args := strings.SplitN(param, " ", 2)
-	if strings.EqualFold(args[0], "UTF8") {
-		c.writeMessage(StatusOK, "I'm in UTF8 only anyway")
+func (c *clientHandler) handleOptsUtf8() error {
+	c.writeMessage(StatusOK, "I'm in UTF8 only anyway")
+
+	return nil
+}
+
+func (c *clientHandler) handleOptsHash(args []string) error {
+	hashMapping := getHashMapping()
+
+	if len(args) > 0 {
+		// try to change the current hash algorithm to the requested one
+		if value, ok := hashMapping[args[0]]; ok {
+			c.selectedHashAlgo = value
+			c.writeMessage(StatusOK, args[0])
+		} else {
+			c.writeMessage(StatusSyntaxErrorParameters, "Unknown algorithm, current selection not changed")
+		}
 
 		return nil
 	}
+	// return the current hash algorithm
+	var currentHash string
 
-	if strings.EqualFold(args[0], "HASH") && c.server.settings.EnableHASH {
-		hashMapping := getHashMapping()
-
-		if len(args) > 1 {
-			// try to change the current hash algorithm to the requested one
-			if value, ok := hashMapping[args[1]]; ok {
-				c.selectedHashAlgo = value
-				c.writeMessage(StatusOK, args[1])
-			} else {
-				c.writeMessage(StatusSyntaxErrorParameters, "Unknown algorithm, current selection not changed")
-			}
-
-			return nil
+	for k, v := range hashMapping {
+		if v == c.selectedHashAlgo {
+			currentHash = k
 		}
-		// return the current hash algorithm
-		var currentHash string
+	}
 
-		for k, v := range hashMapping {
-			if v == c.selectedHashAlgo {
-				currentHash = k
-			}
+	c.writeMessage(StatusOK, currentHash)
+
+	return nil
+}
+
+func (c *clientHandler) handleOPTS(param string) error {
+	args := strings.SplitN(param, " ", 2)
+
+	switch strings.ToUpper(args[0]) {
+	case "UTF8":
+		return c.handleOptsUtf8()
+	case "HASH":
+		if c.server.settings.EnableHASH {
+			return c.handleOptsHash(args[1:])
 		}
-
-		c.writeMessage(StatusOK, currentHash)
-
-		return nil
 	}
 
 	c.writeMessage(StatusSyntaxErrorNotRecognised, "Don't know this option")

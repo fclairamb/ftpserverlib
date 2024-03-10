@@ -51,7 +51,7 @@ func (c *clientHandler) transferFile(write bool, append bool, param, info string
 	path := c.absPath(param)
 
 	// We try to open the file
-	if write {
+	if write { //nolint:nestif // too much effort to change for now
 		fileFlag = os.O_WRONLY
 		if append {
 			fileFlag |= os.O_CREATE | os.O_APPEND
@@ -419,44 +419,50 @@ func (c *clientHandler) handleSIZE(param string) error {
 func (c *clientHandler) handleSTATFile(param string) error {
 	path := c.absPath(param)
 
-	if info, err := c.driver.Stat(path); err == nil {
-		if info.IsDir() {
-			var files []os.FileInfo
-			var errList error
+	info, err := c.driver.Stat(path)
 
-			directoryPath := c.absPath(param)
+	if err != nil {
+		c.writeMessage(StatusFileActionNotTaken, fmt.Sprintf("Could not STAT: %v", err))
 
-			if fileList, ok := c.driver.(ClientDriverExtensionFileList); ok {
-				files, errList = fileList.ReadDir(directoryPath)
-			} else {
-				directory, errOpenFile := c.driver.Open(c.absPath(param))
+		return nil
+	}
 
-				if errOpenFile != nil {
-					c.writeMessage(StatusFileActionNotTaken, fmt.Sprintf("Could not list: %v", errOpenFile))
+	if !info.IsDir() {
+		defer c.multilineAnswer(StatusFileStatus, fmt.Sprintf("STAT %v", param))()
 
-					return nil
-				}
+		c.writeLine(fmt.Sprintf(" %s", c.fileStat(info)))
 
-				files, errList = directory.Readdir(-1)
-				c.closeDirectory(directoryPath, directory)
-			}
+		return nil
+	}
 
-			if errList == nil {
-				defer c.multilineAnswer(StatusDirectoryStatus, fmt.Sprintf("STAT %v", param))()
+	var files []os.FileInfo
+	var errList error
 
-				for _, f := range files {
-					c.writeLine(fmt.Sprintf(" %s", c.fileStat(f)))
-				}
-			} else {
-				c.writeMessage(StatusFileActionNotTaken, fmt.Sprintf("Could not list: %v", errList))
-			}
-		} else {
-			defer c.multilineAnswer(StatusFileStatus, fmt.Sprintf("STAT %v", param))()
+	directoryPath := c.absPath(param)
 
-			c.writeLine(fmt.Sprintf(" %s", c.fileStat(info)))
+	if fileList, ok := c.driver.(ClientDriverExtensionFileList); ok {
+		files, errList = fileList.ReadDir(directoryPath)
+	} else {
+		directory, errOpenFile := c.driver.Open(c.absPath(param))
+
+		if errOpenFile != nil {
+			c.writeMessage(StatusFileActionNotTaken, fmt.Sprintf("Could not list: %v", errOpenFile))
+
+			return nil
+		}
+
+		files, errList = directory.Readdir(-1)
+		c.closeDirectory(directoryPath, directory)
+	}
+
+	if errList == nil {
+		defer c.multilineAnswer(StatusDirectoryStatus, fmt.Sprintf("STAT %v", param))()
+
+		for _, f := range files {
+			c.writeLine(fmt.Sprintf(" %s", c.fileStat(f)))
 		}
 	} else {
-		c.writeMessage(StatusFileActionNotTaken, fmt.Sprintf("Could not STAT: %v", err))
+		c.writeMessage(StatusFileActionNotTaken, fmt.Sprintf("Could not list: %v", errList))
 	}
 
 	return nil
@@ -489,18 +495,22 @@ func (c *clientHandler) handleMLST(param string) error {
 
 func (c *clientHandler) handleALLO(param string) error {
 	// We should probably add a method in the driver
-	if size, err := strconv.Atoi(param); err == nil {
-		if alloInt, ok := c.driver.(ClientDriverExtensionAllocate); !ok {
-			c.writeMessage(StatusNotImplemented, "This extension hasn't been implemented !")
-		} else {
-			if errAllocate := alloInt.AllocateSpace(size); errAllocate != nil {
-				c.writeMessage(StatusActionNotTaken, fmt.Sprintf("Couldn't alloInt: %v", errAllocate))
-			} else {
-				c.writeMessage(StatusOK, "Done !")
-			}
-		}
-	} else {
+	size, err := strconv.Atoi(param)
+
+	if err != nil {
 		c.writeMessage(StatusSyntaxErrorParameters, fmt.Sprintf("Couldn't parse size: %v", err))
+
+		return nil
+	}
+
+	if alloInt, ok := c.driver.(ClientDriverExtensionAllocate); !ok {
+		c.writeMessage(StatusNotImplemented, "This extension hasn't been implemented !")
+	} else {
+		if errAllocate := alloInt.AllocateSpace(size); errAllocate != nil {
+			c.writeMessage(StatusActionNotTaken, fmt.Sprintf("Couldn't alloInt: %v", errAllocate))
+		} else {
+			c.writeMessage(StatusOK, "Done !")
+		}
 	}
 
 	return nil
@@ -619,7 +629,7 @@ func (c *clientHandler) handleGenericHash(param string, algo HASHAlgo, isCustomM
 	// to support partial hash also for the HASH command, we should implement RANG,
 	// but it applies also to uploads/downloads and so it complicates their handling,
 	// we'll add this support in future improvements
-	if isCustomMode {
+	if isCustomMode { //nolint:nestif // too much effort to change for now
 		// for custom command the range can be specified in this way:
 		// XSHA1 <file> <start> <end>
 		if len(args) > 1 {

@@ -351,12 +351,12 @@ type testNetConn struct {
 	remoteAddr net.Addr
 }
 
-func (*testNetConn) Read(_ []byte) (n int, err error) {
-	return
+func (*testNetConn) Read(_ []byte) (int, error) {
+	return 0, nil
 }
 
-func (*testNetConn) Write(_ []byte) (n int, err error) {
-	return
+func (*testNetConn) Write(_ []byte) (int, error) {
+	return 0, nil
 }
 
 func (*testNetConn) Close() error {

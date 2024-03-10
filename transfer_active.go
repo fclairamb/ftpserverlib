@@ -170,7 +170,10 @@ func parsePORTAddr(param string) (*net.TCPAddr, error) {
 // Parse EPRT parameter. Full EPRT command format:
 // - IPv4 : "EPRT |1|h1.h2.h3.h4|port|\r\n"
 // - IPv6 : "EPRT |2|h1::h2:h3:h4:h5|port|\r\n"
-func parseEPRTAddr(param string) (addr *net.TCPAddr, err error) {
+func parseEPRTAddr(param string) (*net.TCPAddr, error) {
+	var addr *net.TCPAddr
+	var err error
+
 	params := strings.Split(param, "|")
 	if len(params) != 5 {
 		return nil, ErrRemoteAddrFormat

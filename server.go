@@ -173,32 +173,42 @@ func (server *FtpServer) Listen() error {
 		server.listener = server.settings.Listener
 	} else {
 		// Otherwise, it's what we currently use
-		server.listener, err = net.Listen("tcp", server.settings.ListenAddr)
+		server.listener, err = server.createListener()
 
 		if err != nil {
-			server.Logger.Error("cannot listen on main port", "err", err, "listenAddr", server.settings.ListenAddr)
-
-			return newNetworkError("cannot listen on main port", err)
-		}
-
-		if server.settings.TLSRequired == ImplicitEncryption {
-			// implicit TLS
-			var tlsConfig *tls.Config
-
-			tlsConfig, err = server.driver.GetTLSConfig()
-			if err != nil || tlsConfig == nil {
-				server.Logger.Error("Cannot get tls config", "err", err)
-
-				return newDriverError("cannot get tls config", err)
-			}
-
-			server.listener = tls.NewListener(server.listener, tlsConfig)
+			return fmt.Errorf("could not create listener: %w", err)
 		}
 	}
 
 	server.Logger.Info("Listening...", "address", server.listener.Addr())
 
 	return nil
+}
+
+func (server *FtpServer) createListener() (net.Listener, error) {
+	listener, err := net.Listen("tcp", server.settings.ListenAddr)
+
+	if err != nil {
+		server.Logger.Error("cannot listen on main port", "err", err, "listenAddr", server.settings.ListenAddr)
+
+		return nil, newNetworkError("cannot listen on main port", err)
+	}
+
+	if server.settings.TLSRequired == ImplicitEncryption {
+		// implicit TLS
+		var tlsConfig *tls.Config
+
+		tlsConfig, err = server.driver.GetTLSConfig()
+		if err != nil || tlsConfig == nil {
+			server.Logger.Error("Cannot get tls config", "err", err)
+
+			return nil, newDriverError("cannot get tls config", err)
+		}
+
+		listener = tls.NewListener(listener, tlsConfig)
+	}
+
+	return listener, nil
 }
 
 func temporaryError(err net.Error) bool {
@@ -219,48 +229,61 @@ func (server *FtpServer) Serve() error {
 		connection, err := server.listener.Accept()
 
 		if err != nil {
-			if errOp := (&net.OpError{}); errors.As(err, &errOp) {
-				// This means we just closed the connection and it's OK
-				if errOp.Err.Error() == "use of closed network connection" {
-					server.listener = nil
-
-					return nil
-				}
+			if ok, finalErr := server.handleAcceptError(err, &tempDelay); ok {
+				return finalErr
 			}
 
-			// see https://github.com/golang/go/blob/4aa1efed4853ea067d665a952eee77c52faac774/src/net/http/server.go#L3046
-			// & https://github.com/fclairamb/ftpserverlib/pull/352#pullrequestreview-1077459896
-			// The temporaryError method should replace net.Error.Temporary() when the go team
-			// will have provided us a better way to detect temporary errors.
-			var ne net.Error
-			if errors.Is(err, ne) && ne.Temporary() { //nolint:staticcheck
-				if tempDelay == 0 {
-					tempDelay = 5 * time.Millisecond
-				} else {
-					tempDelay *= 2
-				}
-
-				if max := 1 * time.Second; tempDelay > max {
-					tempDelay = max
-				}
-
-				server.Logger.Warn(
-					"accept error", err,
-					"retry delay", tempDelay)
-				time.Sleep(tempDelay)
-
-				continue
-			}
-
-			server.Logger.Error("Listener accept error", "err", err)
-
-			return newNetworkError("listener accept error", err)
+			continue
 		}
 
 		tempDelay = 0
 
 		server.clientArrival(connection)
 	}
+}
+
+// handleAcceptError handles the error that occurred when accepting a new connection
+// It returns a boolean indicating if the error should stop the server and the error itself or none if it's a standard
+// scenario (e.g. a closed listener)
+func (server *FtpServer) handleAcceptError(err error, tempDelay *time.Duration) (bool, error) {
+	server.Logger.Error("Serve error", "err", err)
+
+	if errOp := (&net.OpError{}); errors.As(err, &errOp) {
+		// This means we just closed the connection and it's OK
+		if errOp.Err.Error() == "use of closed network connection" {
+			server.listener = nil
+
+			return true, nil
+		}
+	}
+
+	// see https://github.com/golang/go/blob/4aa1efed4853ea067d665a952eee77c52faac774/src/net/http/server.go#L3046
+	// & https://github.com/fclairamb/ftpserverlib/pull/352#pullrequestreview-1077459896
+	// The temporaryError method should replace net.Error.Temporary() when the go team
+	// will have provided us a better way to detect temporary errors.
+	var ne net.Error
+	if errors.Is(err, ne) && ne.Temporary() { //nolint:staticcheck
+		if *tempDelay == 0 {
+			*tempDelay = 5 * time.Millisecond
+		} else {
+			*tempDelay *= 2
+		}
+
+		if max := 1 * time.Second; *tempDelay > max {
+			*tempDelay = max
+		}
+
+		server.Logger.Warn(
+			"accept error", err,
+			"retry delay", tempDelay)
+		time.Sleep(*tempDelay)
+
+		return false, nil
+	}
+
+	server.Logger.Error("Listener accept error", "err", err)
+
+	return true, newNetworkError("listener accept error", err)
 }
 
 // ListenAndServe simply chains the Listen and Serve method calls

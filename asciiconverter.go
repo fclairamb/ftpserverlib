@@ -30,8 +30,10 @@ func newASCIIConverter(r io.Reader, mode convertMode) *asciiConverter {
 	}
 }
 
-func (c *asciiConverter) Read(p []byte) (n int, err error) {
+func (c *asciiConverter) Read(p []byte) (int, error) {
 	var data []byte
+	var n int
+	var err error
 
 	if len(c.remaining) > 0 {
 		data = c.remaining
