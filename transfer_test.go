@@ -117,28 +117,28 @@ func ftpDownloadAndHash(t *testing.T, ftp *goftp.Client, filename string) string
 func ftpDownloadAndHashWithRawConnection(t *testing.T, raw goftp.RawConn, fileName string) string {
 	t.Helper()
 
-	r := require.New(t)
+	req := require.New(t)
 	hasher := sha256.New()
 
 	dcGetter, err := raw.PrepareDataConn()
-	r.NoError(err)
+	req.NoError(err)
 
-	rc, response, err := raw.SendCommand(fmt.Sprintf("RETR %v", fileName))
+	returnCode, response, err := raw.SendCommand(fmt.Sprintf("RETR %v", fileName))
 	require.NoError(t, err)
-	r.Equal(StatusFileStatusOK, rc, response)
+	req.Equal(StatusFileStatusOK, returnCode, response)
 
-	dc, err := dcGetter()
-	r.NoError(err)
+	dataConn, err := dcGetter()
+	req.NoError(err)
 
-	_, err = io.Copy(hasher, dc)
-	r.NoError(err)
+	_, err = io.Copy(hasher, dataConn)
+	req.NoError(err)
 
-	err = dc.Close()
-	r.NoError(err)
+	err = dataConn.Close()
+	req.NoError(err)
 
-	rc, response, err = raw.ReadResponse()
-	r.NoError(err)
-	r.Equal(StatusClosingDataConn, rc, response)
+	returnCode, response, err = raw.ReadResponse()
+	req.NoError(err)
+	req.Equal(StatusClosingDataConn, returnCode, response)
 
 	return hex.EncodeToString(hasher.Sum(nil))
 }
@@ -146,31 +146,31 @@ func ftpDownloadAndHashWithRawConnection(t *testing.T, raw goftp.RawConn, fileNa
 func ftpUploadWithRawConnection(t *testing.T, raw goftp.RawConn, file io.Reader, fileName string, appendFile bool) {
 	t.Helper()
 
-	r := require.New(t)
+	req := require.New(t)
 	dcGetter, err := raw.PrepareDataConn()
-	r.NoError(err)
+	req.NoError(err)
 
 	cmd := "STOR"
 	if appendFile {
 		cmd = "APPE"
 	}
 
-	rc, response, err := raw.SendCommand(fmt.Sprintf("%v %v", cmd, fileName))
+	returnCode, response, err := raw.SendCommand(fmt.Sprintf("%v %v", cmd, fileName))
 	require.NoError(t, err)
-	require.Equal(t, StatusFileStatusOK, rc, response)
+	require.Equal(t, StatusFileStatusOK, returnCode, response)
 
-	dc, err := dcGetter()
-	r.NoError(err)
+	dataConn, err := dcGetter()
+	req.NoError(err)
 
-	_, err = io.Copy(dc, file)
-	r.NoError(err)
+	_, err = io.Copy(dataConn, file)
+	req.NoError(err)
 
-	err = dc.Close()
-	r.NoError(err)
+	err = dataConn.Close()
+	req.NoError(err)
 
-	rc, response, err = raw.ReadResponse()
-	r.NoError(err)
-	assert.Equal(t, StatusClosingDataConn, rc, response)
+	returnCode, response, err = raw.ReadResponse()
+	req.NoError(err)
+	assert.Equal(t, StatusClosingDataConn, returnCode, response)
 }
 
 func ftpDelete(t *testing.T, ftp *goftp.Client, filename string) {
@@ -187,7 +187,7 @@ func TestTransferIPv6(t *testing.T) {
 	t.Parallel()
 
 	createServer := func() *FtpServer {
-		s := NewTestServerWithTestDriver(
+		server := NewTestServerWithTestDriver(
 			t,
 			&TestServerDriver{
 				Debug: false,
@@ -198,11 +198,11 @@ func TestTransferIPv6(t *testing.T) {
 			},
 		)
 
-		if s == nil {
+		if server == nil {
 			t.Skip("IPv6 is not supported here")
 		}
 
-		return s
+		return server
 	}
 
 	t.Run("active", func(t *testing.T) {
@@ -225,7 +225,7 @@ func TestTransfer(t *testing.T) {
 
 	t.Run("without-tls", func(t *testing.T) {
 		t.Parallel()
-		s := NewTestServerWithTestDriver(
+		server := NewTestServerWithTestDriver(
 			t,
 			&TestServerDriver{
 				Debug: false,
@@ -235,12 +235,12 @@ func TestTransfer(t *testing.T) {
 			},
 		)
 
-		testTransferOnConnection(t, s, false, false, false)
-		testTransferOnConnection(t, s, true, false, false)
+		testTransferOnConnection(t, server, false, false, false)
+		testTransferOnConnection(t, server, true, false, false)
 	})
 	t.Run("with-tls", func(t *testing.T) {
 		t.Parallel()
-		s := NewTestServerWithTestDriver(
+		server := NewTestServerWithTestDriver(
 			t,
 			&TestServerDriver{
 				Debug: false,
@@ -251,13 +251,13 @@ func TestTransfer(t *testing.T) {
 			},
 		)
 
-		testTransferOnConnection(t, s, false, true, false)
-		testTransferOnConnection(t, s, true, true, false)
+		testTransferOnConnection(t, server, false, true, false)
+		testTransferOnConnection(t, server, true, true, false)
 	})
 
 	t.Run("with-implicit-tls", func(t *testing.T) {
 		t.Parallel()
-		s := NewTestServerWithTestDriver(t, &TestServerDriver{
+		server := NewTestServerWithTestDriver(t, &TestServerDriver{
 			Debug: false,
 			TLS:   true,
 			Settings: &Settings{
@@ -265,8 +265,8 @@ func TestTransfer(t *testing.T) {
 				TLSRequired:             ImplicitEncryption,
 			}})
 
-		testTransferOnConnection(t, s, false, true, true)
-		testTransferOnConnection(t, s, true, true, true)
+		testTransferOnConnection(t, server, false, true, true)
+		testTransferOnConnection(t, server, true, true, true)
 	})
 }
 
@@ -290,21 +290,21 @@ func testTransferOnConnection(t *testing.T, server *FtpServer, active, enableTLS
 		}
 	}
 
-	c, err := goftp.DialConfig(conf, server.Addr())
+	client, err := goftp.DialConfig(conf, server.Addr())
 	require.NoError(t, err, "Couldn't connect")
 
-	defer func() { panicOnError(c.Close()) }()
+	defer func() { panicOnError(client.Close()) }()
 
 	var hashUpload, hashDownload string
 	{ // We create a 10MB file and upload it
 		file := createTemporaryFile(t, 10*1024*1024)
 		hashUpload = hashFile(t, file)
-		ftpUpload(t, c, file, "file.bin")
+		ftpUpload(t, client, file, "file.bin")
 	}
 
 	{ // We download the file we just uploaded
-		hashDownload = ftpDownloadAndHash(t, c, "file.bin")
-		ftpDelete(t, c, "file.bin")
+		hashDownload = ftpDownloadAndHash(t, client, "file.bin")
+		ftpDelete(t, client, "file.bin")
 	}
 
 	// We make sure the hashes of the two files match
@@ -325,93 +325,93 @@ func TestActiveModeDisabled(t *testing.T) {
 		Password:        authPass,
 		ActiveTransfers: true,
 	}
-	c, err := goftp.DialConfig(conf, server.Addr())
+	client, err := goftp.DialConfig(conf, server.Addr())
 	require.NoError(t, err, "Couldn't connect")
 
-	defer func() { panicOnError(c.Close()) }()
+	defer func() { panicOnError(client.Close()) }()
 
 	file := createTemporaryFile(t, 10*1024)
-	err = c.Store("file.bin", file)
+	err = client.Store("file.bin", file)
 	require.Error(t, err, "active mode is disabled, upload must fail")
 	require.True(t, strings.Contains(err.Error(), "421-PORT command is disabled"))
 }
 
 // TestFailedTransfer validates the handling of failed transfer caused by file access issues
 func TestFailedTransfer(t *testing.T) {
-	s := NewTestServer(t, false)
+	server := NewTestServer(t, false)
 	conf := goftp.Config{
 		User:     authUser,
 		Password: authPass,
 	}
-	c, err := goftp.DialConfig(conf, s.Addr())
+	client, err := goftp.DialConfig(conf, server.Addr())
 	require.NoError(t, err, "Couldn't connect")
 
-	defer func() { panicOnError(c.Close()) }()
+	defer func() { panicOnError(client.Close()) }()
 
 	// We create a 1KB file and upload it
 	file := createTemporaryFile(t, 1*1024)
-	err = c.Store("/non/existing/path/file.bin", file)
+	err = client.Store("/non/existing/path/file.bin", file)
 	require.Error(t, err, "This upload should have failed")
 
-	err = c.Store("file.bin", file)
+	err = client.Store("file.bin", file)
 	require.NoError(t, err, "This upload should have succeeded")
 }
 
 func TestBogusTransferStart(t *testing.T) {
-	s := NewTestServer(t, false)
+	server := NewTestServer(t, false)
 	conf := goftp.Config{
 		User:     authUser,
 		Password: authPass,
 	}
-	c, err := goftp.DialConfig(conf, s.Addr())
+	client, err := goftp.DialConfig(conf, server.Addr())
 	require.NoError(t, err, "Couldn't connect")
 
-	rc, err := c.OpenRawConn()
+	returnCode, err := client.OpenRawConn()
 	require.NoError(t, err)
 
-	defer func() { require.NoError(t, rc.Close()) }()
+	defer func() { require.NoError(t, returnCode.Close()) }()
 
 	{ // Completely bogus port declaration
-		status, resp, err := rc.SendCommand("PORT something")
+		status, resp, err := returnCode.SendCommand("PORT something")
 		require.NoError(t, err)
 		require.Equal(t, StatusSyntaxErrorParameters, status, resp)
 	}
 
 	{ // Completely bogus port declaration
-		status, resp, err := rc.SendCommand("EPRT something")
+		status, resp, err := returnCode.SendCommand("EPRT something")
 		require.NoError(t, err)
 		require.Equal(t, StatusSyntaxErrorParameters, status, resp)
 	}
 
 	{ // Bad port number: 0
-		status, resp, err := rc.SendCommand("EPRT |2|::1|0|")
+		status, resp, err := returnCode.SendCommand("EPRT |2|::1|0|")
 		require.NoError(t, err)
 		require.Equal(t, StatusSyntaxErrorParameters, status, resp)
 	}
 
 	{ // Bad IP
-		status, resp, err := rc.SendCommand("EPRT |1|253.254.255.256|2000|")
+		status, resp, err := returnCode.SendCommand("EPRT |1|253.254.255.256|2000|")
 		require.NoError(t, err)
 		require.Equal(t, StatusSyntaxErrorParameters, status, resp)
 	}
 
 	{ // Bad protocol type: 3
-		status, resp, err := rc.SendCommand("EPRT |3|::1|2000|")
+		status, resp, err := returnCode.SendCommand("EPRT |3|::1|2000|")
 		require.NoError(t, err)
 		require.Equal(t, StatusSyntaxErrorParameters, status, resp)
 	}
 
 	{ // good request but unacceptable ip address
-		status, resp, err := rc.SendCommand("EPRT |1|::1|2000|")
+		status, resp, err := returnCode.SendCommand("EPRT |1|::1|2000|")
 		require.NoError(t, err)
 		require.Equal(t, StatusSyntaxErrorParameters, status, resp)
 		require.Contains(t, resp, "Your request does not meet the configured security requirements")
 	}
 
-	s.settings.ActiveConnectionsCheck = IPMatchDisabled
+	server.settings.ActiveConnectionsCheck = IPMatchDisabled
 
 	{ // We end-up on a positive note
-		status, resp, err := rc.SendCommand("EPRT |1|::1|2000|")
+		status, resp, err := returnCode.SendCommand("EPRT |1|::1|2000|")
 		require.NoError(t, err)
 		require.Equal(t, StatusOK, status, resp)
 	}
@@ -427,7 +427,7 @@ func TestFailingFileTransfer(t *testing.T) {
 			Debug: false,
 		}
 
-		s := NewTestServerWithTestDriver(t, driver)
+		server := NewTestServerWithTestDriver(t, driver)
 		conf := goftp.Config{
 			User:     authUser,
 			Password: authPass,
@@ -435,11 +435,11 @@ func TestFailingFileTransfer(t *testing.T) {
 
 		file := createTemporaryFile(t, 1*1024)
 
-		c, err := goftp.DialConfig(conf, s.Addr())
+		client, err := goftp.DialConfig(conf, server.Addr())
 		require.NoError(t, err)
-		t.Cleanup(func() { panicOnError(c.Close()) })
+		t.Cleanup(func() { panicOnError(client.Close()) })
 
-		return c, file
+		return client, file
 	}
 
 	t.Run("on write", func(t *testing.T) {
@@ -460,7 +460,7 @@ func TestFailingFileTransfer(t *testing.T) {
 
 	t.Run("on seek", func(t *testing.T) {
 		t.Parallel()
-		c, _ := createClientOnServer(t)
+		client, _ := createClientOnServer(t)
 		initialData := []byte("initial data")
 		appendFile, err := os.CreateTemp("", "ftpserver")
 		require.NoError(t, err)
@@ -468,7 +468,7 @@ func TestFailingFileTransfer(t *testing.T) {
 		_, err = appendFile.Write(initialData)
 		require.NoError(t, err)
 
-		err = c.Store("fail-to-seek.bin", appendFile)
+		err = client.Store("fail-to-seek.bin", appendFile)
 		require.NoError(t, err)
 
 		err = appendFile.Close()
@@ -483,7 +483,7 @@ func TestFailingFileTransfer(t *testing.T) {
 		info, err := appendFile.Stat()
 		require.NoError(t, err)
 		require.Equal(t, int64(len(initialData)+len(data)), info.Size())
-		_, err = c.TransferFromOffset("fail-to-seek.bin", nil, appendFile, int64(len(initialData)))
+		_, err = client.TransferFromOffset("fail-to-seek.bin", nil, appendFile, int64(len(initialData)))
 		require.Error(t, err)
 		require.True(t, strings.Contains(err.Error(), errFailSeek.Error()), err)
 		err = appendFile.Close()
@@ -501,18 +501,18 @@ func TestAPPEExistingFile(t *testing.T) {
 	driver := &TestServerDriver{
 		Debug: false,
 	}
-	s := NewTestServerWithTestDriver(t, driver)
+	server := NewTestServerWithTestDriver(t, driver)
 	conf := goftp.Config{
 		User:     authUser,
 		Password: authPass,
 	}
 	file := createTemporaryFile(t, 1*1024)
-	c, err := goftp.DialConfig(conf, s.Addr())
+	client, err := goftp.DialConfig(conf, server.Addr())
 	require.NoError(t, err)
 
-	defer func() { require.NoError(t, c.Close()) }()
+	defer func() { require.NoError(t, client.Close()) }()
 
-	raw, err := c.OpenRawConn()
+	raw, err := client.OpenRawConn()
 	require.NoError(t, err)
 
 	defer func() { require.NoError(t, raw.Close()) }()
@@ -522,7 +522,7 @@ func TestAPPEExistingFile(t *testing.T) {
 
 	fileName := filepath.Base(file.Name())
 
-	err = c.Store(fileName, file)
+	err = client.Store(fileName, file)
 	require.NoError(t, err)
 
 	_, err = file.Seek(0, io.SeekEnd)
@@ -537,12 +537,12 @@ func TestAPPEExistingFile(t *testing.T) {
 
 	ftpUploadWithRawConnection(t, raw, file, fileName, true)
 
-	info, err := c.Stat(fileName)
+	info, err := client.Stat(fileName)
 	require.NoError(t, err)
 	require.Equal(t, int64(1024+len(data)), info.Size())
 
 	localHash := hashFile(t, file)
-	remoteHash := ftpDownloadAndHash(t, c, fileName)
+	remoteHash := ftpDownloadAndHash(t, client, fileName)
 	require.Equal(t, localHash, remoteHash)
 }
 
@@ -550,7 +550,7 @@ func TestAPPENewFile(t *testing.T) {
 	driver := &TestServerDriver{
 		Debug: false,
 	}
-	s := NewTestServerWithTestDriver(t, driver)
+	server := NewTestServerWithTestDriver(t, driver)
 	conf := goftp.Config{
 		User:     authUser,
 		Password: authPass,
@@ -559,12 +559,12 @@ func TestAPPENewFile(t *testing.T) {
 	_, err := file.Seek(0, io.SeekStart)
 	require.NoError(t, err)
 
-	c, err := goftp.DialConfig(conf, s.Addr())
+	client, err := goftp.DialConfig(conf, server.Addr())
 	require.NoError(t, err)
 
-	defer func() { require.NoError(t, c.Close()) }()
+	defer func() { require.NoError(t, client.Close()) }()
 
-	raw, err := c.OpenRawConn()
+	raw, err := client.OpenRawConn()
 	require.NoError(t, err)
 
 	defer func() { require.NoError(t, raw.Close()) }()
@@ -574,7 +574,7 @@ func TestAPPENewFile(t *testing.T) {
 	ftpUploadWithRawConnection(t, raw, file, fileName, true)
 
 	localHash := hashFile(t, file)
-	remoteHash := ftpDownloadAndHash(t, c, fileName)
+	remoteHash := ftpDownloadAndHash(t, client, fileName)
 	require.Equal(t, localHash, remoteHash)
 }
 
@@ -582,21 +582,21 @@ func TestTransfersFromOffset(t *testing.T) {
 	driver := &TestServerDriver{
 		Debug: false,
 	}
-	s := NewTestServerWithTestDriver(t, driver)
+	server := NewTestServerWithTestDriver(t, driver)
 	conf := goftp.Config{
 		User:     authUser,
 		Password: authPass,
 	}
 	file := createTemporaryFile(t, 1*1024)
-	c, err := goftp.DialConfig(conf, s.Addr())
+	client, err := goftp.DialConfig(conf, server.Addr())
 	require.NoError(t, err)
 
-	defer func() { require.NoError(t, c.Close()) }()
+	defer func() { require.NoError(t, client.Close()) }()
 
 	_, err = file.Seek(0, io.SeekStart)
 	require.NoError(t, err)
 
-	err = c.Store("file", file)
+	err = client.Store("file", file)
 	require.NoError(t, err)
 
 	_, err = file.Seek(0, io.SeekEnd)
@@ -609,79 +609,79 @@ func TestTransfersFromOffset(t *testing.T) {
 	_, err = file.Seek(1024, io.SeekStart)
 	require.NoError(t, err)
 
-	_, err = c.TransferFromOffset("file", nil, file, 1024)
+	_, err = client.TransferFromOffset("file", nil, file, 1024)
 	require.NoError(t, err)
 
-	info, err := c.Stat("file")
+	info, err := client.Stat("file")
 	require.NoError(t, err)
 	require.Equal(t, int64(1024+len(data)), info.Size())
 
 	localHash := hashFile(t, file)
-	remoteHash := ftpDownloadAndHash(t, c, "file")
+	remoteHash := ftpDownloadAndHash(t, client, "file")
 	require.Equal(t, localHash, remoteHash)
 
 	// finally test a partial RETR
 	buf := bytes.NewBuffer(nil)
-	_, err = c.TransferFromOffset("file", buf, nil, 1024)
+	_, err = client.TransferFromOffset("file", buf, nil, 1024)
 	require.NoError(t, err)
 	require.Equal(t, string(data), buf.String())
 }
 
 func TestBasicABOR(t *testing.T) {
-	s := NewTestServer(t, false)
+	server := NewTestServer(t, false)
 	conf := goftp.Config{
 		User:     authUser,
 		Password: authPass,
 	}
-	c, err := goftp.DialConfig(conf, s.Addr())
+	client, err := goftp.DialConfig(conf, server.Addr())
 	require.NoError(t, err, "Couldn't connect")
 
-	defer func() { require.NoError(t, c.Close()) }()
+	defer func() { require.NoError(t, client.Close()) }()
 
-	raw, err := c.OpenRawConn()
+	raw, err := client.OpenRawConn()
 	require.NoError(t, err)
 
 	defer func() { require.NoError(t, raw.Close()) }()
 
-	rc, _, err := raw.SendCommand("EPSV")
+	returnCode, _, err := raw.SendCommand("EPSV")
 	require.NoError(t, err)
-	require.Equal(t, StatusEnteringEPSV, rc)
+	require.Equal(t, StatusEnteringEPSV, returnCode)
 
-	rc, _, err = raw.SendCommand(getABORCmd())
+	returnCode, _, err = raw.SendCommand(getABORCmd())
 	require.NoError(t, err)
-	require.Equal(t, StatusClosingDataConn, rc)
+	require.Equal(t, StatusClosingDataConn, returnCode)
 
 	// verify we are in sync
-	rc, _, err = raw.SendCommand("NOOP")
+	returnCode, _, err = raw.SendCommand("NOOP")
 	require.NoError(t, err)
-	require.Equal(t, StatusOK, rc)
+	require.Equal(t, StatusOK, returnCode)
 
 	_, err = raw.PrepareDataConn()
 	require.NoError(t, err)
 
-	rc, _, err = raw.SendCommand("NLST")
+	returnCode, _, err = raw.SendCommand("NLST")
 	require.NoError(t, err)
-	require.Equal(t, StatusFileStatusOK, rc)
+	require.Equal(t, StatusFileStatusOK, returnCode)
 
-	rc, _, err = raw.ReadResponse()
+	returnCode, _, err = raw.ReadResponse()
 	require.NoError(t, err)
-	require.Equal(t, StatusClosingDataConn, rc)
+	require.Equal(t, StatusClosingDataConn, returnCode)
 
 	// test ABOR cmd without special attention chars
-	rc, _, err = raw.SendCommand("ABOR")
+	returnCode, _, err = raw.SendCommand("ABOR")
 	require.NoError(t, err)
-	require.Equal(t, StatusClosingDataConn, rc)
+	require.Equal(t, StatusClosingDataConn, returnCode)
 
 	// verify we are in sync
-	rc, _, err = raw.SendCommand("NOOP")
+	returnCode, _, err = raw.SendCommand("NOOP")
 	require.NoError(t, err)
-	require.Equal(t, StatusOK, rc)
+	require.Equal(t, StatusOK, returnCode)
 }
 
 func TestTransferABOR(t *testing.T) {
 	t.Run("passive-mode", func(t *testing.T) {
-		s := NewTestServer(t, false)
-		s.settings.PassiveTransferPortRange = &PortRange{
+		server := NewTestServer(t, false)
+		server.settings.PassiveTransferPortRange = &PortRange{
 			Start: 49152,
 			End:   65535,
 		}
@@ -689,53 +689,53 @@ func TestTransferABOR(t *testing.T) {
 			User:     authUser,
 			Password: authPass,
 		}
-		c, err := goftp.DialConfig(conf, s.Addr())
+		client, err := goftp.DialConfig(conf, server.Addr())
 		require.NoError(t, err, "Couldn't connect")
 
-		defer func() { require.NoError(t, c.Close()) }()
+		defer func() { require.NoError(t, client.Close()) }()
 
-		aborTransfer(t, c)
+		aborTransfer(t, client)
 	})
 
 	t.Run("active-mode", func(t *testing.T) {
-		s := NewTestServer(t, false)
+		server := NewTestServer(t, false)
 		conf := goftp.Config{
 			User:            authUser,
 			Password:        authPass,
 			ActiveTransfers: true,
 		}
-		s.settings.ActiveTransferPortNon20 = true
-		c, err := goftp.DialConfig(conf, s.Addr())
+		server.settings.ActiveTransferPortNon20 = true
+		client, err := goftp.DialConfig(conf, server.Addr())
 		require.NoError(t, err, "Couldn't connect")
 
-		defer func() { require.NoError(t, c.Close()) }()
+		defer func() { require.NoError(t, client.Close()) }()
 
-		aborTransfer(t, c)
+		aborTransfer(t, client)
 	})
 }
 
 func TestABORWithoutOpenTransfer(t *testing.T) {
-	s := NewTestServer(t, true)
+	server := NewTestServer(t, true)
 	conf := goftp.Config{
 		User:     authUser,
 		Password: authPass,
 	}
-	c, err := goftp.DialConfig(conf, s.Addr())
+	client, err := goftp.DialConfig(conf, server.Addr())
 	require.NoError(t, err, "Couldn't connect")
 
-	defer func() { require.NoError(t, c.Close()) }()
+	defer func() { require.NoError(t, client.Close()) }()
 
 	file := createTemporaryFile(t, 1*1024)
-	err = c.Store("file.bin", file)
+	err = client.Store("file.bin", file)
 	require.NoError(t, err)
 
-	err = c.Rename("file.bin", "delay-io-fail-to-seek.bin")
+	err = client.Rename("file.bin", "delay-io-fail-to-seek.bin")
 	require.NoError(t, err)
 
-	_, err = c.Mkdir("delay-io-fail-to-readdir")
+	_, err = client.Mkdir("delay-io-fail-to-readdir")
 	require.NoError(t, err)
 
-	raw, err := c.OpenRawConn()
+	raw, err := client.OpenRawConn()
 	require.NoError(t, err)
 
 	defer func() { require.NoError(t, raw.Close()) }()
@@ -743,9 +743,9 @@ func TestABORWithoutOpenTransfer(t *testing.T) {
 	_, err = file.Seek(1, io.SeekStart)
 	require.NoError(t, err)
 
-	rc, response, err := raw.SendCommand("REST 1")
+	returnCode, response, err := raw.SendCommand("REST 1")
 	require.NoError(t, err)
-	require.Equal(t, StatusFileActionPending, rc, response)
+	require.Equal(t, StatusFileActionPending, returnCode, response)
 
 	for _, cmd := range []string{"RETR delay-io-fail-to-seek.bin", "LIST delay-io-fail-to-readdir",
 		"NLST delay-io-fail-to-readdir", "MLSD delay-io-fail-to-readdir"} {
@@ -755,66 +755,66 @@ func TestABORWithoutOpenTransfer(t *testing.T) {
 		err = raw.SendCommandNoWaitResponse(cmd)
 		require.NoError(t, err)
 
-		rc, response, err = raw.SendCommand(getABORCmd())
+		returnCode, response, err = raw.SendCommand(getABORCmd())
 		require.NoError(t, err)
-		require.Equal(t, StatusClosingDataConn, rc, response)
+		require.Equal(t, StatusClosingDataConn, returnCode, response)
 		require.Equal(t, "ABOR successful; closing transfer connection", response)
 
 		// verify we are in sync
-		rc, _, err = raw.SendCommand("NOOP")
+		returnCode, _, err = raw.SendCommand("NOOP")
 		require.NoError(t, err)
-		require.Equal(t, StatusOK, rc)
+		require.Equal(t, StatusOK, returnCode)
 	}
 
-	rc, _, err = raw.SendCommand("QUIT")
+	returnCode, _, err = raw.SendCommand("QUIT")
 	require.NoError(t, err)
-	require.Equal(t, StatusClosingControlConn, rc)
+	require.Equal(t, StatusClosingControlConn, returnCode)
 }
 
 func TestABORBeforeOpenTransfer(t *testing.T) {
 	t.Run("passive-mode", func(t *testing.T) {
-		s := NewTestServer(t, false)
+		server := NewTestServer(t, false)
 		conf := goftp.Config{
 			User:     authUser,
 			Password: authPass,
 		}
-		s.settings.ActiveTransferPortNon20 = true
-		c, err := goftp.DialConfig(conf, s.Addr())
+		server.settings.ActiveTransferPortNon20 = true
+		client, err := goftp.DialConfig(conf, server.Addr())
 		require.NoError(t, err, "Couldn't connect")
 
-		defer func() { require.NoError(t, c.Close()) }()
+		defer func() { require.NoError(t, client.Close()) }()
 
-		aborBeforeOpenTransfer(t, c)
+		aborBeforeOpenTransfer(t, client)
 	})
 
 	t.Run("active-mode", func(t *testing.T) {
-		s := NewTestServer(t, false)
+		server := NewTestServer(t, false)
 		conf := goftp.Config{
 			User:            authUser,
 			Password:        authPass,
 			ActiveTransfers: true,
 		}
-		s.settings.ActiveTransferPortNon20 = true
-		c, err := goftp.DialConfig(conf, s.Addr())
+		server.settings.ActiveTransferPortNon20 = true
+		client, err := goftp.DialConfig(conf, server.Addr())
 		require.NoError(t, err, "Couldn't connect")
 
-		defer func() { require.NoError(t, c.Close()) }()
+		defer func() { require.NoError(t, client.Close()) }()
 
-		aborBeforeOpenTransfer(t, c)
+		aborBeforeOpenTransfer(t, client)
 	})
 }
 
-func aborTransfer(t *testing.T, c *goftp.Client) {
+func aborTransfer(t *testing.T, client *goftp.Client) {
 	t.Helper()
 
 	file := createTemporaryFile(t, 1*1024)
-	err := c.Store("file.bin", file)
+	err := client.Store("file.bin", file)
 	require.NoError(t, err)
 
-	err = c.Rename("file.bin", "delay-io.bin")
+	err = client.Rename("file.bin", "delay-io.bin")
 	require.NoError(t, err)
 
-	raw, err := c.OpenRawConn()
+	raw, err := client.OpenRawConn()
 	require.NoError(t, err)
 
 	defer func() { require.NoError(t, raw.Close()) }()
@@ -825,45 +825,45 @@ func aborTransfer(t *testing.T, c *goftp.Client) {
 	_, err = raw.PrepareDataConn()
 	require.NoError(t, err)
 
-	rc, response, err := raw.SendCommand("RETR delay-io.bin")
+	returnCode, response, err := raw.SendCommand("RETR delay-io.bin")
 	require.NoError(t, err)
-	require.Equal(t, StatusFileStatusOK, rc, response)
+	require.Equal(t, StatusFileStatusOK, returnCode, response)
 	require.Equal(t, "Using transfer connection", response)
 
-	rc, response, err = raw.SendCommand("STAT")
+	returnCode, response, err = raw.SendCommand("STAT")
 	require.NoError(t, err)
-	require.Equal(t, StatusSystemStatus, rc, response)
+	require.Equal(t, StatusSystemStatus, returnCode, response)
 	require.Contains(t, response, "RETR delay-io.bin")
 	require.NotContains(t, response, "Using transfer connection")
 	require.NotContains(t, response, "Closing transfer connection")
 
-	rc, response, err = raw.SendCommand(getABORCmd())
+	returnCode, response, err = raw.SendCommand(getABORCmd())
 	require.NoError(t, err)
-	require.Equal(t, StatusTransferAborted, rc, response)
+	require.Equal(t, StatusTransferAborted, returnCode, response)
 	require.Equal(t, "Connection closed; transfer aborted", response)
 
-	rc, response, err = raw.ReadResponse()
+	returnCode, response, err = raw.ReadResponse()
 	require.NoError(t, err)
-	require.Equal(t, StatusClosingDataConn, rc, response)
+	require.Equal(t, StatusClosingDataConn, returnCode, response)
 	require.Equal(t, "ABOR successful; closing transfer connection", response)
 
 	// verify we are in sync
-	rc, _, err = raw.SendCommand("NOOP")
+	returnCode, _, err = raw.SendCommand("NOOP")
 	require.NoError(t, err)
-	require.Equal(t, StatusOK, rc)
+	require.Equal(t, StatusOK, returnCode)
 }
 
-func aborBeforeOpenTransfer(t *testing.T, c *goftp.Client) {
+func aborBeforeOpenTransfer(t *testing.T, client *goftp.Client) {
 	t.Helper()
 
 	file := createTemporaryFile(t, 1*1024)
-	err := c.Store("file.bin", file)
+	err := client.Store("file.bin", file)
 	require.NoError(t, err)
 
-	err = c.Rename("file.bin", "delay-io.bin")
+	err = client.Rename("file.bin", "delay-io.bin")
 	require.NoError(t, err)
 
-	raw, err := c.OpenRawConn()
+	raw, err := client.OpenRawConn()
 	require.NoError(t, err)
 
 	defer func() { require.NoError(t, raw.Close()) }()
@@ -871,9 +871,9 @@ func aborBeforeOpenTransfer(t *testing.T, c *goftp.Client) {
 	_, err = file.Seek(1, io.SeekStart)
 	require.NoError(t, err)
 
-	rc, response, err := raw.SendCommand("REST 1")
+	returnCode, response, err := raw.SendCommand("REST 1")
 	require.NoError(t, err)
-	require.Equal(t, StatusFileActionPending, rc, response)
+	require.Equal(t, StatusFileActionPending, returnCode, response)
 
 	_, err = raw.PrepareDataConn()
 	require.NoError(t, err)
@@ -881,15 +881,15 @@ func aborBeforeOpenTransfer(t *testing.T, c *goftp.Client) {
 	err = raw.SendCommandNoWaitResponse("RETR delay-io.bin")
 	require.NoError(t, err)
 
-	rc, response, err = raw.SendCommand(getABORCmd())
+	returnCode, response, err = raw.SendCommand(getABORCmd())
 	require.NoError(t, err)
-	require.Equal(t, StatusClosingDataConn, rc, response)
+	require.Equal(t, StatusClosingDataConn, returnCode, response)
 	require.Equal(t, "ABOR successful; closing transfer connection", response)
 
 	// verify we are in sync
-	rc, _, err = raw.SendCommand("NOOP")
+	returnCode, _, err = raw.SendCommand("NOOP")
 	require.NoError(t, err)
-	require.Equal(t, StatusOK, rc)
+	require.Equal(t, StatusOK, returnCode)
 }
 
 func TestASCIITransfers(t *testing.T) {
@@ -898,12 +898,12 @@ func TestASCIITransfers(t *testing.T) {
 		User:     authUser,
 		Password: authPass,
 	}
-	c, err := goftp.DialConfig(conf, s.Addr())
+	client, err := goftp.DialConfig(conf, s.Addr())
 	require.NoError(t, err, "Couldn't connect")
 
-	defer func() { require.NoError(t, c.Close()) }()
+	defer func() { require.NoError(t, client.Close()) }()
 
-	raw, err := c.OpenRawConn()
+	raw, err := client.OpenRawConn()
 	require.NoError(t, err)
 
 	defer func() { require.NoError(t, raw.Close()) }()
@@ -926,7 +926,7 @@ func TestASCIITransfers(t *testing.T) {
 
 	ftpUploadWithRawConnection(t, raw, file, "file.txt", false)
 
-	files, err := c.ReadDir("/")
+	files, err := client.ReadDir("/")
 	require.NoError(t, err)
 	require.Len(t, files, 1)
 
@@ -983,7 +983,7 @@ func TestASCIITransfersInvalidFiles(t *testing.T) {
 }
 
 func TestPASVWrappedListenerError(t *testing.T) {
-	s := NewTestServerWithTestDriver(t, &TestServerDriver{
+	server := NewTestServerWithTestDriver(t, &TestServerDriver{
 		Debug:              true,
 		errPassiveListener: os.ErrClosed,
 	})
@@ -991,50 +991,50 @@ func TestPASVWrappedListenerError(t *testing.T) {
 		User:     authUser,
 		Password: authPass,
 	}
-	c, err := goftp.DialConfig(conf, s.Addr())
+	client, err := goftp.DialConfig(conf, server.Addr())
 	require.NoError(t, err, "Couldn't connect")
 
-	defer func() { require.NoError(t, c.Close()) }()
+	defer func() { require.NoError(t, client.Close()) }()
 
-	_, err = c.ReadDir("/")
+	_, err = client.ReadDir("/")
 	if assert.Error(t, err) {
 		assert.Contains(t, err.Error(), "421-Could not listen for passive connection")
 	}
 }
 
 func TestPASVPublicIPResolver(t *testing.T) {
-	s := NewTestServer(t, false)
+	server := NewTestServer(t, false)
 
 	conf := goftp.Config{
 		User:     authUser,
 		Password: authPass,
 	}
 
-	c, err := goftp.DialConfig(conf, s.Addr())
+	client, err := goftp.DialConfig(conf, server.Addr())
 	require.NoError(t, err, "Couldn't connect")
 
-	defer func() { require.NoError(t, c.Close()) }()
+	defer func() { require.NoError(t, client.Close()) }()
 
-	raw, err := c.OpenRawConn()
+	raw, err := client.OpenRawConn()
 	require.NoError(t, err, "Couldn't open raw connection")
 
-	s.settings.PublicHost = ""
-	s.settings.PublicIPResolver = func(_ ClientContext) (string, error) {
+	server.settings.PublicHost = ""
+	server.settings.PublicIPResolver = func(_ ClientContext) (string, error) {
 		return "127.0.0", nil
 	}
 	// we crash if the PublicIPResolver returns an invalid IP, this must be fixed outside the lib
-	rc, resp, err := raw.SendCommand("PASV")
+	returnCode, resp, err := raw.SendCommand("PASV")
 	require.NoError(t, err)
-	require.Equal(t, StatusServiceNotAvailable, rc)
+	require.Equal(t, StatusServiceNotAvailable, returnCode)
 	require.Contains(t, resp, "invalid passive IP")
 
-	s.settings.PublicIPResolver = func(_ ClientContext) (string, error) {
+	server.settings.PublicIPResolver = func(_ ClientContext) (string, error) {
 		return "", errConnectionNotAllowed
 	}
 
-	rc, resp, err = raw.SendCommand("PASV")
+	returnCode, resp, err = raw.SendCommand("PASV")
 	require.NoError(t, err)
-	require.Equal(t, StatusServiceNotAvailable, rc)
+	require.Equal(t, StatusServiceNotAvailable, returnCode)
 	require.Contains(t, resp, "couldn't fetch public IP")
 }
 
@@ -1045,7 +1045,7 @@ func TestPASVConnectionWait(t *testing.T) {
 	tcpListener, err := net.ListenTCP("tcp", addr)
 	require.NoError(t, err)
 
-	c := clientHandler{
+	cltHandler := clientHandler{
 		conn: &testNetConn{
 			remoteAddr: &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: 21},
 		},
@@ -1057,7 +1057,7 @@ func TestPASVConnectionWait(t *testing.T) {
 		},
 	}
 
-	p := passiveTransferHandler{ //nolint:forcetypeassert
+	transferHandler := passiveTransferHandler{ //nolint:forcetypeassert
 		listener: &testNetListener{
 			conn: &testNetConn{
 				remoteAddr: &net.TCPAddr{IP: nil, Port: 21}, // invalid IP
@@ -1065,37 +1065,37 @@ func TestPASVConnectionWait(t *testing.T) {
 		},
 		tcpListener:   tcpListener,
 		Port:          tcpListener.Addr().(*net.TCPAddr).Port,
-		settings:      c.server.settings,
+		settings:      cltHandler.server.settings,
 		logger:        lognoop.NewNoOpLogger(),
-		checkDataConn: c.checkDataConnectionRequirement,
+		checkDataConn: cltHandler.checkDataConnectionRequirement,
 	}
 
 	defer func() {
-		err = p.Close()
+		err = transferHandler.Close()
 		assert.NoError(t, err)
 	}()
 
-	_, err = p.ConnectionWait(1 * time.Second)
+	_, err = transferHandler.ConnectionWait(1 * time.Second)
 	if assert.Error(t, err) {
 		assert.Contains(t, err.Error(), "invalid remote IP")
 	}
 
-	p.listener = &testNetListener{
+	transferHandler.listener = &testNetListener{
 		conn: &testNetConn{
 			remoteAddr: &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: 21},
 		},
 	}
 
-	_, err = p.ConnectionWait(1 * time.Second)
+	_, err = transferHandler.ConnectionWait(1 * time.Second)
 	assert.NoError(t, err)
 }
 
 // On Mac Os X, this requires to issue the following command:
 // sudo ifconfig lo0 alias 127.0.1.1 up
 func TestPASVIPMatch(t *testing.T) {
-	s := NewTestServer(t, false)
+	server := NewTestServer(t, false)
 
-	conn, err := net.DialTimeout("tcp", s.Addr(), 5*time.Second)
+	conn, err := net.DialTimeout("tcp", server.Addr(), 5*time.Second)
 	require.NoError(t, err)
 
 	defer func() {
@@ -1113,15 +1113,15 @@ func TestPASVIPMatch(t *testing.T) {
 	loginConnection(t, conn)
 
 	for _, mode := range []DataConnectionRequirement{IPMatchRequired, IPMatchDisabled} {
-		s.settings.PasvConnectionsCheck = mode
+		server.settings.PasvConnectionsCheck = mode
 
 		_, err = conn.Write([]byte("PASV\r\n"))
 		require.NoError(t, err)
 
-		n, err := conn.Read(buf)
+		readBytes, err := conn.Read(buf)
 		require.NoError(t, err)
 
-		resp := string(buf[:n])
+		resp := string(buf[:readBytes])
 		port := getPortFromPASVResponse(t, resp)
 		assert.NotEqual(t, 0, port)
 
@@ -1130,14 +1130,14 @@ func TestPASVIPMatch(t *testing.T) {
 
 		addr := net.JoinHostPort("127.0.0.1", strconv.Itoa(port))
 		// now dial from 127.0.1.1 instead of 127.0.0.1
-		d := net.Dialer{
+		dialer := net.Dialer{
 			LocalAddr: &net.TCPAddr{
 				IP:   net.ParseIP("127.0.1.1"),
 				Port: 0,
 			},
 			Timeout: 5 * time.Second,
 		}
-		dataConn, err := d.Dial("tcp", addr)
+		dataConn, err := dialer.Dial("tcp", addr)
 		require.NoError(t, err)
 
 		defer func() {
@@ -1145,10 +1145,10 @@ func TestPASVIPMatch(t *testing.T) {
 			assert.NoError(t, err)
 		}()
 
-		n, err = conn.Read(buf)
+		readBytes, err = conn.Read(buf)
 		require.NoError(t, err)
 
-		resp = string(buf[:n])
+		resp = string(buf[:readBytes])
 
 		if mode == IPMatchRequired {
 			require.Equal(t, "425 data connection security requirements not met", strings.TrimSpace(resp))
@@ -1159,21 +1159,21 @@ func TestPASVIPMatch(t *testing.T) {
 }
 
 func TestPassivePortExhaustion(t *testing.T) {
-	s := NewTestServer(t, false)
-	s.settings.PassiveTransferPortRange = &PortRange{
+	server := NewTestServer(t, false)
+	server.settings.PassiveTransferPortRange = &PortRange{
 		Start: 40000,
 		End:   40005,
 	}
 
-	c, err := goftp.DialConfig(goftp.Config{
+	client, err := goftp.DialConfig(goftp.Config{
 		User:     authUser,
 		Password: authPass,
-	}, s.Addr())
+	}, server.Addr())
 	require.NoError(t, err, "Couldn't connect")
 
-	defer func() { panicOnError(c.Close()) }()
+	defer func() { panicOnError(client.Close()) }()
 
-	raw, err := c.OpenRawConn()
+	raw, err := client.OpenRawConn()
 	require.NoError(t, err, "Couldn't open raw connection")
 
 	defer func() { require.NoError(t, raw.Close()) }()
@@ -1192,19 +1192,19 @@ func loginConnection(t *testing.T, conn net.Conn) {
 	_, err := fmt.Fprintf(conn, "USER %v\r\n", authUser)
 	require.NoError(t, err)
 
-	n, err := conn.Read(buf)
+	readBytes, err := conn.Read(buf)
 	require.NoError(t, err)
 
-	resp := string(buf[:n])
+	resp := string(buf[:readBytes])
 	require.True(t, strings.HasPrefix(resp, "331"))
 
 	_, err = fmt.Fprintf(conn, "PASS %v\r\n", authPass)
 	require.NoError(t, err)
 
-	n, err = conn.Read(buf)
+	readBytes, err = conn.Read(buf)
 	require.NoError(t, err)
 
-	resp = string(buf[:n])
+	resp = string(buf[:readBytes])
 	require.True(t, strings.HasPrefix(resp, "230"))
 }
 

@@ -111,21 +111,23 @@ type clientHandler struct {
 }
 
 // newClientHandler initializes a client handler when someone connects
-func (server *FtpServer) newClientHandler(connection net.Conn, id uint32, transferType TransferType) *clientHandler {
-	p := &clientHandler{
+func (server *FtpServer) newClientHandler(
+	connection net.Conn,
+	clientID uint32,
+	transferType TransferType,
+) *clientHandler {
+	return &clientHandler{
 		server:              server,
 		conn:                connection,
-		id:                  id,
+		id:                  clientID,
 		writer:              bufio.NewWriter(connection),
 		reader:              bufio.NewReaderSize(connection, maxCommandSize),
 		connectedAt:         time.Now().UTC(),
 		path:                "/",
 		selectedHashAlgo:    HASHAlgoSHA256,
 		currentTransferType: transferType,
-		logger:              server.Logger.With("clientId", id),
+		logger:              server.Logger.With("clientId", clientID),
 	}
-
-	return p
 }
 
 func (c *clientHandler) disconnect() {
@@ -742,14 +744,14 @@ func getIPFromRemoteAddr(remoteAddr net.Addr) (net.IP, error) {
 		return nil, &ipValidationError{error: "nil remote address"}
 	}
 
-	ip, _, err := net.SplitHostPort(remoteAddr.String())
+	ipAddress, _, err := net.SplitHostPort(remoteAddr.String())
 	if err != nil {
 		return nil, fmt.Errorf("error parsing remote address: %w", err)
 	}
 
-	remoteIP := net.ParseIP(ip)
+	remoteIP := net.ParseIP(ipAddress)
 	if remoteIP == nil {
-		return nil, &ipValidationError{error: fmt.Sprintf("invalid remote IP: %v", ip)}
+		return nil, &ipValidationError{error: fmt.Sprintf("invalid remote IP: %v", ipAddress)}
 	}
 
 	return remoteIP, nil

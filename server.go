@@ -110,37 +110,37 @@ type FtpServer struct {
 }
 
 func (server *FtpServer) loadSettings() error {
-	s, err := server.driver.GetSettings()
+	settings, err := server.driver.GetSettings()
 
-	if err != nil || s == nil {
+	if err != nil || settings == nil {
 		return newDriverError("couldn't load settings", err)
 	}
 
-	if s.PublicHost != "" {
-		s.PublicHost, err = parseIPv4(s.PublicHost)
+	if settings.PublicHost != "" {
+		settings.PublicHost, err = parseIPv4(settings.PublicHost)
 		if err != nil {
 			return err
 		}
 	}
 
-	if s.Listener == nil && s.ListenAddr == "" {
-		s.ListenAddr = "0.0.0.0:2121"
+	if settings.Listener == nil && settings.ListenAddr == "" {
+		settings.ListenAddr = "0.0.0.0:2121"
 	}
 
 	// florent(2018-01-14): #58: IDLE timeout: Default idle timeout will be set at 900 seconds
-	if s.IdleTimeout == 0 {
-		s.IdleTimeout = 900
+	if settings.IdleTimeout == 0 {
+		settings.IdleTimeout = 900
 	}
 
-	if s.ConnectionTimeout == 0 {
-		s.ConnectionTimeout = 30
+	if settings.ConnectionTimeout == 0 {
+		settings.ConnectionTimeout = 30
 	}
 
-	if s.Banner == "" {
-		s.Banner = "ftpserver - golang FTP server"
+	if settings.Banner == "" {
+		settings.Banner = "ftpserver - golang FTP server"
 	}
 
-	server.settings = s
+	server.settings = settings
 
 	return nil
 }

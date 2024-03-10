@@ -100,7 +100,7 @@ func (c *clientHandler) transferFile(write bool, appendFile bool, param, info st
 		}
 	}
 
-	tr, err := c.TransferOpen(info)
+	fileTransferConn, err := c.TransferOpen(info)
 	if err != nil {
 		if fileTransferError, ok := file.(FileTransferError); ok {
 			fileTransferError.TransferError(err)
@@ -112,7 +112,7 @@ func (c *clientHandler) transferFile(write bool, appendFile bool, param, info st
 		return
 	}
 
-	err = c.doFileTransfer(tr, file, write)
+	err = c.doFileTransfer(fileTransferConn, file, write)
 	// we ignore close error for reads
 	if errClose := file.Close(); errClose != nil && err == nil && write {
 		err = errClose
@@ -122,32 +122,32 @@ func (c *clientHandler) transferFile(write bool, appendFile bool, param, info st
 	c.TransferClose(err)
 }
 
-func (c *clientHandler) doFileTransfer(tr net.Conn, file io.ReadWriter, write bool) error {
+func (c *clientHandler) doFileTransfer(transferConn net.Conn, file io.ReadWriter, write bool) error {
 	var err error
-	var in io.Reader
-	var out io.Writer
+	var reader io.Reader
+	var writer io.Writer
 
 	conversionMode := convertModeToCRLF
 
 	// Copy the data
 	if write { // ... from the connection to the file
-		in = tr
-		out = file
+		reader = transferConn
+		writer = file
 
 		if runtime.GOOS != "windows" {
 			conversionMode = convertModeToLF
 		}
 	} else { // ... from the file to the connection
-		in = file
-		out = tr
+		reader = file
+		writer = transferConn
 	}
 
 	if c.currentTransferType == TransferTypeASCII {
-		in = newASCIIConverter(in, conversionMode)
+		reader = newASCIIConverter(reader, conversionMode)
 	}
 
 	// for reads io.EOF isn't an error, for writes it must be considered an error
-	if written, errCopy := io.Copy(out, in); errCopy != nil && (errors.Is(errCopy, io.EOF) || write) {
+	if written, errCopy := io.Copy(writer, reader); errCopy != nil && (errors.Is(errCopy, io.EOF) || write) {
 		err = errCopy
 	} else {
 		c.logger.Debug(
@@ -156,7 +156,7 @@ func (c *clientHandler) doFileTransfer(tr net.Conn, file io.ReadWriter, write bo
 		)
 
 		if written == 0 {
-			_, err = out.Write([]byte{})
+			_, err = writer.Write([]byte{})
 		}
 	}
 
@@ -681,21 +681,21 @@ func (c *clientHandler) handleGenericHash(param string, algo HASHAlgo, isCustomM
 }
 
 func (c *clientHandler) computeHashForFile(filePath string, algo HASHAlgo, start, end int64) (string, error) {
-	var h hash.Hash
+	var chosenHashAlgo hash.Hash
 	var file FileTransfer
 	var err error
 
 	switch algo {
 	case HASHAlgoCRC32:
-		h = crc32.NewIEEE()
+		chosenHashAlgo = crc32.NewIEEE()
 	case HASHAlgoMD5:
-		h = md5.New() //nolint:gosec
+		chosenHashAlgo = md5.New() //nolint:gosec
 	case HASHAlgoSHA1:
-		h = sha1.New() //nolint:gosec
+		chosenHashAlgo = sha1.New() //nolint:gosec
 	case HASHAlgoSHA256:
-		h = sha256.New()
+		chosenHashAlgo = sha256.New()
 	case HASHAlgoSHA512:
-		h = sha512.New()
+		chosenHashAlgo = sha512.New()
 	default:
 		return "", errUnknowHash
 	}
@@ -715,13 +715,13 @@ func (c *clientHandler) computeHashForFile(filePath string, algo HASHAlgo, start
 		}
 	}
 
-	_, err = io.CopyN(h, file, end-start)
+	_, err = io.CopyN(chosenHashAlgo, file, end-start)
 
 	if err != nil && errors.Is(err, io.EOF) {
 		return "", newFileAccessError("couldn't read file", err)
 	}
 
-	return hex.EncodeToString(h.Sum(nil)), nil
+	return hex.EncodeToString(chosenHashAlgo.Sum(nil)), nil
 }
 
 func (c *clientHandler) getFileHandle(name string, flags int, offset int64) (FileTransfer, error) {
@@ -734,13 +734,13 @@ func (c *clientHandler) getFileHandle(name string, flags int, offset int64) (Fil
 		return ft, err
 	}
 
-	ft, err := c.driver.OpenFile(name, flags, os.ModePerm)
+	file, err := c.driver.OpenFile(name, flags, os.ModePerm)
 
 	if err != nil {
 		err = newDriverError("calling OpenFile", err)
 	}
 
-	return ft, err
+	return file, err
 }
 
 func (c *clientHandler) closeUnchecked(file io.Closer) {

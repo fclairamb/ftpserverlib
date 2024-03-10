@@ -9,7 +9,6 @@ import (
 	"time"
 
 	lognoop "github.com/fclairamb/go-log/noop"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -82,12 +81,12 @@ func newFakeListener(err error) net.Listener {
 }
 
 func TestCannotListen(t *testing.T) {
-	r := require.New(t)
+	req := require.New(t)
 
 	portBlockerListener, err := net.Listen("tcp", "127.0.0.1:0")
-	r.NoError(err)
+	req.NoError(err)
 
-	defer func() { r.NoError(portBlockerListener.Close()) }()
+	defer func() { req.NoError(portBlockerListener.Close()) }()
 
 	server := FtpServer{
 		Logger: lognoop.NewNoOpLogger(),
@@ -100,17 +99,17 @@ func TestCannotListen(t *testing.T) {
 
 	err = server.Listen()
 	var ne NetworkError
-	r.ErrorAs(err, &ne)
-	r.Equal("cannot listen on main port", ne.str)
+	req.ErrorAs(err, &ne)
+	req.Equal("cannot listen on main port", ne.str)
 }
 
 func TestListenWithBadTLSSettings(t *testing.T) {
-	r := require.New(t)
+	req := require.New(t)
 
 	portBlockerListener, err := net.Listen("tcp", "127.0.0.1:0")
-	r.NoError(err)
+	req.NoError(err)
 
-	defer func() { r.NoError(portBlockerListener.Close()) }()
+	defer func() { req.NoError(portBlockerListener.Close()) }()
 
 	server := FtpServer{
 		Logger: lognoop.NewNoOpLogger(),
@@ -124,8 +123,8 @@ func TestListenWithBadTLSSettings(t *testing.T) {
 
 	err = server.Listen()
 	var drvErr DriverError
-	r.ErrorAs(err, &drvErr)
-	r.Equal("cannot get tls config", drvErr.str)
+	req.ErrorAs(err, &drvErr)
+	req.Equal("cannot get tls config", drvErr.str)
 }
 
 func TestListenerAcceptErrors(t *testing.T) {
@@ -222,7 +221,7 @@ func TestServerSettingsIPError(t *testing.T) {
 }
 
 func TestServerSettingsNilSettings(t *testing.T) {
-	r := require.New(t)
+	req := require.New(t)
 	server := FtpServer{
 		Logger: lognoop.NewNoOpLogger(),
 		driver: &TestServerDriver{
@@ -231,26 +230,26 @@ func TestServerSettingsNilSettings(t *testing.T) {
 	}
 
 	err := server.loadSettings()
-	r.Error(err)
+	req.Error(err)
 
 	drvErr := DriverError{}
-	r.ErrorAs(err, &drvErr)
-	r.ErrorContains(drvErr, "couldn't load settings")
+	req.ErrorAs(err, &drvErr)
+	req.ErrorContains(drvErr, "couldn't load settings")
 }
 
 func TestTemporaryError(t *testing.T) {
-	a := assert.New(t)
+	req := require.New(t)
 
 	// Test the temporaryError function
-	a.False(temporaryError(nil))
-	a.False(temporaryError(&fakeNetError{error: errListenerAccept}))
-	a.False(temporaryError(&net.OpError{
+	req.False(temporaryError(nil))
+	req.False(temporaryError(&fakeNetError{error: errListenerAccept}))
+	req.False(temporaryError(&net.OpError{
 		Err: &fakeNetError{error: errListenerAccept},
 	}))
 
 	for _, serr := range []syscall.Errno{syscall.ECONNABORTED, syscall.ECONNRESET} {
-		a.True(temporaryError(&net.OpError{Err: &os.SyscallError{Err: serr}}))
+		req.True(temporaryError(&net.OpError{Err: &os.SyscallError{Err: serr}}))
 	}
 
-	a.False(temporaryError(&net.OpError{Err: &os.SyscallError{Err: syscall.EAGAIN}}))
+	req.False(temporaryError(&net.OpError{Err: &os.SyscallError{Err: syscall.EAGAIN}}))
 }

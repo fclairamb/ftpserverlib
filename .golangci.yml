@@ -272,6 +272,8 @@ linters:
         - unconvert
         - unparam
         - unused
+        - usestdlibvars
+        - varnamelen
         # - varcheck -> unused
         - whitespace
         # - wrapcheck

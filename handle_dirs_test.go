@@ -40,22 +40,22 @@ func TestGetRelativePaths(t *testing.T) {
 
 func TestDirListing(t *testing.T) {
 	// MLSD is disabled we relies on LIST of files listing
-	s := NewTestServerWithTestDriver(t, &TestServerDriver{Debug: false, Settings: &Settings{DisableMLSD: true}})
+	server := NewTestServerWithTestDriver(t, &TestServerDriver{Debug: false, Settings: &Settings{DisableMLSD: true}})
 	conf := goftp.Config{
 		User:     authUser,
 		Password: authPass,
 	}
 
-	c, err := goftp.DialConfig(conf, s.Addr())
+	client, err := goftp.DialConfig(conf, server.Addr())
 	require.NoError(t, err, "Couldn't connect")
 
-	defer func() { panicOnError(c.Close()) }()
+	defer func() { panicOnError(client.Close()) }()
 
-	dirName, err := c.Mkdir(DirKnown)
+	dirName, err := client.Mkdir(DirKnown)
 	require.NoError(t, err, "Couldn't create dir")
 	require.Equal(t, path.Join("/", DirKnown), dirName)
 
-	contents, err := c.ReadDir("/")
+	contents, err := client.ReadDir("/")
 	require.NoError(t, err)
 	require.Len(t, contents, 1)
 	require.Equal(t, DirKnown, contents[0].Name())
@@ -63,47 +63,47 @@ func TestDirListing(t *testing.T) {
 	// LIST also works for filePath
 	fileName := "testfile.ext"
 
-	_, err = c.ReadDir(fileName)
+	_, err = client.ReadDir(fileName)
 	require.Error(t, err, "LIST for not existing filePath must fail")
 
-	ftpUpload(t, c, createTemporaryFile(t, 10), fileName)
+	ftpUpload(t, client, createTemporaryFile(t, 10), fileName)
 
-	fileContents, err := c.ReadDir(fileName)
+	fileContents, err := client.ReadDir(fileName)
 	require.NoError(t, err)
 	require.Len(t, fileContents, 1)
 	require.Equal(t, fileName, fileContents[0].Name())
 
 	// the test driver will fail to open this dir
-	dirName, err = c.Mkdir("fail-to-open-dir")
+	dirName, err = client.Mkdir("fail-to-open-dir")
 	require.NoError(t, err)
-	_, err = c.ReadDir(dirName)
+	_, err = client.ReadDir(dirName)
 	require.Error(t, err)
 }
 
 func TestDirListingPathArg(t *testing.T) {
 	// MLSD is disabled we relies on LIST of files listing
-	s := NewTestServerWithTestDriver(t, &TestServerDriver{Debug: false, Settings: &Settings{DisableMLSD: true}})
+	server := NewTestServerWithTestDriver(t, &TestServerDriver{Debug: false, Settings: &Settings{DisableMLSD: true}})
 	conf := goftp.Config{
 		User:     authUser,
 		Password: authPass,
 	}
 
-	c, err := goftp.DialConfig(conf, s.Addr())
+	client, err := goftp.DialConfig(conf, server.Addr())
 	require.NoError(t, err, "Couldn't connect")
 
-	defer func() { panicOnError(c.Close()) }()
+	defer func() { panicOnError(client.Close()) }()
 
 	for _, dir := range []string{"/" + DirKnown, "/" + DirKnown + "/1"} {
-		_, err = c.Mkdir(dir)
+		_, err = client.Mkdir(dir)
 		require.NoError(t, err, "Couldn't create dir")
 	}
 
-	contents, err := c.ReadDir(DirKnown)
+	contents, err := client.ReadDir(DirKnown)
 	require.NoError(t, err)
 	require.Len(t, contents, 1)
 	require.Equal(t, "1", contents[0].Name())
 
-	contents, err = c.ReadDir("")
+	contents, err = client.ReadDir("")
 	require.NoError(t, err)
 	require.Len(t, contents, 1)
 	require.Equal(t, DirKnown, contents[0].Name())
@@ -112,86 +112,86 @@ func TestDirListingPathArg(t *testing.T) {
 func TestDirHandling(t *testing.T) {
 	s := NewTestServer(t, false)
 
-	c, err := goftp.DialConfig(goftp.Config{
+	client, err := goftp.DialConfig(goftp.Config{
 		User:     authUser,
 		Password: authPass,
 	}, s.Addr())
 	require.NoError(t, err, "Couldn't connect")
 
-	defer func() { panicOnError(c.Close()) }()
+	defer func() { panicOnError(client.Close()) }()
 
-	raw, err := c.OpenRawConn()
+	raw, err := client.OpenRawConn()
 	require.NoError(t, err, "Couldn't open raw connection")
 
 	defer func() { require.NoError(t, raw.Close()) }()
 
-	rc, _, err := raw.SendCommand("CWD /unknown")
+	returnCode, _, err := raw.SendCommand("CWD /unknown")
 	require.NoError(t, err)
-	require.Equal(t, StatusActionNotTaken, rc)
+	require.Equal(t, StatusActionNotTaken, returnCode)
 
-	_, err = c.Mkdir("/" + DirKnown)
+	_, err = client.Mkdir("/" + DirKnown)
 	require.NoError(t, err)
 
-	contents, err := c.ReadDir("/")
+	contents, err := client.ReadDir("/")
 	require.NoError(t, err)
 	require.Len(t, contents, 1)
 
-	rc, _, err = raw.SendCommand("CWD /" + DirKnown)
+	returnCode, _, err = raw.SendCommand("CWD /" + DirKnown)
 	require.NoError(t, err)
-	require.Equal(t, StatusFileOK, rc)
+	require.Equal(t, StatusFileOK, returnCode)
 
 	testSubdir := ` strange\\ sub" dìr`
-	rc, _, err = raw.SendCommand(fmt.Sprintf("MKD %v", testSubdir))
+	returnCode, _, err = raw.SendCommand(fmt.Sprintf("MKD %v", testSubdir))
 	require.NoError(t, err)
-	require.Equal(t, StatusPathCreated, rc)
+	require.Equal(t, StatusPathCreated, returnCode)
 
-	rc, response, err := raw.SendCommand(fmt.Sprintf("CWD %v", testSubdir))
+	returnCode, response, err := raw.SendCommand(fmt.Sprintf("CWD %v", testSubdir))
 	require.NoError(t, err)
-	require.Equal(t, StatusFileOK, rc, response)
+	require.Equal(t, StatusFileOK, returnCode, response)
 
-	rc, response, err = raw.SendCommand(fmt.Sprintf("PWD %v", testSubdir))
+	returnCode, response, err = raw.SendCommand(fmt.Sprintf("PWD %v", testSubdir))
 	require.NoError(t, err)
-	require.Equal(t, StatusPathCreated, rc, response)
+	require.Equal(t, StatusPathCreated, returnCode, response)
 	require.Equal(t, `"/known/ strange\\ sub"" dìr" is the current directory`, response)
 
-	rc, response, err = raw.SendCommand("CDUP")
+	returnCode, response, err = raw.SendCommand("CDUP")
 	require.NoError(t, err)
-	require.Equal(t, StatusFileOK, rc, response)
+	require.Equal(t, StatusFileOK, returnCode, response)
 
-	err = c.Rmdir(path.Join("/", DirKnown, testSubdir))
-	require.NoError(t, err)
-
-	err = c.Rmdir(path.Join("/", DirKnown))
+	err = client.Rmdir(path.Join("/", DirKnown, testSubdir))
 	require.NoError(t, err)
 
-	err = c.Rmdir(path.Join("/", DirKnown))
+	err = client.Rmdir(path.Join("/", DirKnown))
+	require.NoError(t, err)
+
+	err = client.Rmdir(path.Join("/", DirKnown))
 	require.Error(t, err, "We shouldn't have been able to ftpDelete known again")
 }
 
 func TestCWDToRegularFile(t *testing.T) {
-	s := NewTestServer(t, false)
+	server := NewTestServer(t, false)
 	conf := goftp.Config{
 		User:     authUser,
 		Password: authPass,
 	}
 
-	c, err := goftp.DialConfig(conf, s.Addr())
+	client, err := goftp.DialConfig(conf, server.Addr())
 	require.NoError(t, err, "Couldn't connect")
 
-	defer func() { panicOnError(c.Close()) }()
+	defer func() { panicOnError(client.Close()) }()
 
 	// Getwd will send a PWD command
-	p, err := c.Getwd()
+	p, err := client.Getwd()
 	require.NoError(t, err)
 	require.Equal(t, "/", p, "Bad path")
 
-	raw, err := c.OpenRawConn()
+	raw, err := client.OpenRawConn()
 	require.NoError(t, err, "Couldn't open raw connection")
 
 	defer func() { require.NoError(t, raw.Close()) }()
 
 	// Creating a tiny file
-	ftpUpload(t, c, createTemporaryFile(t, 10), "file.txt")
+	ftpUpload(t, client, createTemporaryFile(t, 10), "file.txt")
 
 	rc, msg, err := raw.SendCommand("CWD /file.txt")
 	require.NoError(t, err)
@@ -200,114 +200,115 @@ func TestCWDToRegularFile(t *testing.T) {
 }
 
 func TestMkdirRmDir(t *testing.T) {
-	s := NewTestServer(t, false)
+	server := NewTestServer(t, false)
+	req := require.New(t)
 	conf := goftp.Config{
 		User:     authUser,
 		Password: authPass,
 	}
 
-	c, err := goftp.DialConfig(conf, s.Addr())
-	require.NoError(t, err, "Couldn't connect")
+	client, err := goftp.DialConfig(conf, server.Addr())
+	req.NoError(err, "Couldn't connect")
 
-	defer func() { panicOnError(c.Close()) }()
+	defer func() { panicOnError(client.Close()) }()
 
-	raw, err := c.OpenRawConn()
-	require.NoError(t, err, "Couldn't open raw connection")
+	raw, err := client.OpenRawConn()
+	req.NoError(err, "Couldn't open raw connection")
 
 	defer func() { require.NoError(t, raw.Close()) }()
 
 	t.Run("standard", func(t *testing.T) {
-		rc, _, err := raw.SendCommand("SITE MKDIR /dir1/dir2/dir3")
+		returnCode, _, err := raw.SendCommand("SITE MKDIR /dir1/dir2/dir3")
 		require.NoError(t, err)
-		require.Equal(t, StatusFileOK, rc)
+		require.Equal(t, StatusFileOK, returnCode)
 
 		for _, d := range []string{"/dir1", "/dir1/dir2", "/dir1/dir2/dir3"} {
-			stat, errStat := c.Stat(d)
+			stat, errStat := client.Stat(d)
 			require.NoError(t, errStat)
 			require.True(t, stat.IsDir())
 		}
 
-		rc, _, err = raw.SendCommand("SITE RMDIR /dir1")
+		returnCode, _, err = raw.SendCommand("SITE RMDIR /dir1")
 		require.NoError(t, err)
-		require.Equal(t, StatusFileOK, rc)
+		require.Equal(t, StatusFileOK, returnCode)
 
 		for _, d := range []string{"/dir1", "/dir1/dir2", "/dir1/dir2/dir3"} {
-			stat, errStat := c.Stat(d)
+			stat, errStat := client.Stat(d)
 			require.Error(t, errStat)
 			require.Nil(t, stat)
 		}
 
-		_, err = c.Mkdir("/missing/path")
+		_, err = client.Mkdir("/missing/path")
 		require.Error(t, err)
 	})
 
 	t.Run("syntax error", func(t *testing.T) {
-		rc, _, err := raw.SendCommand("SITE MKDIR")
+		returnCode, _, err := raw.SendCommand("SITE MKDIR")
 		require.NoError(t, err)
-		require.Equal(t, StatusSyntaxErrorNotRecognised, rc)
+		require.Equal(t, StatusSyntaxErrorNotRecognised, returnCode)
 
-		rc, _, err = raw.SendCommand("SITE RMDIR")
+		returnCode, _, err = raw.SendCommand("SITE RMDIR")
 		require.NoError(t, err)
-		require.Equal(t, StatusSyntaxErrorNotRecognised, rc)
+		require.Equal(t, StatusSyntaxErrorNotRecognised, returnCode)
 	})
 
 	t.Run("spaces", func(t *testing.T) {
-		rc, _, err := raw.SendCommand("SITE MKDIR /dir1 /dir2")
+		returnCode, _, err := raw.SendCommand("SITE MKDIR /dir1 /dir2")
 		require.NoError(t, err)
-		require.Equal(t, StatusFileOK, rc)
+		require.Equal(t, StatusFileOK, returnCode)
 
 		{
 			dir := "/dir1 /dir2"
-			stat, errStat := c.Stat(dir)
+			stat, errStat := client.Stat(dir)
 			require.NoError(t, errStat)
 			require.True(t, stat.IsDir())
 		}
 
-		rc, _, err = raw.SendCommand("SITE RMDIR /dir1 /dir2")
+		returnCode, _, err = raw.SendCommand("SITE RMDIR /dir1 /dir2")
 		require.NoError(t, err)
-		require.Equal(t, StatusFileOK, rc)
+		require.Equal(t, StatusFileOK, returnCode)
 	})
 }
 
 // TestDirListingWithSpace uses the MLSD for files listing
 func TestDirListingWithSpace(t *testing.T) {
-	s := NewTestServer(t, false)
+	server := NewTestServer(t, false)
 	conf := goftp.Config{
 		User:     authUser,
 		Password: authPass,
 	}
 
-	c, err := goftp.DialConfig(conf, s.Addr())
+	client, err := goftp.DialConfig(conf, server.Addr())
 	require.NoError(t, err, "Couldn't connect")
 
-	defer func() { panicOnError(c.Close()) }()
+	defer func() { panicOnError(client.Close()) }()
 
 	dirName := " with spaces "
 
-	_, err = c.Mkdir(dirName)
+	_, err = client.Mkdir(dirName)
 	require.NoError(t, err, "Couldn't create dir")
 
-	contents, err := c.ReadDir("/")
+	contents, err := client.ReadDir("/")
 	require.NoError(t, err)
 	require.Len(t, contents, 1)
 	require.Equal(t, dirName, contents[0].Name())
 
-	raw, err := c.OpenRawConn()
+	raw, err := client.OpenRawConn()
 	require.NoError(t, err, "Couldn't open raw connection")
 
 	defer func() { require.NoError(t, raw.Close()) }()
 
-	rc, response, err := raw.SendCommand("CWD /" + dirName)
+	returnCode, response, err := raw.SendCommand("CWD /" + dirName)
 	require.NoError(t, err)
-	require.Equal(t, StatusFileOK, rc)
+	require.Equal(t, StatusFileOK, returnCode)
 	require.Equal(t, "CD worked on /"+dirName, response)
 
 	dcGetter, err := raw.PrepareDataConn()
 	require.NoError(t, err)
 
-	rc, response, err = raw.SendCommand("NLST /")
+	returnCode, response, err = raw.SendCommand("NLST /")
 	require.NoError(t, err)
-	require.Equal(t, StatusFileStatusOK, rc, response)
+	require.Equal(t, StatusFileStatusOK, returnCode, response)
 
 	dc, err := dcGetter()
 	require.NoError(t, err)
@@ -315,31 +316,31 @@ func TestDirListingWithSpace(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "../"+dirName+"\r\n", string(resp))
 
-	rc, _, err = raw.ReadResponse()
+	returnCode, _, err = raw.ReadResponse()
 	require.NoError(t, err)
-	require.Equal(t, StatusClosingDataConn, rc)
+	require.Equal(t, StatusClosingDataConn, returnCode)
 
 	_, err = raw.PrepareDataConn()
 	require.NoError(t, err)
 
-	rc, response, err = raw.SendCommand("NLST /missingpath")
+	returnCode, response, err = raw.SendCommand("NLST /missingpath")
 	require.NoError(t, err)
-	require.Equal(t, StatusFileActionNotTaken, rc, response)
+	require.Equal(t, StatusFileActionNotTaken, returnCode, response)
 }
 
 func TestCleanPath(t *testing.T) {
-	s := NewTestServer(t, false)
+	server := NewTestServer(t, false)
 	conf := goftp.Config{
 		User:     authUser,
 		Password: authPass,
 	}
 
-	c, err := goftp.DialConfig(conf, s.Addr())
+	client, err := goftp.DialConfig(conf, server.Addr())
 	require.NoError(t, err, "Couldn't connect")
 
-	defer func() { panicOnError(c.Close()) }()
+	defer func() { panicOnError(client.Close()) }()
 
-	raw, err := c.OpenRawConn()
+	raw, err := client.OpenRawConn()
 	require.NoError(t, err, "Couldn't open raw connection")
 
 	defer func() { require.NoError(t, raw.Close()) }()
@@ -359,18 +360,19 @@ func TestCleanPath(t *testing.T) {
 		require.Equal(t, StatusFileOK, rc)
 		require.Equal(t, "CD worked on /", response)
 
-		p, err := c.Getwd()
+		p, err := client.Getwd()
 		require.NoError(t, err)
 		require.Equal(t, "/", p)
 	}
 }
 
 func TestTLSTransfer(t *testing.T) {
-	s := NewTestServerWithTestDriver(t, &TestServerDriver{
+	req := require.New(t)
+	server := NewTestServerWithTestDriver(t, &TestServerDriver{
 		Debug: false,
 		TLS:   true,
 	})
-	s.settings.TLSRequired = MandatoryEncryption
+	server.settings.TLSRequired = MandatoryEncryption
 
 	conf := goftp.Config{
 		User:     authUser,
@@ -382,37 +384,37 @@ func TestTLSTransfer(t *testing.T) {
 		TLSMode: goftp.TLSExplicit,
 	}
 
-	c, err := goftp.DialConfig(conf, s.Addr())
-	require.NoError(t, err, "Couldn't connect")
+	client, err := goftp.DialConfig(conf, server.Addr())
+	req.NoError(err, "Couldn't connect")
 
-	defer func() { panicOnError(c.Close()) }()
+	defer func() { panicOnError(client.Close()) }()
 
-	contents, err := c.ReadDir("/")
-	require.NoError(t, err)
-	require.Empty(t, contents)
+	contents, err := client.ReadDir("/")
+	req.NoError(err)
+	req.Empty(contents)
 
-	raw, err := c.OpenRawConn()
-	require.NoError(t, err, "Couldn't open raw connection")
+	raw, err := client.OpenRawConn()
+	req.NoError(err, "Couldn't open raw connection")
 
 	defer func() { require.NoError(t, raw.Close()) }()
 
-	rc, response, err := raw.SendCommand("PROT C")
-	require.NoError(t, err)
-	require.Equal(t, StatusOK, rc)
-	require.Equal(t, "OK", response)
+	returnCode, response, err := raw.SendCommand("PROT C")
+	req.NoError(err)
+	req.Equal(StatusOK, returnCode)
+	req.Equal("OK", response)
 
-	rc, _, err = raw.SendCommand("PASV")
-	require.NoError(t, err)
-	require.Equal(t, StatusEnteringPASV, rc)
+	returnCode, _, err = raw.SendCommand("PASV")
+	req.NoError(err)
+	req.Equal(StatusEnteringPASV, returnCode)
 
-	rc, response, err = raw.SendCommand("MLSD /")
-	require.NoError(t, err)
-	require.Equal(t, StatusServiceNotAvailable, rc)
-	require.Equal(t, "unable to open transfer: TLS is required", response)
+	returnCode, response, err = raw.SendCommand("MLSD /")
+	req.NoError(err)
+	req.Equal(StatusServiceNotAvailable, returnCode)
+	req.Equal("unable to open transfer: TLS is required", response)
 }
 
 func TestPerClientTLSTransfer(t *testing.T) {
-	s := NewTestServerWithTestDriver(t, &TestServerDriver{
+	server := NewTestServerWithTestDriver(t, &TestServerDriver{
 		Debug:          true,
 		TLS:            true,
 		TLSRequirement: MandatoryEncryption,
@@ -427,32 +429,32 @@ func TestPerClientTLSTransfer(t *testing.T) {
 		TLSMode: goftp.TLSExplicit,
 	}
 
-	c, err := goftp.DialConfig(conf, s.Addr())
+	client, err := goftp.DialConfig(conf, server.Addr())
 	require.NoError(t, err, "Couldn't connect")
 
-	defer func() { panicOnError(c.Close()) }()
+	defer func() { panicOnError(client.Close()) }()
 
-	_, err = c.ReadDir("/")
+	_, err = client.ReadDir("/")
 	require.NoError(t, err)
 
 	// now switch to unencrypted data connection
-	raw, err := c.OpenRawConn()
+	raw, err := client.OpenRawConn()
 	require.NoError(t, err, "Couldn't open raw connection")
 
 	defer func() { require.NoError(t, raw.Close()) }()
 
-	rc, resp, err := raw.SendCommand("PROT C")
+	returnCode, resp, err := raw.SendCommand("PROT C")
 	require.NoError(t, err)
-	require.Equal(t, StatusOK, rc)
+	require.Equal(t, StatusOK, returnCode)
 	require.Equal(t, "OK", resp)
 
-	rc, _, err = raw.SendCommand("PASV")
+	returnCode, _, err = raw.SendCommand("PASV")
 	require.NoError(t, err)
-	require.Equal(t, StatusEnteringPASV, rc)
+	require.Equal(t, StatusEnteringPASV, returnCode)
 
-	rc, response, err := raw.SendCommand("MLSD /")
+	returnCode, response, err := raw.SendCommand("MLSD /")
 	require.NoError(t, err)
-	require.Equal(t, StatusServiceNotAvailable, rc)
+	require.Equal(t, StatusServiceNotAvailable, returnCode)
 	require.Equal(t, "unable to open transfer: TLS is required", response)
 }
 
@@ -467,19 +469,19 @@ func TestDirListingBeforeLogin(t *testing.T) {
 	}()
 
 	buf := make([]byte, 1024)
-	n, err := conn.Read(buf)
+	readBytes, err := conn.Read(buf)
 	require.NoError(t, err)
 
-	response := string(buf[:n])
+	response := string(buf[:readBytes])
 	require.Equal(t, "220 TEST Server\r\n", response)
 
 	_, err = conn.Write([]byte("LIST\r\n"))
 	require.NoError(t, err)
 
-	n, err = conn.Read(buf)
+	readBytes, err = conn.Read(buf)
 	require.NoError(t, err)
 
-	response = string(buf[:n])
+	response = string(buf[:readBytes])
 	require.Equal(t, "530 Please login with USER and PASS\r\n", response)
 }
 
@@ -503,10 +505,9 @@ func TestListArgs(t *testing.T) {
 	})
 }
 
-func testListDirArgs(t *testing.T, s *FtpServer) {
+func testListDirArgs(t *testing.T, server *FtpServer) {
 	t.Helper()
-
-	r := require.New(t)
+	req := require.New(t)
 
 	conf := goftp.Config{
 		User:     authUser,
@@ -514,62 +515,62 @@ func testListDirArgs(t *testing.T, s *FtpServer) {
 	}
 	testDir := "testdir"
 
-	c, err := goftp.DialConfig(conf, s.Addr())
-	r.NoError(err, "Couldn't connect")
+	client, err := goftp.DialConfig(conf, server.Addr())
+	req.NoError(err, "Couldn't connect")
 
-	defer func() { panicOnError(c.Close()) }()
+	defer func() { panicOnError(client.Close()) }()
 
 	for _, arg := range supportedlistArgs {
-		s.settings.DisableLISTArgs = true
+		server.settings.DisableLISTArgs = true
 
-		_, err = c.ReadDir(arg)
+		_, err = client.ReadDir(arg)
 		require.Error(t, err, fmt.Sprintf("list args are disabled \"list %v\" must fail", arg))
 
-		s.settings.DisableLISTArgs = false
+		server.settings.DisableLISTArgs = false
 
-		contents, err := c.ReadDir(arg)
-		r.NoError(err)
-		r.Empty(contents)
+		contents, err := client.ReadDir(arg)
+		req.NoError(err)
+		req.Empty(contents)
 
-		_, err = c.Mkdir(arg)
-		r.NoError(err)
+		_, err = client.Mkdir(arg)
+		req.NoError(err)
 
-		_, err = c.Mkdir(fmt.Sprintf("%v/%v", arg, testDir))
-		r.NoError(err)
+		_, err = client.Mkdir(fmt.Sprintf("%v/%v", arg, testDir))
+		req.NoError(err)
 
-		contents, err = c.ReadDir(arg)
-		r.NoError(err)
-		r.Len(contents, 1)
-		r.Equal(contents[0].Name(), testDir)
+		contents, err = client.ReadDir(arg)
+		req.NoError(err)
+		req.Len(contents, 1)
+		req.Equal(contents[0].Name(), testDir)
 
-		contents, err = c.ReadDir(fmt.Sprintf("%v %v", arg, arg))
-		r.NoError(err)
-		r.Len(contents, 1)
-		r.Equal(contents[0].Name(), testDir)
+		contents, err = client.ReadDir(fmt.Sprintf("%v %v", arg, arg))
+		req.NoError(err)
+		req.Len(contents, 1)
+		req.Equal(contents[0].Name(), testDir)
 
 		// cleanup
-		err = c.Rmdir(fmt.Sprintf("%v/%v", arg, testDir))
-		r.NoError(err)
+		err = client.Rmdir(fmt.Sprintf("%v/%v", arg, testDir))
+		req.NoError(err)
 
-		err = c.Rmdir(arg)
-		r.NoError(err)
+		err = client.Rmdir(arg)
+		req.NoError(err)
 	}
 }
 
 func TestMLSDTimezone(t *testing.T) {
-	s := NewTestServer(t, false)
+	server := NewTestServer(t, false)
 	conf := goftp.Config{
 		User:     authUser,
 		Password: authPass,
 	}
 
-	c, err := goftp.DialConfig(conf, s.Addr())
+	client, err := goftp.DialConfig(conf, server.Addr())
 	require.NoError(t, err, "Couldn't connect")
 
-	defer func() { panicOnError(c.Close()) }()
+	defer func() { panicOnError(client.Close()) }()
 
-	ftpUpload(t, c, createTemporaryFile(t, 10), "file")
-	contents, err := c.ReadDir("/")
+	ftpUpload(t, client, createTemporaryFile(t, 10), "file")
+	contents, err := client.ReadDir("/")
 	require.NoError(t, err)
 	require.Len(t, contents, 1)
 	require.Equal(t, "file", contents[0].Name())
@@ -577,30 +578,30 @@ func TestMLSDTimezone(t *testing.T) {
 }
 
 func TestMLSDAndNLSTFilePathError(t *testing.T) {
-	s := NewTestServer(t, false)
+	server := NewTestServer(t, false)
 	conf := goftp.Config{
 		User:     authUser,
 		Password: authPass,
 	}
 
-	c, err := goftp.DialConfig(conf, s.Addr())
+	client, err := goftp.DialConfig(conf, server.Addr())
 	require.NoError(t, err, "Couldn't connect")
 
-	defer func() { panicOnError(c.Close()) }()
+	defer func() { panicOnError(client.Close()) }()
 
 	// MLSD shouldn't work for filePaths
 	var fileName = "testfile.ext"
 
-	_, err = c.ReadDir(fileName)
+	_, err = client.ReadDir(fileName)
 	require.Error(t, err, "MLSD for not existing filePath must fail")
 
-	ftpUpload(t, c, createTemporaryFile(t, 10), fileName)
+	ftpUpload(t, client, createTemporaryFile(t, 10), fileName)
 
-	_, err = c.ReadDir(fileName)
+	_, err = client.ReadDir(fileName)
 	require.Error(t, err, "MLSD is enabled, MLSD for filePath must fail")
 
 	// NLST should work for filePath
-	raw, err := c.OpenRawConn()
+	raw, err := client.OpenRawConn()
 	require.NoError(t, err, "Couldn't open raw connection")
 
 	defer func() { require.NoError(t, raw.Close()) }()

@@ -12,15 +12,15 @@ func TestASCIIConvert(t *testing.T) {
 	lines := []byte("line1\r\nline2\r\n\r\nline4")
 	src := bytes.NewBuffer(lines)
 	dst := bytes.NewBuffer(nil)
-	c := newASCIIConverter(src, convertModeToLF)
-	_, err := io.Copy(dst, c)
+	converter := newASCIIConverter(src, convertModeToLF)
+	_, err := io.Copy(dst, converter)
 	require.NoError(t, err)
 	require.Equal(t, []byte("line1\nline2\n\nline4"), dst.Bytes())
 
 	lines = []byte("line1\nline2\n\nline4")
 	dst = bytes.NewBuffer(nil)
-	c = newASCIIConverter(bytes.NewBuffer(lines), convertModeToCRLF)
-	_, err = io.Copy(dst, c)
+	converter = newASCIIConverter(bytes.NewBuffer(lines), convertModeToCRLF)
+	_, err = io.Copy(dst, converter)
 	require.NoError(t, err)
 	require.Equal(t, []byte("line1\r\nline2\r\n\r\nline4"), dst.Bytes())
 
@@ -31,8 +31,8 @@ func TestASCIIConvert(t *testing.T) {
 	}
 
 	dst = bytes.NewBuffer(nil)
-	c = newASCIIConverter(bytes.NewBuffer(buf), convertModeToCRLF)
-	_, err = io.Copy(dst, c)
+	converter = newASCIIConverter(bytes.NewBuffer(buf), convertModeToCRLF)
+	_, err = io.Copy(dst, converter)
 	require.NoError(t, err)
 	require.Equal(t, buf, dst.Bytes())
 }

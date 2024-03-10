@@ -38,15 +38,15 @@ func (c *clientHandler) handleUSER(user string) error {
 }
 
 func (c *clientHandler) handleUserTLS(user string) bool {
-	verifier, ok := c.server.driver.(MainDriverExtensionTLSVerifier)
+	verifier, interfaceFound := c.server.driver.(MainDriverExtensionTLSVerifier)
 
-	if !ok {
+	if !interfaceFound {
 		return false
 	}
 
-	tlsConn, ok := c.conn.(*tls.Conn)
+	tlsConn, interfaceFound := c.conn.(*tls.Conn)
 
-	if !ok {
+	if !interfaceFound {
 		return false
 	}
 

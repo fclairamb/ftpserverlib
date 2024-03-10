@@ -29,44 +29,44 @@ func (c *clientHandler) absPath(p string) string {
 
 // getRelativePath returns the specified path as relative to the
 // current working directory. The specified path must be cleaned
-func (c *clientHandler) getRelativePath(p string) string {
-	var sb strings.Builder
+func (c *clientHandler) getRelativePath(inputPath string) string {
+	var builder strings.Builder
 	base := c.Path()
 
 	for {
-		if base == p {
-			return sb.String()
+		if base == inputPath {
+			return builder.String()
 		}
 
 		if !strings.HasSuffix(base, "/") {
 			base += "/"
 		}
 
-		if strings.HasPrefix(p, base) {
-			sb.WriteString(strings.TrimPrefix(p, base))
+		if strings.HasPrefix(inputPath, base) {
+			builder.WriteString(strings.TrimPrefix(inputPath, base))
 
-			return sb.String()
+			return builder.String()
 		}
 
 		if base == "/" || base == "./" {
-			return p
+			return inputPath
 		}
 
-		sb.WriteString("../")
+		builder.WriteString("../")
 
 		base = path.Dir(path.Clean(base))
 	}
 }
 
 func (c *clientHandler) handleCWD(param string) error {
-	p := c.absPath(param)
+	pathAbsolute := c.absPath(param)
 
-	if stat, err := c.driver.Stat(p); err == nil {
+	if stat, err := c.driver.Stat(pathAbsolute); err == nil {
 		if stat.IsDir() {
-			c.SetPath(p)
-			c.writeMessage(StatusFileOK, "CD worked on "+p)
+			c.SetPath(pathAbsolute)
+			c.writeMessage(StatusFileOK, "CD worked on "+pathAbsolute)
 		} else {
-			c.writeMessage(StatusActionNotTaken, fmt.Sprintf("Can't change directory to %s: Not a Directory", p))
+			c.writeMessage(StatusActionNotTaken, fmt.Sprintf("Can't change directory to %s: Not a Directory", pathAbsolute))
 		}
 	} else {
 		c.writeMessage(StatusActionNotTaken, fmt.Sprintf("CD issue: %v", err))
@@ -76,13 +76,13 @@ func (c *clientHandler) handleCWD(param string) error {
 }
 
 func (c *clientHandler) handleMKD(param string) error {
-	p := c.absPath(param)
-	if err := c.driver.Mkdir(p, 0755); err == nil {
+	pathAbsolute := c.absPath(param)
+	if err := c.driver.Mkdir(pathAbsolute, 0755); err == nil {
 		// handleMKD confirms to "quote-doubling"
 		// https://tools.ietf.org/html/rfc959 , page 63
-		c.writeMessage(StatusPathCreated, fmt.Sprintf(`Created dir "%s"`, quoteDoubling(p)))
+		c.writeMessage(StatusPathCreated, fmt.Sprintf(`Created dir "%s"`, quoteDoubling(pathAbsolute)))
 	} else {
-		c.writeMessage(StatusActionNotTaken, fmt.Sprintf(`Could not create "%s" : %v`, quoteDoubling(p), err))
+		c.writeMessage(StatusActionNotTaken, fmt.Sprintf(`Could not create "%s" : %v`, quoteDoubling(pathAbsolute), err))
 	}
 
 	return nil
@@ -107,18 +107,18 @@ func (c *clientHandler) handleMKDIR(params string) {
 func (c *clientHandler) handleRMD(param string) error {
 	var err error
 
-	p := c.absPath(param)
+	pathAbsolute := c.absPath(param)
 
 	if rmd, ok := c.driver.(ClientDriverExtensionRemoveDir); ok {
-		err = rmd.RemoveDir(p)
+		err = rmd.RemoveDir(pathAbsolute)
 	} else {
-		err = c.driver.Remove(p)
+		err = c.driver.Remove(pathAbsolute)
 	}
 
 	if err == nil {
-		c.writeMessage(StatusFileOK, "Deleted dir "+p)
+		c.writeMessage(StatusFileOK, "Deleted dir "+pathAbsolute)
 	} else {
-		c.writeMessage(StatusActionNotTaken, fmt.Sprintf("Could not delete dir %s: %v", p, err))
+		c.writeMessage(StatusActionNotTaken, fmt.Sprintf("Could not delete dir %s: %v", pathAbsolute, err))
 	}
 
 	return nil
@@ -223,9 +223,9 @@ func (c *clientHandler) handleNLST(param string) error {
 	return nil
 }
 
-func (c *clientHandler) dirTransferNLST(w io.Writer, files []os.FileInfo, parentDir string) error {
+func (c *clientHandler) dirTransferNLST(writer io.Writer, files []os.FileInfo, parentDir string) error {
 	if len(files) == 0 {
-		_, err := w.Write([]byte(""))
+		_, err := writer.Write([]byte(""))
 
 		if err != nil {
 			err = newNetworkError("couldn't send NLST data", err)
@@ -238,7 +238,7 @@ func (c *clientHandler) dirTransferNLST(w io.Writer, files []os.FileInfo, parent
 		// Based on RFC 959 NLST is intended to return information that can be used
 		// by a program to further process the files automatically.
 		// So we return paths relative to the current working directory
-		if _, err := fmt.Fprintf(w, "%s\r\n", path.Join(c.getRelativePath(parentDir), file.Name())); err != nil {
+		if _, err := fmt.Fprintf(writer, "%s\r\n", path.Join(c.getRelativePath(parentDir), file.Name())); err != nil {
 			return newNetworkError("couldn't send NLST data", err)
 		}
 	}
@@ -303,9 +303,9 @@ func (c *clientHandler) fileStat(file os.FileInfo) string {
 }
 
 // fclairamb (2018-02-13): #64: Removed extra empty line
-func (c *clientHandler) dirTransferLIST(w io.Writer, files []os.FileInfo) error {
+func (c *clientHandler) dirTransferLIST(writer io.Writer, files []os.FileInfo) error {
 	if len(files) == 0 {
-		_, err := w.Write([]byte(""))
+		_, err := writer.Write([]byte(""))
 
 		if err != nil {
 			err = newNetworkError("error writing LIST entry", err)
@@ -315,7 +315,7 @@ func (c *clientHandler) dirTransferLIST(w io.Writer, files []os.FileInfo) error 
 	}
 
 	for _, file := range files {
-		if _, err := fmt.Fprintf(w, "%s\r\n", c.fileStat(file)); err != nil {
+		if _, err := fmt.Fprintf(writer, "%s\r\n", c.fileStat(file)); err != nil {
 			return fmt.Errorf("error writing LIST entry: %w", err)
 		}
 	}
@@ -324,9 +324,9 @@ func (c *clientHandler) dirTransferLIST(w io.Writer, files []os.FileInfo) error 
 }
 
 // fclairamb (2018-02-13): #64: Removed extra empty line
-func (c *clientHandler) dirTransferMLSD(w io.Writer, files []os.FileInfo) error {
+func (c *clientHandler) dirTransferMLSD(writer io.Writer, files []os.FileInfo) error {
 	if len(files) == 0 {
-		_, err := w.Write([]byte(""))
+		_, err := writer.Write([]byte(""))
 
 		if err != nil {
 			err = newNetworkError("error writing MLSD entry", err)
@@ -336,14 +336,14 @@ func (c *clientHandler) dirTransferMLSD(w io.Writer, files []os.FileInfo) error 
 	}
 
 	for _, file := range files {
-		if err := c.writeMLSxEntry(w, file); err != nil {
+		if err := c.writeMLSxEntry(writer, file); err != nil {
 			return err
 		}
 	}
 
 	return nil
 }
-func (c *clientHandler) writeMLSxEntry(w io.Writer, file os.FileInfo) error {
+func (c *clientHandler) writeMLSxEntry(writer io.Writer, file os.FileInfo) error {
 	var listType string
 	if file.IsDir() {
 		listType = "dir"
@@ -352,7 +352,7 @@ func (c *clientHandler) writeMLSxEntry(w io.Writer, file os.FileInfo) error {
 	}
 
 	_, err := fmt.Fprintf(
-		w,
+		writer,
 		"Type=%s;Size=%d;Modify=%s; %s\r\n",
 		listType,
 		file.Size(),

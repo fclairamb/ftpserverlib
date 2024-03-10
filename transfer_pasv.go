@@ -49,28 +49,28 @@ func (e *ipValidationError) Error() string {
 
 func (c *clientHandler) getCurrentIP() ([]string, error) {
 	// Provide our external IP address so the ftp client can connect back to us
-	ip := c.server.settings.PublicHost
+	ipParts := c.server.settings.PublicHost
 
 	// If we don't have an IP address, we can take the one that was used for the current connection
-	if ip == "" {
+	if ipParts == "" {
 		// Defer to the user-provided resolver.
 		if c.server.settings.PublicIPResolver != nil {
 			var err error
-			ip, err = c.server.settings.PublicIPResolver(c)
+			ipParts, err = c.server.settings.PublicIPResolver(c)
 
 			if err != nil {
 				return nil, fmt.Errorf("couldn't fetch public IP: %w", err)
 			}
 		} else {
-			ip = strings.Split(c.conn.LocalAddr().String(), ":")[0]
+			ipParts = strings.Split(c.conn.LocalAddr().String(), ":")[0]
 		}
 	}
 
-	quads := strings.Split(ip, ".")
+	quads := strings.Split(ipParts, ".")
 	if len(quads) != 4 {
-		c.logger.Warn("Invalid passive IP", "IP", ip)
+		c.logger.Warn("Invalid passive IP", "IP", ipParts)
 
-		return nil, &ipValidationError{error: fmt.Sprintf("invalid passive IP %#v", ip)}
+		return nil, &ipValidationError{error: fmt.Sprintf("invalid passive IP %#v", ipParts)}
 	}
 
 	return quads, nil
@@ -164,7 +164,7 @@ func (c *clientHandler) handlePASV(_ string) error {
 		}
 	}
 
-	p := &passiveTransferHandler{ //nolint:forcetypeassert
+	transferHandler := &passiveTransferHandler{ //nolint:forcetypeassert
 		tcpListener:   tcpListener,
 		listener:      listener,
 		Port:          tcpListener.Addr().(*net.TCPAddr).Port,
@@ -175,21 +175,11 @@ func (c *clientHandler) handlePASV(_ string) error {
 
 	// We should rewrite this part
 	if command == "PASV" {
-		p1 := p.Port / 256
-		p2 := p.Port - (p1 * 256)
-		quads, err2 := c.getCurrentIP()
-
-		if err2 != nil {
-			c.writeMessage(StatusServiceNotAvailable, fmt.Sprintf("Could not listen for passive connection: %v", err2))
-
+		if c.handlePassivePASV(transferHandler) {
 			return nil
 		}
-
-		c.writeMessage(
-			StatusEnteringPASV,
-			fmt.Sprintf("Entering Passive Mode (%s,%s,%s,%s,%d,%d)", quads[0], quads[1], quads[2], quads[3], p1, p2))
 	} else {
-		c.writeMessage(StatusEnteringEPSV, fmt.Sprintf("Entering Extended Passive Mode (|||%d|)", p.Port))
+		c.writeMessage(StatusEnteringEPSV, fmt.Sprintf("Entering Extended Passive Mode (|||%d|)", transferHandler.Port))
 	}
 
 	c.transferMu.Lock()
@@ -197,11 +187,34 @@ func (c *clientHandler) handlePASV(_ string) error {
 		c.transfer.Close() //nolint:errcheck,gosec
 	}
 
-	c.transfer = p
+	c.transfer = transferHandler
 	c.transferMu.Unlock()
 	c.setLastDataChannel(DataChannelPassive)
 
 	return nil
+}
+
+func (c *clientHandler) handlePassivePASV(transferHandler *passiveTransferHandler) bool {
+	portByte1 := transferHandler.Port / 256
+	portByte2 := transferHandler.Port - (portByte1 * 256)
+	quads, err2 := c.getCurrentIP()
+
+	if err2 != nil {
+		c.writeMessage(StatusServiceNotAvailable, fmt.Sprintf("Could not listen for passive connection: %v", err2))
+
+		return true
+	}
+
+	c.writeMessage(
+		StatusEnteringPASV,
+		fmt.Sprintf(
+			"Entering Passive Mode (%s,%s,%s,%s,%d,%d)",
+			quads[0], quads[1], quads[2], quads[3],
+			portByte1, portByte2,
+		),
+	)
+
+	return false
 }
 
 func (p *passiveTransferHandler) ConnectionWait(wait time.Duration) (net.Conn, error) {
@@ -217,14 +230,14 @@ func (p *passiveTransferHandler) ConnectionWait(wait time.Duration) (net.Conn, e
 			return nil, fmt.Errorf("failed to accept passive transfer connection: %w", err)
 		}
 
-		ip, err := getIPFromRemoteAddr(p.connection.RemoteAddr())
+		ipAddress, err := getIPFromRemoteAddr(p.connection.RemoteAddr())
 		if err != nil {
 			p.logger.Warn("Could get remote passive IP address", "err", err)
 
 			return nil, err
 		}
 
-		if err := p.checkDataConn(ip, DataChannelPassive); err != nil {
+		if err := p.checkDataConn(ipAddress, DataChannelPassive); err != nil {
 			// we don't want to expose the full error to the client, we just log it
 			p.logger.Warn("Could not validate passive data connection requirement", "err", err)
 

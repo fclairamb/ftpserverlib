@@ -143,22 +143,22 @@ func parsePORTAddr(param string) (*net.TCPAddr, error) {
 
 	params := strings.Split(param, ",")
 
-	ip := strings.Join(params[0:4], ".")
+	ipParts := strings.Join(params[0:4], ".")
 
-	p1, err := strconv.Atoi(params[4])
+	portByte1, err := strconv.Atoi(params[4])
 	if err != nil {
 		return nil, ErrRemoteAddrFormat
 	}
 
-	p2, err := strconv.Atoi(params[5])
+	portByte2, err := strconv.Atoi(params[5])
 
 	if err != nil {
 		return nil, ErrRemoteAddrFormat
 	}
 
-	port := p1<<8 + p2
+	port := portByte1<<8 + portByte2
 
-	addr, err := net.ResolveTCPAddr("tcp", fmt.Sprintf("%s:%d", ip, port))
+	addr, err := net.ResolveTCPAddr("tcp", fmt.Sprintf("%s:%d", ipParts, port))
 
 	if err != nil {
 		err = newNetworkError("could not resolve "+param, err)
@@ -189,13 +189,13 @@ func parseEPRTAddr(param string) (*net.TCPAddr, error) {
 		return nil, ErrRemoteAddrFormat
 	}
 
-	var ip net.IP
+	var ipAddress net.IP
 
 	switch netProtocol {
 	case "1", "2":
 		// use protocol 1 means IPv4. 2 means IPv6
 		// net.ParseIP for validate IP
-		if ip = net.ParseIP(remoteIP); ip == nil {
+		if ipAddress = net.ParseIP(remoteIP); ipAddress == nil {
 			return nil, ErrRemoteAddrFormat
 		}
 	default:
@@ -203,10 +203,10 @@ func parseEPRTAddr(param string) (*net.TCPAddr, error) {
 		return nil, ErrRemoteAddrFormat
 	}
 
-	addr, err = net.ResolveTCPAddr("tcp", net.JoinHostPort(ip.String(), strconv.Itoa(portI)))
+	addr, err = net.ResolveTCPAddr("tcp", net.JoinHostPort(ipAddress.String(), strconv.Itoa(portI)))
 
 	if err != nil {
-		err = newNetworkError(fmt.Sprintf("could not resolve addr %v:%v", ip, portI), err)
+		err = newNetworkError(fmt.Sprintf("could not resolve addr %v:%v", ipAddress, portI), err)
 	}
 
 	return addr, err

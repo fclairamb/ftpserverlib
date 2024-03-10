@@ -17,9 +17,9 @@ func panicOnError(err error) {
 }
 
 func TestLoginSuccess(t *testing.T) {
-	s := NewTestServer(t, false)
+	server := NewTestServer(t, false)
 	// send a NOOP before the login, this doesn't seems possible using secsy/goftp so use the old way ...
-	conn, err := net.DialTimeout("tcp", s.Addr(), 5*time.Second)
+	conn, err := net.DialTimeout("tcp", server.Addr(), 5*time.Second)
 	require.NoError(t, err)
 
 	defer func() {
@@ -28,19 +28,19 @@ func TestLoginSuccess(t *testing.T) {
 	}()
 
 	buf := make([]byte, 1024)
-	n, err := conn.Read(buf)
+	readBytes, err := conn.Read(buf)
 	require.NoError(t, err)
 
-	response := string(buf[:n])
+	response := string(buf[:readBytes])
 	require.Equal(t, "220 TEST Server\r\n", response)
 
 	_, err = conn.Write([]byte("NOOP\r\n"))
 	require.NoError(t, err)
 
-	n, err = conn.Read(buf)
+	readBytes, err = conn.Read(buf)
 	require.NoError(t, err)
 
-	response = string(buf[:n])
+	response = string(buf[:readBytes])
 	require.Equal(t, "200 OK\r\n", response)
 
 	conf := goftp.Config{
@@ -48,7 +48,7 @@ func TestLoginSuccess(t *testing.T) {
 		Password: authPass,
 	}
 
-	c, err := goftp.DialConfig(conf, s.Addr())
+	c, err := goftp.DialConfig(conf, server.Addr())
 	require.NoError(t, err, "Couldn't connect")
 
 	defer func() { panicOnError(c.Close()) }()
@@ -58,78 +58,78 @@ func TestLoginSuccess(t *testing.T) {
 
 	defer func() { require.NoError(t, raw.Close()) }()
 
-	rc, _, err := raw.SendCommand("NOOP")
+	returnCode, _, err := raw.SendCommand("NOOP")
 	require.NoError(t, err)
-	require.Equal(t, StatusOK, rc, "Couldn't NOOP")
+	require.Equal(t, StatusOK, returnCode, "Couldn't NOOP")
 
-	rc, response, err = raw.SendCommand("SYST")
+	returnCode, response, err = raw.SendCommand("SYST")
 	require.NoError(t, err)
-	require.Equal(t, StatusSystemType, rc)
+	require.Equal(t, StatusSystemType, returnCode)
 	require.Equal(t, "UNIX Type: L8", response)
 
-	s.settings.DisableSYST = true
-	rc, response, err = raw.SendCommand("SYST")
+	server.settings.DisableSYST = true
+	returnCode, response, err = raw.SendCommand("SYST")
 	require.NoError(t, err)
-	require.Equal(t, StatusCommandNotImplemented, rc, response)
+	require.Equal(t, StatusCommandNotImplemented, returnCode, response)
 }
 
 func TestLoginFailure(t *testing.T) {
-	s := NewTestServer(t, false)
+	server := NewTestServer(t, false)
 
 	conf := goftp.Config{
 		User:     authUser,
 		Password: authPass + "_wrong",
 	}
 
-	c, err := goftp.DialConfig(conf, s.Addr())
+	client, err := goftp.DialConfig(conf, server.Addr())
 	require.NoError(t, err, "Couldn't connect")
 
-	defer func() { panicOnError(c.Close()) }()
+	defer func() { panicOnError(client.Close()) }()
 
-	_, err = c.OpenRawConn()
+	_, err = client.OpenRawConn()
 	require.Error(t, err, "We should have failed to login")
 }
 
 func TestLoginCustom(t *testing.T) {
+	req := require.New(t)
 	driver := &MesssageDriver{}
 	driver.Init()
-	s := NewTestServerWithDriver(t, driver)
-	r := require.New(t)
+	server := NewTestServerWithDriver(t, driver)
 
 	conf := goftp.Config{
 		User:     authUser,
 		Password: authPass + "_wrong",
 	}
 
-	c, err := goftp.DialConfig(conf, s.Addr())
-	r.NoError(err, "Couldn't connect")
+	client, err := goftp.DialConfig(conf, server.Addr())
+	req.NoError(err, "Couldn't connect")
 
-	defer func() { panicOnError(c.Close()) }()
+	defer func() { panicOnError(client.Close()) }()
 
-	_, err = c.OpenRawConn()
-	r.Error(err, "We should have failed to login")
+	_, err = client.OpenRawConn()
+	req.Error(err, "We should have failed to login")
 }
 
 func TestLoginNil(t *testing.T) {
-	s := NewTestServer(t, true)
-	r := require.New(t)
+	server := NewTestServer(t, true)
+	req := require.New(t)
 
 	conf := goftp.Config{
 		User:     "nil",
 		Password: "nil",
 	}
 
-	c, err := goftp.DialConfig(conf, s.Addr())
+	client, err := goftp.DialConfig(conf, server.Addr())
 	require.NoError(t, err, "Couldn't connect")
 
-	defer func() { panicOnError(c.Close()) }()
+	defer func() { panicOnError(client.Close()) }()
 
-	_, err = c.OpenRawConn()
-	r.Error(err)
+	_, err = client.OpenRawConn()
+	req.Error(err)
 }
 
 func TestAuthTLS(t *testing.T) {
-	s := NewTestServerWithTestDriver(t, &TestServerDriver{
+	server := NewTestServerWithTestDriver(t, &TestServerDriver{
 		Debug: false,
 		TLS:   true,
 	})
@@ -144,12 +144,12 @@ func TestAuthTLS(t *testing.T) {
 		TLSMode: goftp.TLSExplicit,
 	}
 
-	c, err := goftp.DialConfig(conf, s.Addr())
+	client, err := goftp.DialConfig(conf, server.Addr())
 	require.NoError(t, err, "Couldn't connect")
 
-	defer func() { panicOnError(c.Close()) }()
+	defer func() { panicOnError(client.Close()) }()
 
-	raw, err := c.OpenRawConn()
+	raw, err := client.OpenRawConn()
 	require.NoError(t, err, "Couldn't upgrade connection to TLS")
 
 	err = raw.Close()
@@ -157,7 +157,7 @@ func TestAuthTLS(t *testing.T) {
 }
 
 func TestAuthExplicitTLSFailure(t *testing.T) {
-	s := NewTestServer(t, false)
+	server := NewTestServer(t, false)
 
 	conf := goftp.Config{
 		User:     authUser,
@@ -169,7 +169,7 @@ func TestAuthExplicitTLSFailure(t *testing.T) {
 		TLSMode: goftp.TLSExplicit,
 	}
 
-	c, err := goftp.DialConfig(conf, s.Addr())
+	c, err := goftp.DialConfig(conf, server.Addr())
 	require.NoError(t, err, "Couldn't connect")
 
 	defer func() { panicOnError(c.Close()) }()
@@ -179,23 +179,23 @@ func TestAuthExplicitTLSFailure(t *testing.T) {
 }
 
 func TestAuthTLSRequired(t *testing.T) {
-	s := NewTestServerWithTestDriver(t, &TestServerDriver{
+	server := NewTestServerWithTestDriver(t, &TestServerDriver{
 		Debug: false,
 		TLS:   true,
 	})
-	s.settings.TLSRequired = MandatoryEncryption
+	server.settings.TLSRequired = MandatoryEncryption
 
 	conf := goftp.Config{
 		User:     authUser,
 		Password: authPass,
 	}
 
-	c, err := goftp.DialConfig(conf, s.Addr())
+	client, err := goftp.DialConfig(conf, server.Addr())
 	require.NoError(t, err, "Couldn't connect")
 
-	defer func() { panicOnError(c.Close()) }()
+	defer func() { panicOnError(client.Close()) }()
 
-	_, err = c.OpenRawConn()
+	_, err = client.OpenRawConn()
 	require.Error(t, err, "Plain text login must fail, TLS is required")
 	require.EqualError(t, err, "unexpected response: 421-TLS is required")
 
@@ -205,10 +205,10 @@ func TestAuthTLSRequired(t *testing.T) {
 	}
 	conf.TLSMode = goftp.TLSExplicit
 
-	c, err = goftp.DialConfig(conf, s.Addr())
+	client, err = goftp.DialConfig(conf, server.Addr())
 	require.NoError(t, err, "Couldn't connect")
 
-	raw, err := c.OpenRawConn()
+	raw, err := client.OpenRawConn()
 	require.NoError(t, err, "Couldn't open raw connection")
 
 	defer func() { require.NoError(t, raw.Close()) }()
@@ -219,7 +219,7 @@ func TestAuthTLSRequired(t *testing.T) {
 }
 
 func TestAuthTLSVerificationFailed(t *testing.T) {
-	s := NewTestServerWithTestDriver(t, &TestServerDriver{
+	server := NewTestServerWithTestDriver(t, &TestServerDriver{
 		Debug:                true,
 		TLS:                  true,
 		TLSVerificationReply: tlsVerificationFailed,
@@ -235,17 +235,17 @@ func TestAuthTLSVerificationFailed(t *testing.T) {
 		TLSMode: goftp.TLSExplicit,
 	}
 
-	c, err := goftp.DialConfig(conf, s.Addr())
+	client, err := goftp.DialConfig(conf, server.Addr())
 	require.NoError(t, err, "Couldn't connect")
 
-	defer func() { panicOnError(c.Close()) }()
+	defer func() { panicOnError(client.Close()) }()
 
-	_, err = c.OpenRawConn()
+	_, err = client.OpenRawConn()
 	require.Error(t, err, "TLS verification shoul fail")
 }
 
 func TestAuthTLSCertificate(t *testing.T) {
-	s := NewTestServerWithTestDriver(t, &TestServerDriver{
+	server := NewTestServerWithTestDriver(t, &TestServerDriver{
 		Debug:                true,
 		TLS:                  true,
 		TLSVerificationReply: tlsVerificationAuthenticated,
@@ -260,7 +260,7 @@ func TestAuthTLSCertificate(t *testing.T) {
 		TLSMode: goftp.TLSExplicit,
 	}
 
-	c, err := goftp.DialConfig(conf, s.Addr())
+	c, err := goftp.DialConfig(conf, server.Addr())
 	require.NoError(t, err, "Couldn't connect")
 
 	defer func() { panicOnError(c.Close()) }()
@@ -276,7 +276,7 @@ func TestAuthTLSCertificate(t *testing.T) {
 }
 
 func TestAuthPerClientTLSRequired(t *testing.T) {
-	s := NewTestServerWithTestDriver(t, &TestServerDriver{
+	server := NewTestServerWithTestDriver(t, &TestServerDriver{
 		Debug:          true,
 		TLS:            true,
 		TLSRequirement: MandatoryEncryption,
@@ -287,12 +287,12 @@ func TestAuthPerClientTLSRequired(t *testing.T) {
 		Password: authPass,
 	}
 
-	c, err := goftp.DialConfig(conf, s.Addr())
+	client, err := goftp.DialConfig(conf, server.Addr())
 	require.NoError(t, err, "Couldn't connect")
 
-	defer func() { panicOnError(c.Close()) }()
+	defer func() { panicOnError(client.Close()) }()
 
-	_, err = c.OpenRawConn()
+	_, err = client.OpenRawConn()
 	require.Error(t, err, "Plain text login must fail, TLS is required")
 	require.EqualError(t, err, "unexpected response: 421-TLS is required")
 
@@ -301,10 +301,10 @@ func TestAuthPerClientTLSRequired(t *testing.T) {
 	}
 	conf.TLSMode = goftp.TLSExplicit
 
-	c, err = goftp.DialConfig(conf, s.Addr())
+	client, err = goftp.DialConfig(conf, server.Addr())
 	require.NoError(t, err, "Couldn't connect")
 
-	raw, err := c.OpenRawConn()
+	raw, err := client.OpenRawConn()
 	require.NoError(t, err, "Couldn't open raw connection")
 
 	defer func() { require.NoError(t, raw.Close()) }()
@@ -315,7 +315,7 @@ func TestAuthPerClientTLSRequired(t *testing.T) {
 }
 
 func TestUserVerifierError(t *testing.T) {
-	s := NewTestServerWithTestDriver(t, &TestServerDriver{
+	server := NewTestServerWithTestDriver(t, &TestServerDriver{
 		Debug: false,
 		TLS:   true,
 		// setting an invalid TLS requirement will cause the test driver
@@ -332,7 +332,7 @@ func TestUserVerifierError(t *testing.T) {
 		TLSMode: goftp.TLSExplicit,
 	}
 
-	c, err := goftp.DialConfig(conf, s.Addr())
+	c, err := goftp.DialConfig(conf, server.Addr())
 	require.NoError(t, err, "Couldn't connect")
 
 	defer func() { panicOnError(c.Close()) }()

@@ -31,34 +31,34 @@ func TestTransferCloseStorageExceeded(t *testing.T) {
 func TestErrorTypes(t *testing.T) {
 	// a := assert.New(t)
 	t.Run("DriverError", func(t *testing.T) {
-		r := require.New(t)
+		req := require.New(t)
 		var err error = newDriverError("test", os.ErrPermission)
-		r.Equal("driver error: test: permission denied", err.Error())
-		r.ErrorIs(err, os.ErrPermission)
+		req.Equal("driver error: test: permission denied", err.Error())
+		req.ErrorIs(err, os.ErrPermission)
 
 		var specificError DriverError
-		r.ErrorAs(err, &specificError)
-		r.Equal("test", specificError.str)
+		req.ErrorAs(err, &specificError)
+		req.Equal("test", specificError.str)
 	})
 
 	t.Run("NetworkError", func(t *testing.T) {
-		r := require.New(t)
+		req := require.New(t)
 		var err error = newNetworkError("test", os.ErrPermission)
-		r.Equal("network error: test: permission denied", err.Error())
-		r.ErrorIs(err, os.ErrPermission)
+		req.Equal("network error: test: permission denied", err.Error())
+		req.ErrorIs(err, os.ErrPermission)
 
 		var specificError NetworkError
-		r.ErrorAs(err, &specificError)
-		r.Equal("test", specificError.str)
+		req.ErrorAs(err, &specificError)
+		req.Equal("test", specificError.str)
 	})
 
 	t.Run("FileAccessError", func(t *testing.T) {
-		r := require.New(t)
+		req := require.New(t)
 		var err error = newFileAccessError("test", os.ErrPermission)
-		r.Equal("file access error: test: permission denied", err.Error())
-		r.ErrorIs(err, os.ErrPermission)
+		req.Equal("file access error: test: permission denied", err.Error())
+		req.ErrorIs(err, os.ErrPermission)
 		var specificError FileAccessError
-		r.ErrorAs(err, &specificError)
-		r.Equal("test", specificError.str)
+		req.ErrorAs(err, &specificError)
+		req.Equal("test", specificError.str)
 	})
 }
