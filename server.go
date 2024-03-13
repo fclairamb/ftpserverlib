@@ -254,7 +254,7 @@ func (server *FtpServer) handleAcceptError(err error, tempDelay *time.Duration) 
 	// The temporaryError method should replace net.Error.Temporary() when the go team
 	// will have provided us a better way to detect temporary errors.
 	var ne net.Error
-	if errors.Is(err, ne) && ne.Temporary() { //nolint:staticcheck
+	if errors.As(err, &ne) && ne.Temporary() { //nolint:staticcheck
 		if *tempDelay == 0 {
 			*tempDelay = 5 * time.Millisecond
 		} else {
