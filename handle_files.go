@@ -146,7 +146,7 @@ func (c *clientHandler) doFileTransfer(transferConn net.Conn, file io.ReadWriter
 	}
 
 	// for reads io.EOF isn't an error, for writes it must be considered an error
-	if written, errCopy := io.Copy(writer, reader); errCopy != nil && (errors.Is(errCopy, io.EOF) || write) {
+	if written, errCopy := io.Copy(writer, reader); errCopy != nil && (!errors.Is(errCopy, io.EOF) || write) {
 		err = errCopy
 	} else {
 		c.logger.Debug(
@@ -713,7 +713,7 @@ func (c *clientHandler) computeHashForFile(filePath string, algo HASHAlgo, start
 
 	_, err = io.CopyN(chosenHashAlgo, file, end-start)
 
-	if err != nil && errors.Is(err, io.EOF) {
+	if err != nil && !errors.Is(err, io.EOF) {
 		return "", newFileAccessError("couldn't read file", err)
 	}
 
