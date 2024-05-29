@@ -56,7 +56,13 @@ jobs:
       - name: Test
         run: |
           go test -parallel 20 -v -race -coverprofile=coverage.txt -covermode=atomic ./...
-          bash <(curl -s https://codecov.io/bash)
+
+      - name: Codecov
+        uses: codecov/codecov-action@v4.4.1
+        with:
+          fail_ci_if_error: true # optional (default = false)
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 
   # For github to have a unique status check name
   build-status:
