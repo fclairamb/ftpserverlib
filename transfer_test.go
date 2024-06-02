@@ -10,6 +10,7 @@ import (
 	"math/rand"
 	"net"
 	"os"
+	"path"
 	"path/filepath"
 	"runtime"
 	"strconv"
@@ -116,6 +117,7 @@ func ftpDownloadAndHash(t *testing.T, ftp *goftp.Client, filename string) string
 
 type ftpDownloadOptions struct {
 	deflateMode bool
+	otherWriter io.Writer
 }
 
 func ftpDownloadAndHashWithRawConnection(t *testing.T, raw goftp.RawConn, fileName string, options *ftpDownloadOptions) string {
@@ -143,7 +145,13 @@ func ftpDownloadAndHashWithRawConnection(t *testing.T, raw goftp.RawConn, fileNa
 		req.NoError(err)
 	}
 
-	_, err = io.Copy(hasher, dataConn)
+	var writer io.Writer = hasher
+
+	if options.otherWriter != nil {
+		writer = io.MultiWriter(writer, options.otherWriter)
+	}
+
+	_, err = io.Copy(writer, dataConn)
 	req.NoError(err)
 
 	err = dataConn.Close()
@@ -1260,12 +1268,14 @@ func getPortFromPASVResponse(t *testing.T, resp string) int {
 }
 
 func TestTransferModeDeflate(t *testing.T) {
-	s := NewTestServer(t, false)
+	driver := &TestServerDriver{Debug: true}
+	server := NewTestServerWithTestDriver(t, driver)
+
 	conf := goftp.Config{
 		User:     authUser,
 		Password: authPass,
 	}
-	client, err := goftp.DialConfig(conf, s.Addr())
+	client, err := goftp.DialConfig(conf, server.Addr())
 	require.NoError(t, err, "Couldn't connect")
 
 	defer func() { require.NoError(t, client.Close()) }()
@@ -1281,6 +1291,7 @@ func TestTransferModeDeflate(t *testing.T) {
 	contents := []byte("line1\r\n\r\nline3\r\n,line4")
 	_, err = file.Write(contents)
 	require.NoError(t, err)
+	localHash := hashFile(t, file)
 
 	defer func() { require.NoError(t, file.Close()) }()
 
@@ -1297,7 +1308,26 @@ func TestTransferModeDeflate(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, files, 1)
 
-	remoteHash := ftpDownloadAndHashWithRawConnection(t, raw, "file.txt", &ftpDownloadOptions{deflateMode: true})
-	localHash := hashFile(t, file)
-	require.Equal(t, localHash, remoteHash)
+	{ // Hash on server
+		fp, err := os.Open(path.Join(driver.serverDir, "file.txt"))
+		require.NoError(t, err)
+
+		defer func() { require.NoError(t, fp.Close()) }()
+
+		readContents, err := io.ReadAll(fp)
+		require.NoError(t, err)
+		require.Equal(t, contents, readContents)
+	}
+
+	{ // Hash on standard connection
+		writer := bytes.NewBuffer(nil)
+		remoteHash := ftpDownloadAndHashWithRawConnection(t, raw, "file.txt", &ftpDownloadOptions{otherWriter: writer})
+		require.Equal(t, string(contents), writer.String())
+		require.Equal(t, localHash, remoteHash)
+	}
+
+	{ // Hash on deflate connection
+		remoteHash := ftpDownloadAndHashWithRawConnection(t, raw, "file.txt", &ftpDownloadOptions{deflateMode: true})
+		require.Equal(t, localHash, remoteHash)
+	}
 }

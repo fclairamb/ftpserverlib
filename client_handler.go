@@ -823,10 +823,8 @@ func (c *deflateConn) Write(p []byte) (int, error) {
 }
 
 func (c *deflateConn) Close() error {
-	errWriter := c.Writer.Flush()
-
-	if errWriter != nil {
-		return errWriter
+	if err := c.Writer.Close(); err != nil {
+		return fmt.Errorf("could not close deflate writer: %w", err)
 	}
 
 	return c.Conn.Close()
