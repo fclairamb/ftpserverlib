@@ -283,6 +283,16 @@ func (c *clientHandler) handleTYPE(param string) error {
 	return nil
 }
 
+func (c *clientHandler) handleMODE(param string) error {
+	if param == "S" {
+		c.writeMessage(StatusOK, "Using stream mode")
+	} else {
+		c.writeMessage(StatusNotImplementedParam, "Unsupported mode")
+	}
+
+	return nil
+}
+
 func (c *clientHandler) handleQUIT(_ string) error {
 	c.transferWg.Wait()
 
