@@ -2,6 +2,7 @@ package ftpserver
 
 import (
 	"bufio"
+	"compress/flate"
 	"errors"
 	"fmt"
 	"io"
@@ -32,6 +33,14 @@ type TransferType int8
 const (
 	TransferTypeASCII TransferType = iota
 	TransferTypeBinary
+)
+
+// TransferMode is the enumerable that represents the transfer mode (stream, block, compressed, deflate)
+type TransferMode int8
+
+const (
+	TransferModeStream  TransferMode = iota // TransferModeStream is the standard mode
+	TransferModeDeflate                     // TransferModeDeflate is the deflate mode
 )
 
 // DataChannel is the enumerable that represents the data channel (active or passive)
@@ -99,6 +108,7 @@ type clientHandler struct {
 	selectedHashAlgo    HASHAlgo        // algorithm used when we receive the HASH command
 	logger              log.Logger      // Client handler logging
 	currentTransferType TransferType    // current transfer type
+	transferMode        TransferMode    // Transfer mode (stream, block, compressed)
 	transferWg          sync.WaitGroup  // wait group for command that open a transfer connection
 	transferMu          sync.Mutex      // this mutex will protect the transfer parameters
 	transfer            transferHandler // Transfer connection (passive or active)s
@@ -663,6 +673,15 @@ func (c *clientHandler) TransferOpen(info string) (net.Conn, error) {
 		return nil, err
 	}
 
+	if c.transferMode == TransferModeDeflate {
+		conn, err = newDeflateConn(conn, c.server.settings.DeflateCompressionLevel)
+		if err != nil {
+			c.writeMessage(StatusActionNotTaken, fmt.Sprintf("Could not switch to deflate mode: %v", err))
+
+			return nil, fmt.Errorf("could not switch to deflate mode: %w", err)
+		}
+	}
+
 	c.isTransferOpen = true
 	c.transfer.SetInfo(info)
 
@@ -787,4 +806,39 @@ func getMessageLines(message string) []string {
 	}
 
 	return lines
+}
+
+type deflateConn struct {
+	net.Conn
+	io.Reader
+	*flate.Writer
+}
+
+func (c *deflateConn) Read(p []byte) (int, error) {
+	return c.Reader.Read(p)
+}
+
+func (c *deflateConn) Write(p []byte) (int, error) {
+	return c.Writer.Write(p)
+}
+
+func (c *deflateConn) Close() error {
+	errWriter := c.Writer.Flush()
+
+	if errWriter != nil {
+		return errWriter
+	}
+
+	return c.Conn.Close()
+}
+
+func newDeflateConn(conn net.Conn, compressionLevel int) (net.Conn, error) {
+	reader := flate.NewReader(conn)
+	writer, err := flate.NewWriter(conn, compressionLevel)
+
+	if err != nil {
+		return nil, fmt.Errorf("could not create deflate writer: %w", err)
+	}
+
+	return &deflateConn{Conn: conn, Reader: reader, Writer: writer}, nil
 }

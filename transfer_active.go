@@ -72,6 +72,9 @@ func (c *clientHandler) handlePORT(param string) error {
 	return nil
 }
 
+// activeTransferHandler implements the transferHandler interface
+var _ transferHandler = (*activeTransferHandler)(nil)
+
 // Active connection
 type activeTransferHandler struct {
 	raddr     *net.TCPAddr // Remote address of the client
