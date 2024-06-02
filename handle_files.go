@@ -606,9 +606,14 @@ func (c *clientHandler) handleGenericHash(param string, algo HASHAlgo, isCustomM
 		return nil
 	}
 
-	args := strings.SplitN(param, " ", 3)
-	info, err := c.driver.Stat(args[0])
+	args, err := unquoteSpaceSeparatedParams(param)
+	if err != nil || len(args) == 0 {
+		c.writeMessage(StatusSyntaxErrorParameters, fmt.Sprintf("invalid HASH parameters: %v", param))
 
+		return nil //nolint:nilerr
+	}
+
+	info, err := c.driver.Stat(args[0])
 	if err != nil {
 		c.writeMessage(StatusActionNotTaken, fmt.Sprintf("%v: %v", param, err))
 
@@ -627,25 +632,11 @@ func (c *clientHandler) handleGenericHash(param string, algo HASHAlgo, isCustomM
 	// to support partial hash also for the HASH command, we should implement RANG,
 	// but it applies also to uploads/downloads and so it complicates their handling,
 	// we'll add this support in future improvements
-	if isCustomMode { //nolint:nestif // too much effort to change for now
-		// for custom command the range can be specified in this way:
-		// XSHA1 <file> <start> <end>
-		if len(args) > 1 {
-			start, err = strconv.ParseInt(args[1], 10, 64)
-			if err != nil {
-				c.writeMessage(StatusSyntaxErrorParameters, fmt.Sprintf("invalid start offset %v: %v", args[1], err))
+	if isCustomMode {
+		if err = getPartialHASHRange(args, &start, &end); err != nil {
+			c.writeMessage(StatusSyntaxErrorParameters, err.Error())
 
-				return nil
-			}
-		}
-
-		if len(args) > 2 {
-			end, err = strconv.ParseInt(args[2], 10, 64)
-			if err != nil {
-				c.writeMessage(StatusSyntaxErrorParameters, fmt.Sprintf("invalid end offset %v: %v", args[2], err))
-
-				return nil
-			}
+			return nil
 		}
 	}
 
@@ -745,6 +736,30 @@ func (c *clientHandler) closeUnchecked(file io.Closer) {
 			"err", err,
 		)
 	}
+}
+
+func getPartialHASHRange(args []string, start *int64, end *int64) error {
+	// for custom HASH commands the range can be specified in this way:
+	// XSHA1 <file> <start> <end>
+	if len(args) > 1 {
+		val, err := strconv.ParseInt(args[1], 10, 64)
+		if err != nil {
+			return fmt.Errorf("invalid start offset %v: %w", args[1], err)
+		}
+
+		*start = val
+	}
+
+	if len(args) > 2 {
+		val, err := strconv.ParseInt(args[2], 10, 64)
+		if err != nil {
+			return fmt.Errorf("invalid end offset %v: %w", args[1], err)
+		}
+
+		*end = val
+	}
+
+	return nil
 }
 
 // This method split params by spaces, except when the space is inside quotes.

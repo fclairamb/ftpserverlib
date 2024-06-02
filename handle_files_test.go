@@ -546,6 +546,7 @@ func TestHASHCommand(t *testing.T) {
 	sha256Hash := "ceee704dd96e2b8c2ceca59c4c697bc01123fb9e66a1a3ac34dbdd2d6da9659b"
 
 	ftpUpload(t, client, tempFile, "file.txt")
+	ftpUpload(t, client, tempFile, "file with space.txt")
 
 	raw, err := client.OpenRawConn()
 	require.NoError(t, err, "Couldn't open raw connection")
@@ -562,6 +563,11 @@ func TestHASHCommand(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, StatusFileStatus, returnCode)
 	require.True(t, strings.HasSuffix(message, fmt.Sprintf("SHA-256 0-36 %v file.txt", sha256Hash)))
+	// test the same quoting the file name
+	returnCode, message, err = raw.SendCommand(`HASH "file with space.txt"`)
+	require.NoError(t, err)
+	require.Equal(t, StatusFileStatus, returnCode)
+	require.True(t, strings.HasSuffix(message, fmt.Sprintf("SHA-256 0-36 %v file with space.txt", sha256Hash)))
 
 	// change algo and request the hash again
 	returnCode, message, err = raw.SendCommand("OPTS HASH CRC32")
@@ -573,6 +579,37 @@ func TestHASHCommand(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, StatusFileStatus, returnCode)
 	require.True(t, strings.HasSuffix(message, fmt.Sprintf("CRC32 0-36 %v file.txt", crc32Sum)))
+}
+
+func TestHashWithoutParams(t *testing.T) {
+	server := NewTestServerWithTestDriver(
+		t,
+		&TestServerDriver{
+			Debug: false,
+			Settings: &Settings{
+				EnableHASH: true,
+			},
+		},
+	)
+	conf := goftp.Config{
+		User:     authUser,
+		Password: authPass,
+	}
+
+	client, err := goftp.DialConfig(conf, server.Addr())
+	require.NoError(t, err, "Couldn't connect")
+
+	defer func() { panicOnError(client.Close()) }()
+
+	raw, err := client.OpenRawConn()
+	require.NoError(t, err, "Couldn't open raw connection")
+
+	defer func() { require.NoError(t, raw.Close()) }()
+
+	returnCode, message, err := raw.SendCommand("HASH")
+	require.NoError(t, err)
+	require.Equal(t, StatusSyntaxErrorParameters, returnCode)
+	require.Contains(t, message, "invalid HASH parameters")
 }
 
 func TestCustomHASHCommands(t *testing.T) {
