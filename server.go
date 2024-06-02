@@ -87,6 +87,7 @@ var commandsMap = map[string]*CommandDescription{ //nolint:gochecknoglobals
 
 	// Connection handling
 	"TYPE": {Fn: (*clientHandler).handleTYPE},
+	"MODE": {Fn: (*clientHandler).handleMODE},
 	"PASV": {Fn: (*clientHandler).handlePASV},
 	"EPSV": {Fn: (*clientHandler).handlePASV},
 	"PORT": {Fn: (*clientHandler).handlePORT},
