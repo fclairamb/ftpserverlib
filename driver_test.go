@@ -105,7 +105,7 @@ func NewTestServerWithDriverAndLogger(t *testing.T, driver MainDriver, logger lo
 	})
 
 	go func() {
-		if err := server.Serve(); err != nil && errors.Is(err, io.EOF) {
+		if err := server.Serve(); err != nil && !errors.Is(err, io.EOF) {
 			server.Logger.Error("problem serving", "err", err)
 		}
 	}()
