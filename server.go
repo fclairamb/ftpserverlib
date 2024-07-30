@@ -92,6 +92,7 @@ var commandsMap = map[string]*CommandDescription{ //nolint:gochecknoglobals
 	"EPSV": {Fn: (*clientHandler).handlePASV},
 	"PORT": {Fn: (*clientHandler).handlePORT},
 	"EPRT": {Fn: (*clientHandler).handlePORT},
+	"REIN": {Fn: (*clientHandler).handleREIN},
 }
 
 var specialAttentionCommands = []string{"ABOR", "STAT", "QUIT"} //nolint:gochecknoglobals

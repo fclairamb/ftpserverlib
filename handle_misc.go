@@ -374,3 +374,9 @@ func (c *clientHandler) handleAVBL(param string) error {
 
 	return nil
 }
+
+func (c *clientHandler) handleREIN(param string) error {
+	c.writeMessage(StatusCommandNotImplemented, "REIN is not implemented")
+
+	return nil
+}
