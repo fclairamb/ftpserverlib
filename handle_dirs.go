@@ -62,7 +62,7 @@ func (c *clientHandler) handleCWD(param string) error {
 	pathAbsolute := c.absPath(param)
 
 	if stat, err := c.driver.Stat(pathAbsolute); err == nil {
-		if stat.IsDir() {
+		if stat.IsDir() || strings.HasSuffix(pathAbsolute, "/") {
 			c.SetPath(pathAbsolute)
 			c.writeMessage(StatusFileOK, "CD worked on "+pathAbsolute)
 		} else {
@@ -378,7 +378,7 @@ func (c *clientHandler) getFileList(param string, filePathAllowed bool) ([]os.Fi
 		return nil, "", newFileAccessError("couldn't stat", err)
 	}
 
-	if !info.IsDir() {
+	if !info.IsDir() && !strings.HasSuffix(listPath, "/") {
 		if filePathAllowed {
 			return []os.FileInfo{info}, path.Dir(c.getListPath()), nil
 		}
