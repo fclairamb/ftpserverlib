@@ -1,4 +1,4 @@
-module github.com/fclairamb/ftpserverlib
+module github.com/refuse2speak/ftpserverlib
 
 go 1.21
 
