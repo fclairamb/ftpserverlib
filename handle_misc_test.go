@@ -442,3 +442,23 @@ func TestMode(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, StatusNotImplementedParam, returnCode)
 }
+
+func TestREIN(t *testing.T) {
+	server := NewTestServer(t, false)
+	conf := goftp.Config{
+		User:     authUser,
+		Password: authPass,
+	}
+
+	client, err := goftp.DialConfig(conf, server.Addr())
+	require.NoError(t, err, "Couldn't connect")
+
+	defer func() { panicOnError(client.Close()) }()
+
+	raw, err := client.OpenRawConn()
+	require.NoError(t, err, "Couldn't open raw connection")
+
+	returnCode, _, err := raw.SendCommand("REIN")
+	require.NoError(t, err)
+	require.Equal(t, StatusCommandNotImplemented, returnCode)
+}
