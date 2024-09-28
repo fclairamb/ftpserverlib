@@ -30,11 +30,17 @@ var commandsMap = map[string]*CommandDescription{ //nolint:gochecknoglobals
 	// Authentication
 	"USER": {Fn: (*clientHandler).handleUSER, Open: true},
 	"PASS": {Fn: (*clientHandler).handlePASS, Open: true},
+	"ACCT": {Fn: (*clientHandler).handleNotImplemented},
+	"ADAT": {Fn: (*clientHandler).handleNotImplemented},
 
 	// TLS handling
 	"AUTH": {Fn: (*clientHandler).handleAUTH, Open: true},
 	"PROT": {Fn: (*clientHandler).handlePROT, Open: true},
 	"PBSZ": {Fn: (*clientHandler).handlePBSZ, Open: true},
+	"CCC":  {Fn: (*clientHandler).handleNotImplemented},
+	"CONF": {Fn: (*clientHandler).handleNotImplemented},
+	"ENC":  {Fn: (*clientHandler).handleNotImplemented},
+	"MIC":  {Fn: (*clientHandler).handleNotImplemented},
 
 	// Misc
 	"CLNT": {Fn: (*clientHandler).handleCLNT, Open: true},
@@ -45,14 +51,26 @@ var commandsMap = map[string]*CommandDescription{ //nolint:gochecknoglobals
 	"QUIT": {Fn: (*clientHandler).handleQUIT, Open: true, SpecialAction: true},
 	"AVBL": {Fn: (*clientHandler).handleAVBL},
 	"ABOR": {Fn: (*clientHandler).handleABOR, SpecialAction: true},
+	"CSID": {Fn: (*clientHandler).handleNotImplemented},
+	"HELP": {Fn: (*clientHandler).handleNotImplemented},
+	"HOST": {Fn: (*clientHandler).handleNotImplemented},
+	"LANG": {Fn: (*clientHandler).handleNotImplemented},
+	"XRSQ": {Fn: (*clientHandler).handleNotImplemented},
+	"XSEM": {Fn: (*clientHandler).handleNotImplemented},
+	"XSEN": {Fn: (*clientHandler).handleNotImplemented},
 
 	// File access
 	"SIZE":    {Fn: (*clientHandler).handleSIZE},
+	"DSIZ":    {Fn: (*clientHandler).handleNotImplemented},
 	"STAT":    {Fn: (*clientHandler).handleSTAT, SpecialAction: true},
 	"MDTM":    {Fn: (*clientHandler).handleMDTM},
 	"MFMT":    {Fn: (*clientHandler).handleMFMT},
+	"MFF":     {Fn: (*clientHandler).handleNotImplemented},
+	"MFCT":    {Fn: (*clientHandler).handleNotImplemented},
 	"RETR":    {Fn: (*clientHandler).handleRETR, TransferRelated: true},
 	"STOR":    {Fn: (*clientHandler).handleSTOR, TransferRelated: true},
+	"STOU":    {Fn: (*clientHandler).handleNotImplemented},
+	"STRU":    {Fn: (*clientHandler).handleNotImplemented},
 	"APPE":    {Fn: (*clientHandler).handleAPPE, TransferRelated: true},
 	"DELE":    {Fn: (*clientHandler).handleDELE},
 	"RNFR":    {Fn: (*clientHandler).handleRNFR},
@@ -69,6 +87,8 @@ var commandsMap = map[string]*CommandDescription{ //nolint:gochecknoglobals
 	"XSHA256": {Fn: (*clientHandler).handleSHA256},
 	"XSHA512": {Fn: (*clientHandler).handleSHA512},
 	"COMB":    {Fn: (*clientHandler).handleCOMB},
+	"THMB":    {Fn: (*clientHandler).handleNotImplemented},
+	"XRCP":    {Fn: (*clientHandler).handleNotImplemented},
 
 	// Directory handling
 	"CWD":  {Fn: (*clientHandler).handleCWD},
@@ -82,16 +102,23 @@ var commandsMap = map[string]*CommandDescription{ //nolint:gochecknoglobals
 	"MLST": {Fn: (*clientHandler).handleMLST},
 	"MKD":  {Fn: (*clientHandler).handleMKD},
 	"RMD":  {Fn: (*clientHandler).handleRMD},
+	"RMDA": {Fn: (*clientHandler).handleNotImplemented},
 	"XMKD": {Fn: (*clientHandler).handleMKD},
 	"XRMD": {Fn: (*clientHandler).handleRMD},
+	"SMNT": {Fn: (*clientHandler).handleNotImplemented},
+	"XCUP": {Fn: (*clientHandler).handleNotImplemented},
 
 	// Connection handling
 	"TYPE": {Fn: (*clientHandler).handleTYPE},
 	"MODE": {Fn: (*clientHandler).handleMODE},
 	"PASV": {Fn: (*clientHandler).handlePASV},
 	"EPSV": {Fn: (*clientHandler).handlePASV},
+	"LPSV": {Fn: (*clientHandler).handleNotImplemented},
+	"SPSV": {Fn: (*clientHandler).handleNotImplemented},
 	"PORT": {Fn: (*clientHandler).handlePORT},
+	"LRPT": {Fn: (*clientHandler).handleNotImplemented},
 	"EPRT": {Fn: (*clientHandler).handlePORT},
+	"REIN": {Fn: (*clientHandler).handleNotImplemented},
 }
 
 var specialAttentionCommands = []string{"ABOR", "STAT", "QUIT"} //nolint:gochecknoglobals

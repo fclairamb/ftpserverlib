@@ -374,3 +374,9 @@ func (c *clientHandler) handleAVBL(param string) error {
 
 	return nil
 }
+
+func (c *clientHandler) handleNotImplemented(_ string) error {
+	c.writeMessage(StatusCommandNotImplemented, "This command hasn't been implemented !")
+
+	return nil
+}
