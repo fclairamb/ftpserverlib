@@ -637,7 +637,7 @@ func (c *clientHandler) GetTranferInfo() string {
 	return c.transfer.GetInfo()
 }
 
-func (c *clientHandler) TransferOpen(info string) (net.Conn, error) {
+func (c *clientHandler) TransferOpen(info string) (io.ReadWriter, error) {
 	c.transferMu.Lock()
 	defer c.transferMu.Unlock()
 
@@ -673,8 +673,10 @@ func (c *clientHandler) TransferOpen(info string) (net.Conn, error) {
 		return nil, err
 	}
 
+	var transferStream io.ReadWriter = conn
+
 	if c.transferMode == TransferModeDeflate {
-		conn, err = newDeflateConn(conn, c.server.settings.DeflateCompressionLevel)
+		transferStream, err = newDeflateTransfer(transferStream, c.server.settings.DeflateCompressionLevel)
 		if err != nil {
 			c.writeMessage(StatusActionNotTaken, fmt.Sprintf("Could not switch to deflate mode: %v", err))
 
@@ -694,12 +696,26 @@ func (c *clientHandler) TransferOpen(info string) (net.Conn, error) {
 			"localAddr", conn.LocalAddr().String())
 	}
 
-	return conn, nil
+	return transferStream, nil
 }
 
-func (c *clientHandler) TransferClose(err error) {
+// Flusher is the interface that wraps the basic Flush method.
+type Flusher interface {
+	Flush() error
+}
+
+func (c *clientHandler) TransferClose(transfer io.ReadWriter, err error) {
 	c.transferMu.Lock()
 	defer c.transferMu.Unlock()
+
+	if flush, ok := transfer.(Flusher); ok {
+		if errFlush := flush.Flush(); errFlush != nil {
+			c.logger.Warn(
+				"Error flushing transfer connection",
+				"err", errFlush,
+			)
+		}
+	}
 
 	errClose := c.closeTransfer()
 	if errClose != nil {
@@ -808,35 +824,24 @@ func getMessageLines(message string) []string {
 	return lines
 }
 
-type deflateConn struct {
-	net.Conn
+// We check that it implements flusher
+var _ Flusher = (*deflateReadWriter)(nil)
+
+type deflateReadWriter struct {
 	io.Reader
 	*flate.Writer
 }
 
-func (c *deflateConn) Read(p []byte) (int, error) {
-	return c.Reader.Read(p)
-}
-
-func (c *deflateConn) Write(p []byte) (int, error) {
-	return c.Writer.Write(p)
-}
-
-func (c *deflateConn) Close() error {
-	if err := c.Writer.Close(); err != nil {
-		return fmt.Errorf("could not close deflate writer: %w", err)
-	}
-
-	return c.Conn.Close()
-}
-
-func newDeflateConn(conn net.Conn, compressionLevel int) (net.Conn, error) {
-	reader := flate.NewReader(conn)
-	writer, err := flate.NewWriter(conn, compressionLevel)
-
+func newDeflateTransfer(conn io.ReadWriter, level int) (io.ReadWriter, error) {
+	writer, err := flate.NewWriter(conn, level)
 	if err != nil {
 		return nil, fmt.Errorf("could not create deflate writer: %w", err)
 	}
 
-	return &deflateConn{Conn: conn, Reader: reader, Writer: writer}, nil
+	reader := flate.NewReader(conn)
+
+	return &deflateReadWriter{
+		Reader: reader,
+		Writer: writer,
+	}, nil
 }
