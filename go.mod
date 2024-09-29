@@ -2,7 +2,7 @@ module github.com/fclairamb/ftpserverlib
 
 go 1.21
 
-toolchain go1.22.3
+toolchain go1.22.5
 
 require (
 	github.com/fclairamb/go-log v0.5.0
@@ -10,7 +10,7 @@ require (
 	github.com/secsy/goftp v0.0.0-20200609142545-aa2de14babf4
 	github.com/spf13/afero v1.11.0
 	github.com/stretchr/testify v1.9.0
-	golang.org/x/sys v0.20.0
+	golang.org/x/sys v0.22.0
 )
 
 require (
