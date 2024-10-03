@@ -191,7 +191,7 @@ func (c *clientHandler) handleLIST(param string) error {
 	if files, _, err := c.getFileList(param, true); err == nil || errors.Is(err, io.EOF) {
 		if tr, errTr := c.TransferOpen(info); errTr == nil {
 			err = c.dirTransferLIST(tr, files)
-			c.TransferClose(err)
+			c.TransferClose(tr, err)
 
 			return nil
 		}
@@ -210,7 +210,7 @@ func (c *clientHandler) handleNLST(param string) error {
 	if files, parentDir, err := c.getFileList(param, true); err == nil || errors.Is(err, io.EOF) {
 		if tr, errTrOpen := c.TransferOpen(info); errTrOpen == nil {
 			err = c.dirTransferNLST(tr, files, parentDir)
-			c.TransferClose(err)
+			c.TransferClose(tr, err)
 
 			return nil
 		}
@@ -257,7 +257,7 @@ func (c *clientHandler) handleMLSD(param string) error {
 	if files, _, err := c.getFileList(param, false); err == nil || errors.Is(err, io.EOF) {
 		if tr, errTr := c.TransferOpen(info); errTr == nil {
 			err = c.dirTransferMLSD(tr, files)
-			c.TransferClose(err)
+			c.TransferClose(tr, err)
 
 			return nil
 		}
