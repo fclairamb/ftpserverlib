@@ -164,6 +164,10 @@ func (server *FtpServer) loadSettings() error {
 		settings.Banner = "ftpserver - golang FTP server"
 	}
 
+	if settings.TransferFileBuffer == 0 {
+		settings.TransferFileBuffer = 64 * 1024 // 64 KB
+	}
+
 	server.settings = settings
 
 	return nil

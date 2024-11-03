@@ -1,6 +1,7 @@
 package ftpserver
 
 import (
+	"bufio"
 	"crypto/md5"  //nolint:gosec
 	"crypto/sha1" //nolint:gosec
 	"crypto/sha256"
@@ -145,8 +146,9 @@ func (c *clientHandler) doFileTransfer(transferConn net.Conn, file io.ReadWriter
 		reader = newASCIIConverter(reader, conversionMode)
 	}
 
+	bufferedWriter := bufio.NewWriterSize(writer, c.server.settings.TransferFileBuffer)
 	// for reads io.EOF isn't an error, for writes it must be considered an error
-	if written, errCopy := io.Copy(writer, reader); errCopy != nil && (!errors.Is(errCopy, io.EOF) || write) {
+	if written, errCopy := io.Copy(bufferedWriter, reader); errCopy != nil && (!errors.Is(errCopy, io.EOF) || write) {
 		err = errCopy
 	} else {
 		c.logger.Debug(
@@ -157,6 +159,11 @@ func (c *clientHandler) doFileTransfer(transferConn net.Conn, file io.ReadWriter
 		if written == 0 {
 			_, err = writer.Write([]byte{})
 		}
+	}
+
+	err = bufferedWriter.Flush()
+	if err != nil {
+		err = newNetworkError("error flushing data", err)
 	}
 
 	if err != nil {
