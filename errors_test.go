@@ -24,7 +24,7 @@ func TestCustomErrorsCode(t *testing.T) {
 func TestTransferCloseStorageExceeded(t *testing.T) {
 	buf := bytes.Buffer{}
 	h := clientHandler{writer: bufio.NewWriter(&buf)}
-	h.TransferClose(ErrStorageExceeded)
+	h.TransferClose(nil, ErrStorageExceeded)
 	require.Equal(t, "552 Issue during transfer: storage limit exceeded\r\n", buf.String())
 }
 
