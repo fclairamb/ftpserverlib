@@ -94,7 +94,7 @@ func ftpUpload(t *testing.T, ftp *goftp.Client, file io.ReadSeeker, filename str
 		t.Log("Couldn't stat file:", err)
 	} else {
 		found := false
-		if strings.HasSuffix(stats.Name(), filename) {
+		if strings.HasSuffix(stats.Name(), filename) || strings.HasSuffix(filename, stats.Name()) {
 			found = true
 		}
 
