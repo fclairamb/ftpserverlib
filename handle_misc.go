@@ -78,19 +78,29 @@ func (c *clientHandler) handleSITE(param string) error {
 		params = ""
 	}
 
-	switch cmd {
-	case "CHMOD":
-		c.handleCHMOD(params)
-	case "CHOWN":
-		c.handleCHOWN(params)
-	case "SYMLINK":
-		c.handleSYMLINK(params)
-	case "MKDIR":
-		c.handleMKDIR(params)
-	case "RMDIR":
-		c.handleRMDIR(params)
-	default:
-		c.writeMessage(StatusSyntaxErrorNotRecognised, "Unknown SITE subcommand: "+cmd)
+	var handler SiteHandler
+	handlerMap := c.server.settings.SiteHandlers
+	if handlerMap != nil {
+		handler, _ = handlerMap[cmd]
+	}
+	if handler == nil {
+		switch cmd {
+		case "CHMOD":
+			c.handleCHMOD(params)
+		case "CHOWN":
+			c.handleCHOWN(params)
+		case "SYMLINK":
+			c.handleSYMLINK(params)
+		case "MKDIR":
+			c.handleMKDIR(params)
+		case "RMDIR":
+			c.handleRMDIR(params)
+		default:
+			c.writeMessage(StatusSyntaxErrorNotRecognised, "Unknown SITE subcommand: "+cmd)
+		}
+	} else {
+		errCode, msg := handler(params, c.server.driver, c.driver)
+		c.writeMessage(errCode, msg)
 	}
 
 	return nil
