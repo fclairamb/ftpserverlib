@@ -58,7 +58,7 @@ jobs:
           go test -parallel 20 -v -race -coverprofile=coverage.txt -covermode=atomic ./...
 
       - name: Codecov
-        uses: codecov/codecov-action@v5.3.1
+        uses: codecov/codecov-action@v5.4.0
         with:
           fail_ci_if_error: true # optional (default = false)
         env:
