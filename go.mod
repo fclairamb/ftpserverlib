@@ -8,7 +8,7 @@ require (
 	github.com/fclairamb/go-log v0.5.0
 	github.com/go-kit/log v0.2.1
 	github.com/secsy/goftp v0.0.0-20200609142545-aa2de14babf4
-	github.com/spf13/afero v1.13.0
+	github.com/spf13/afero v1.14.0
 	github.com/stretchr/testify v1.10.0
 	golang.org/x/sys v0.31.0
 )
