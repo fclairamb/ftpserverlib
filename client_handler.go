@@ -2,6 +2,7 @@ package ftpserver
 
 import (
 	"bufio"
+	"compress/flate"
 	"errors"
 	"fmt"
 	"io"
@@ -32,6 +33,14 @@ type TransferType int8
 const (
 	TransferTypeASCII TransferType = iota
 	TransferTypeBinary
+)
+
+// TransferMode is the enumerable that represents the transfer mode (stream, block, compressed, deflate)
+type TransferMode int8
+
+const (
+	TransferModeStream  TransferMode = iota // TransferModeStream is the standard mode
+	TransferModeDeflate                     // TransferModeDeflate is the deflate mode
 )
 
 // DataChannel is the enumerable that represents the data channel (active or passive)
@@ -99,6 +108,7 @@ type clientHandler struct {
 	selectedHashAlgo    HASHAlgo        // algorithm used when we receive the HASH command
 	logger              log.Logger      // Client handler logging
 	currentTransferType TransferType    // current transfer type
+	transferMode        TransferMode    // Transfer mode (stream, block, compressed)
 	transferWg          sync.WaitGroup  // wait group for command that open a transfer connection
 	transferMu          sync.Mutex      // this mutex will protect the transfer parameters
 	transfer            transferHandler // Transfer connection (passive or active)s
@@ -627,7 +637,7 @@ func (c *clientHandler) GetTranferInfo() string {
 	return c.transfer.GetInfo()
 }
 
-func (c *clientHandler) TransferOpen(info string) (net.Conn, error) {
+func (c *clientHandler) TransferOpen(info string) (io.ReadWriter, error) {
 	c.transferMu.Lock()
 	defer c.transferMu.Unlock()
 
@@ -663,6 +673,17 @@ func (c *clientHandler) TransferOpen(info string) (net.Conn, error) {
 		return nil, err
 	}
 
+	var transferStream io.ReadWriter = conn
+
+	if c.transferMode == TransferModeDeflate {
+		transferStream, err = newDeflateTransfer(transferStream, c.server.settings.DeflateCompressionLevel)
+		if err != nil {
+			c.writeMessage(StatusActionNotTaken, fmt.Sprintf("Could not switch to deflate mode: %v", err))
+
+			return nil, fmt.Errorf("could not switch to deflate mode: %w", err)
+		}
+	}
+
 	c.isTransferOpen = true
 	c.transfer.SetInfo(info)
 
@@ -675,12 +696,26 @@ func (c *clientHandler) TransferOpen(info string) (net.Conn, error) {
 			"localAddr", conn.LocalAddr().String())
 	}
 
-	return conn, nil
+	return transferStream, nil
 }
 
-func (c *clientHandler) TransferClose(err error) {
+// Flusher is the interface that wraps the basic Flush method.
+type Flusher interface {
+	Flush() error
+}
+
+func (c *clientHandler) TransferClose(transfer io.ReadWriter, err error) {
 	c.transferMu.Lock()
 	defer c.transferMu.Unlock()
+
+	if flush, ok := transfer.(Flusher); ok {
+		if errFlush := flush.Flush(); errFlush != nil {
+			c.logger.Warn(
+				"Error flushing transfer connection",
+				"err", errFlush,
+			)
+		}
+	}
 
 	errClose := c.closeTransfer()
 	if errClose != nil {
@@ -787,4 +822,26 @@ func getMessageLines(message string) []string {
 	}
 
 	return lines
+}
+
+// We check that it implements flusher
+var _ Flusher = (*deflateReadWriter)(nil)
+
+type deflateReadWriter struct {
+	io.Reader
+	*flate.Writer
+}
+
+func newDeflateTransfer(conn io.ReadWriter, level int) (io.ReadWriter, error) {
+	writer, err := flate.NewWriter(conn, level)
+	if err != nil {
+		return nil, fmt.Errorf("could not create deflate writer: %w", err)
+	}
+
+	reader := flate.NewReader(conn)
+
+	return &deflateReadWriter{
+		Reader: reader,
+		Writer: writer,
+	}, nil
 }
