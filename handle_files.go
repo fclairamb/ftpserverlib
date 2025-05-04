@@ -407,7 +407,11 @@ func (c *clientHandler) handleSIZE(param string) error {
 
 	path := c.absPath(param)
 	if info, err := c.driver.Stat(path); err == nil {
-		c.writeMessage(StatusFileStatus, strconv.FormatInt(info.Size(), 10))
+		if info.IsDir() {
+			c.writeMessage(StatusActionNotTaken, fmt.Sprintf("%s is a directory", path))
+		} else {
+			c.writeMessage(StatusFileStatus, strconv.FormatInt(info.Size(), 10))
+		}
 	} else {
 		c.writeMessage(StatusActionNotTaken, fmt.Sprintf("Couldn't access %s: %v", path, err))
 	}
