@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
+	"math/rand"
 	"os"
 	"regexp"
 	"strconv"
@@ -887,6 +888,47 @@ func TestSIZE(t *testing.T) {
 	require.Equal(t, StatusOK, returnCode, response)
 
 	returnCode, response, err = raw.SendCommand("SIZE file.bin")
+	require.NoError(t, err)
+	require.Equal(t, StatusActionNotTaken, returnCode, response)
+	require.Equal(t, "SIZE not allowed in ASCII mode", response)
+
+	// case of directory
+
+	returnCode, response, err = raw.SendCommand("TYPE I")
+	require.NoError(t, err)
+	require.Equal(t, StatusOK, returnCode, response)
+
+	_, err = client.Mkdir("a-dir")
+	require.NoError(t, err)
+
+	returnCode, response, err = raw.SendCommand("SIZE a-dir")
+	require.NoError(t, err)
+	require.Equal(t, StatusActionNotTaken, returnCode, response)
+	require.True(t, strings.HasSuffix(response, "is a directory"))
+
+	fileSize := 11 + rand.Intn(10)
+	ftpUpload(t, client, createTemporaryFile(t, fileSize), "a-dir/file.bin")
+
+	returnCode, response, err = raw.SendCommand("SIZE a-dir/file.bin")
+	require.NoError(t, err)
+	require.Equal(t, StatusFileStatus, returnCode, response)
+	require.Equal(t, fmt.Sprintf("%d", fileSize), response)
+
+	returnCode, response, err = raw.SendCommand("SIZE b-dir/file.bin")
+	require.NoError(t, err)
+	require.Equal(t, StatusActionNotTaken, returnCode, response)
+	require.True(t, strings.HasSuffix(response, "no such file or directory"))
+
+	returnCode, response, err = raw.SendCommand("TYPE A")
+	require.NoError(t, err)
+	require.Equal(t, StatusOK, returnCode, response)
+
+	returnCode, response, err = raw.SendCommand("SIZE a-dir")
+	require.NoError(t, err)
+	require.Equal(t, StatusActionNotTaken, returnCode, response)
+	require.Equal(t, "SIZE not allowed in ASCII mode", response)
+
+	returnCode, response, err = raw.SendCommand("SIZE a-dir/file.bin")
 	require.NoError(t, err)
 	require.Equal(t, StatusActionNotTaken, returnCode, response)
 	require.Equal(t, "SIZE not allowed in ASCII mode", response)
