@@ -230,7 +230,7 @@ func (r PortRange) FetchNext() (int, int, bool) {
 }
 
 func (r PortRange) NumberAttempts() int {
-	return r.End - r.Start
+	return r.End - r.Start + 1
 }
 
 // PortMappingRange is a range of mapped ports
