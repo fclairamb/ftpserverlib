@@ -48,9 +48,9 @@ func createTemporaryFile(t *testing.T, targetSize int) *os.File {
 
 	t.Cleanup(func() {
 		err = file.Close()
-		assert.NoError(t, err, fmt.Sprintf("Problem closing file %#v", file.Name()))
+		assert.NoError(t, err, "Problem closing file", file.Name())
 		err := os.Remove(file.Name())
-		require.NoError(t, err, fmt.Sprintf("Problem deleting file %#v", file.Name()))
+		require.NoError(t, err, "Problem deleting file", file.Name())
 	})
 
 	return file
@@ -334,7 +334,7 @@ func TestActiveModeDisabled(t *testing.T) {
 	file := createTemporaryFile(t, 10*1024)
 	err = client.Store("file.bin", file)
 	require.Error(t, err, "active mode is disabled, upload must fail")
-	require.True(t, strings.Contains(err.Error(), "421-PORT command is disabled"))
+	require.Contains(t, err.Error(), "421-PORT command is disabled")
 }
 
 // TestFailedTransfer validates the handling of failed transfer caused by file access issues
@@ -448,7 +448,7 @@ func TestFailingFileTransfer(t *testing.T) {
 		c, file := createClientOnServer(t)
 		err := c.Store("fail-to-write.bin", file)
 		require.Error(t, err)
-		require.True(t, strings.Contains(err.Error(), errFailWrite.Error()), err)
+		require.Contains(t, err.Error(), errFailWrite.Error())
 	})
 
 	t.Run("on close", func(t *testing.T) {
@@ -456,7 +456,7 @@ func TestFailingFileTransfer(t *testing.T) {
 		c, file := createClientOnServer(t)
 		err := c.Store("fail-to-close.bin", file)
 		require.Error(t, err)
-		require.True(t, strings.Contains(err.Error(), errFailClose.Error()), err)
+		require.Contains(t, err.Error(), errFailClose.Error())
 	})
 
 	t.Run("on seek", func(t *testing.T) {
@@ -475,7 +475,7 @@ func TestFailingFileTransfer(t *testing.T) {
 		err = appendFile.Close()
 		require.NoError(t, err)
 
-		appendFile, err = os.OpenFile(appendFile.Name(), os.O_APPEND|os.O_WRONLY, os.ModePerm)
+		appendFile, err = os.OpenFile(appendFile.Name(), os.O_APPEND|os.O_WRONLY, 0600)
 		require.NoError(t, err)
 
 		data := []byte("some more data")
@@ -486,7 +486,7 @@ func TestFailingFileTransfer(t *testing.T) {
 		require.Equal(t, int64(len(initialData)+len(data)), info.Size())
 		_, err = client.TransferFromOffset("fail-to-seek.bin", nil, appendFile, int64(len(initialData)))
 		require.Error(t, err)
-		require.True(t, strings.Contains(err.Error(), errFailSeek.Error()), err)
+		require.Contains(t, err.Error(), errFailSeek.Error())
 		err = appendFile.Close()
 		require.NoError(t, err)
 	})
