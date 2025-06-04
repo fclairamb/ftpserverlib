@@ -46,7 +46,7 @@ jobs:
 
       # Install Go
       - name: Setup go
-        uses: actions/setup-go@v5.4.0
+        uses: actions/setup-go@v5.5.0
         with:
           go-version: ${{ matrix.go }}
 
@@ -58,7 +58,7 @@ jobs:
           go test -parallel 20 -v -race -coverprofile=coverage.txt -covermode=atomic ./...
 
       - name: Codecov
-        uses: codecov/codecov-action@v5.4.2
+        uses: codecov/codecov-action@v5.4.3
         with:
           fail_ci_if_error: true # optional (default = false)
         env:
