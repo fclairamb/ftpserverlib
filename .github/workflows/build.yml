@@ -26,9 +26,9 @@ jobs:
 
     strategy:
       matrix:
-        go: [ '1.23', '1.22' ]
+        go: [ '1.24', '1.23' ]
         include:
-          - go: '1.23'
+          - go: '1.24'
             lint: true
   
     # Steps represent a sequence of tasks that will be executed as part of the job
@@ -39,9 +39,9 @@ jobs:
       # Running golangci-lint
       - name: Linting
         if: matrix.lint
-        uses: golangci/golangci-lint-action@v6.5.2
+        uses: golangci/golangci-lint-action@v8.0.0
         with:
-          version: v1.56.2
+          version: v2.1.6
           only-new-issues: true
 
       # Install Go

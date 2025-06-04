@@ -289,8 +289,8 @@ func (server *FtpServer) handleAcceptError(err error, tempDelay *time.Duration) 
 			*tempDelay *= 2
 		}
 
-		if max := 1 * time.Second; *tempDelay > max {
-			*tempDelay = max
+		if maxDelay := 1 * time.Second; *tempDelay > maxDelay {
+			*tempDelay = maxDelay
 		}
 
 		server.Logger.Warn(
