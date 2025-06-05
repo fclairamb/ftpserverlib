@@ -261,68 +261,6 @@ func (c *clientHandler) combineFiles(targetPath string, fileFlag int, sourcePath
 	c.writeMessage(StatusFileOK, "COMB succeeded!")
 }
 
-func (c *clientHandler) handleCHMOD(params string) {
-	spl := strings.SplitN(params, " ", 2)
-	modeNb, err := strconv.ParseUint(spl[0], 8, 32)
-
-	mode := os.FileMode(modeNb)
-	path := c.absPath(spl[1])
-
-	if err == nil {
-		err = c.driver.Chmod(path, mode)
-	}
-
-	if err != nil {
-		c.writeMessage(StatusActionNotTaken, err.Error())
-
-		return
-	}
-
-	c.writeMessage(StatusOK, "SITE CHMOD command successful")
-}
-
-// https://www.raidenftpd.com/en/raiden-ftpd-doc/help-sitecmd.html (wildcard isn't supported)
-func (c *clientHandler) handleCHOWN(params string) {
-	spl := strings.SplitN(params, " ", 3)
-
-	if len(spl) != 2 {
-		c.writeMessage(StatusSyntaxErrorParameters, "bad command")
-
-		return
-	}
-
-	var userID, groupID int
-	{
-		usergroup := strings.Split(spl[0], ":")
-		userName := usergroup[0]
-
-		if id, err := strconv.ParseInt(userName, 10, 32); err == nil {
-			userID = int(id)
-		} else {
-			userID = 0
-		}
-
-		if len(usergroup) > 1 {
-			groupName := usergroup[1]
-			if id, err := strconv.ParseInt(groupName, 10, 32); err == nil {
-				groupID = int(id)
-			} else {
-				groupID = 0
-			}
-		} else {
-			groupID = 0
-		}
-	}
-
-	path := c.absPath(spl[1])
-
-	if err := c.driver.Chown(path, userID, groupID); err != nil {
-		c.writeMessage(StatusActionNotTaken, fmt.Sprintf("Couldn't chown: %v", err))
-	} else {
-		c.writeMessage(StatusOK, "Done !")
-	}
-}
-
 // https://learn.akamai.com/en-us/webhelp/netstorage/netstorage-user-guide/
 // GUID-AB301948-C6FF-4957-9291-FE3F02457FD0.html
 func (c *clientHandler) handleSYMLINK(params string) {

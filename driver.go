@@ -130,6 +130,21 @@ type ClientDriverExtensionAvailableSpace interface {
 	GetAvailableSpace(dirName string) (int64, error)
 }
 
+// ClientDriverExtensionSiteCommand is an extension to support SITE commands
+type ClientDriverExtensionSiteCommand interface {
+	// SiteChmod handles the "SITE CHMOD" command
+	SiteChmod(path string, mode os.FileMode) error
+
+	// SiteChown handles the "SITE CHOWN" command  
+	SiteChown(path string, uid, gid int) error
+
+	// SiteMkdir handles the "SITE MKDIR" command
+	SiteMkdir(path string) error
+
+	// SiteRmdir handles the "SITE RMDIR" command
+	SiteRmdir(path string) error
+}
+
 // ClientContext is implemented on the server side to provide some access to few data around the client
 type ClientContext interface {
 	// Path provides the path of the current connection
