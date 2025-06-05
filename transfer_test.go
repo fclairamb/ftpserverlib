@@ -1343,13 +1343,13 @@ func getPortFromEPSVResponse(t *testing.T, resp string) int {
 	resp = strings.Replace(resp, "(", "", 1)
 	resp = strings.Replace(resp, ")", "", 1)
 	resp = strings.TrimSpace(resp)
-	
+
 	// Extract port from |||port| format
 	parts := strings.Split(resp, "|")
 	require.Len(t, parts, 5) // Should be ["", "", "", "port", ""]
-	
+
 	port, err := strconv.Atoi(parts[3])
 	require.NoError(t, err)
-	
+
 	return port
 }
