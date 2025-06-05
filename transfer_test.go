@@ -1226,9 +1226,9 @@ func TestPortMappingRange(t *testing.T) {
 	defer func() { require.NoError(t, raw.Close()) }()
 
 	// Test PASV command with port mapping
-	rc, message, err := raw.SendCommand("PASV")
+	returnCode, message, err := raw.SendCommand("PASV")
 	require.NoError(t, err)
-	require.Equal(t, StatusEnteringPASV, rc, message)
+	require.Equal(t, StatusEnteringPASV, returnCode, message)
 
 	// Extract port from PASV response and verify it's in the exposed range
 	port := getPortFromPASVResponse(t, message)
@@ -1236,9 +1236,9 @@ func TestPortMappingRange(t *testing.T) {
 	require.Less(t, port, 50010)
 
 	// Test EPSV command with port mapping as well
-	rc, message, err = raw.SendCommand("EPSV")
+	returnCode, message, err = raw.SendCommand("EPSV")
 	require.NoError(t, err)
-	require.Equal(t, StatusEnteringEPSV, rc, message)
+	require.Equal(t, StatusEnteringEPSV, returnCode, message)
 
 	// Extract port from EPSV response and verify it's in the exposed range
 	epsvPort := getPortFromEPSVResponse(t, message)
