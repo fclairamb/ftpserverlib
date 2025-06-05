@@ -135,7 +135,7 @@ type ClientDriverExtensionSiteCommand interface {
 	// SiteChmod handles the "SITE CHMOD" command
 	SiteChmod(path string, mode os.FileMode) error
 
-	// SiteChown handles the "SITE CHOWN" command  
+	// SiteChown handles the "SITE CHOWN" command
 	SiteChown(path string, uid, gid int) error
 
 	// SiteMkdir handles the "SITE MKDIR" command
