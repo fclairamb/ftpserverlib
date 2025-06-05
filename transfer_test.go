@@ -1188,6 +1188,109 @@ func TestPassivePortExhaustion(t *testing.T) {
 	}
 }
 
+func TestPortMappingRange(t *testing.T) {
+	// Test PortMappingRange functionality
+	portMapping := PortMappingRange{
+		ExposedStart:  50000,
+		ListenedStart: 60000,
+		Count:         10,
+	}
+
+	// Test FetchNext method
+	exposedPort, listenedPort, ok := portMapping.FetchNext()
+	require.True(t, ok)
+	require.GreaterOrEqual(t, exposedPort, 50000)
+	require.Less(t, exposedPort, 50010)
+	require.GreaterOrEqual(t, listenedPort, 60000)
+	require.Less(t, listenedPort, 60010)
+	require.Equal(t, exposedPort-50000, listenedPort-60000) // Should have same offset
+
+	// Test NumberAttempts method
+	require.Equal(t, 10, portMapping.NumberAttempts())
+
+	// Test with server
+	server := NewTestServer(t, false)
+	server.settings.PassiveTransferPortRange = &portMapping
+
+	client, err := goftp.DialConfig(goftp.Config{
+		User:     authUser,
+		Password: authPass,
+	}, server.Addr())
+	require.NoError(t, err, "Couldn't connect")
+
+	defer func() { panicOnError(client.Close()) }()
+
+	raw, err := client.OpenRawConn()
+	require.NoError(t, err, "Couldn't open raw connection")
+
+	defer func() { require.NoError(t, raw.Close()) }()
+
+	// Test PASV command with port mapping
+	returnCode, message, err := raw.SendCommand("PASV")
+	require.NoError(t, err)
+	require.Equal(t, StatusEnteringPASV, returnCode, message)
+
+	// Extract port from PASV response and verify it's in the exposed range
+	port := getPortFromPASVResponse(t, message)
+	require.GreaterOrEqual(t, port, 50000)
+	require.Less(t, port, 50010)
+
+	// Test EPSV command with port mapping as well
+	returnCode, message, err = raw.SendCommand("EPSV")
+	require.NoError(t, err)
+	require.Equal(t, StatusEnteringEPSV, returnCode, message)
+
+	// Extract port from EPSV response and verify it's in the exposed range
+	epsvPort := getPortFromEPSVResponse(t, message)
+	require.GreaterOrEqual(t, epsvPort, 50000)
+	require.Less(t, epsvPort, 50010)
+}
+
+func TestPortRangeBackwardCompatibility(t *testing.T) {
+	// Test that PortRange still works as PasvPortGetter
+	portRange := PortRange{
+		Start: 45000,
+		End:   45010,
+	}
+
+	// Test FetchNext method
+	exposedPort, listenedPort, ok := portRange.FetchNext()
+	require.True(t, ok)
+	require.GreaterOrEqual(t, exposedPort, 45000)
+	require.LessOrEqual(t, exposedPort, 45010)
+	require.Equal(t, exposedPort, listenedPort) // Should be the same for PortRange
+
+	// Test NumberAttempts method
+	require.Equal(t, 11, portRange.NumberAttempts())
+
+	// Test with server to ensure backward compatibility
+	server := NewTestServer(t, false)
+	server.settings.PassiveTransferPortRange = &portRange
+
+	client, err := goftp.DialConfig(goftp.Config{
+		User:     authUser,
+		Password: authPass,
+	}, server.Addr())
+	require.NoError(t, err, "Couldn't connect")
+
+	defer func() { panicOnError(client.Close()) }()
+
+	raw, err := client.OpenRawConn()
+	require.NoError(t, err, "Couldn't open raw connection")
+
+	defer func() { require.NoError(t, raw.Close()) }()
+
+	// Test PASV command
+	rc, message, err := raw.SendCommand("PASV")
+	require.NoError(t, err)
+	require.Equal(t, StatusEnteringPASV, rc, message)
+
+	// Extract port from PASV response and verify it's in the range
+	port := getPortFromPASVResponse(t, message)
+	require.GreaterOrEqual(t, port, 45000)
+	require.LessOrEqual(t, port, 45010)
+}
+
 func loginConnection(t *testing.T, conn net.Conn) {
 	t.Helper()
 
@@ -1228,6 +1331,25 @@ func getPortFromPASVResponse(t *testing.T, resp string) int {
 
 		port |= portOctet << (byte(1-i) * 8)
 	}
+
+	return port
+}
+
+func getPortFromEPSVResponse(t *testing.T, resp string) int {
+	t.Helper()
+
+	// EPSV response format: "229 Entering Extended Passive Mode (|||port|)"
+	resp = strings.Replace(resp, "229 Entering Extended Passive Mode", "", 1)
+	resp = strings.Replace(resp, "(", "", 1)
+	resp = strings.Replace(resp, ")", "", 1)
+	resp = strings.TrimSpace(resp)
+
+	// Extract port from |||port| format
+	parts := strings.Split(resp, "|")
+	require.Len(t, parts, 5) // Should be ["", "", "", "port", ""]
+
+	port, err := strconv.Atoi(parts[3])
+	require.NoError(t, err)
 
 	return port
 }
