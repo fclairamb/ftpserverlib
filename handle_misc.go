@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -80,20 +81,151 @@ func (c *clientHandler) handleSITE(param string) error {
 
 	switch cmd {
 	case "CHMOD":
-		c.handleCHMOD(params)
+		c.handleSiteCHMOD(params)
 	case "CHOWN":
-		c.handleCHOWN(params)
+		c.handleSiteCHOWN(params)
 	case "SYMLINK":
 		c.handleSYMLINK(params)
 	case "MKDIR":
-		c.handleMKDIR(params)
+		c.handleSiteMKDIR(params)
 	case "RMDIR":
-		c.handleRMDIR(params)
+		c.handleSiteRMDIR(params)
 	default:
 		c.writeMessage(StatusSyntaxErrorNotRecognised, "Unknown SITE subcommand: "+cmd)
 	}
 
 	return nil
+}
+
+func (c *clientHandler) handleSiteCHMOD(params string) {
+	spl := strings.SplitN(params, " ", 2)
+	if len(spl) != 2 {
+		c.writeMessage(StatusSyntaxErrorParameters, "bad command")
+		return
+	}
+
+	modeNb, err := strconv.ParseUint(spl[0], 8, 32)
+	if err != nil {
+		c.writeMessage(StatusActionNotTaken, err.Error())
+		return
+	}
+
+	mode := os.FileMode(modeNb)
+	path := c.absPath(spl[1])
+
+	// Try extension first
+	if siteExt, ok := c.driver.(ClientDriverExtensionSiteCommand); ok {
+		err = siteExt.SiteChmod(path, mode)
+	} else {
+		// Fallback to default implementation
+		err = c.driver.Chmod(path, mode)
+	}
+
+	if err != nil {
+		c.writeMessage(StatusActionNotTaken, err.Error())
+		return
+	}
+
+	c.writeMessage(StatusOK, "SITE CHMOD command successful")
+}
+
+func (c *clientHandler) handleSiteCHOWN(params string) {
+	spl := strings.SplitN(params, " ", 3)
+	if len(spl) != 2 {
+		c.writeMessage(StatusSyntaxErrorParameters, "bad command")
+		return
+	}
+
+	var userID, groupID int
+	usergroup := strings.Split(spl[0], ":")
+	userName := usergroup[0]
+
+	if id, err := strconv.ParseInt(userName, 10, 32); err == nil {
+		userID = int(id)
+	} else {
+		userID = 0
+	}
+
+	if len(usergroup) > 1 {
+		groupName := usergroup[1]
+		if id, err := strconv.ParseInt(groupName, 10, 32); err == nil {
+			groupID = int(id)
+		} else {
+			groupID = 0
+		}
+	} else {
+		groupID = 0
+	}
+
+	path := c.absPath(spl[1])
+
+	var err error
+	// Try extension first
+	if siteExt, ok := c.driver.(ClientDriverExtensionSiteCommand); ok {
+		err = siteExt.SiteChown(path, userID, groupID)
+	} else {
+		// Fallback to default implementation (same as original)
+		err = c.driver.Chown(path, userID, groupID)
+	}
+
+	if err != nil {
+		c.writeMessage(StatusActionNotTaken, fmt.Sprintf("Couldn't chown: %v", err))
+		return
+	}
+
+	c.writeMessage(StatusOK, "Done !")
+}
+
+func (c *clientHandler) handleSiteMKDIR(params string) {
+	if params == "" {
+		c.writeMessage(StatusSyntaxErrorNotRecognised, "Missing path")
+		return
+	}
+
+	path := c.absPath(params)
+
+	// Try extension first
+	if siteExt, ok := c.driver.(ClientDriverExtensionSiteCommand); ok {
+		err := siteExt.SiteMkdir(path)
+		if err != nil {
+			c.writeMessage(StatusActionNotTaken, fmt.Sprintf("Couldn't create dir %s: %v", path, err))
+			return
+		}
+	} else {
+		// Fallback to default implementation
+		if err := c.driver.MkdirAll(path, 0o755); err != nil {
+			c.writeMessage(StatusActionNotTaken, fmt.Sprintf("Couldn't create dir %s: %v", path, err))
+			return
+		}
+	}
+
+	c.writeMessage(StatusFileOK, "Created dir "+path)
+}
+
+func (c *clientHandler) handleSiteRMDIR(params string) {
+	if params == "" {
+		c.writeMessage(StatusSyntaxErrorNotRecognised, "Missing path")
+		return
+	}
+
+	path := c.absPath(params)
+
+	// Try extension first
+	if siteExt, ok := c.driver.(ClientDriverExtensionSiteCommand); ok {
+		err := siteExt.SiteRmdir(path)
+		if err != nil {
+			c.writeMessage(StatusActionNotTaken, fmt.Sprintf("Couldn't remove dir %s: %v", path, err))
+			return
+		}
+	} else {
+		// Fallback to default implementation
+		if err := c.driver.RemoveAll(path); err != nil {
+			c.writeMessage(StatusActionNotTaken, fmt.Sprintf("Couldn't remove dir %s: %v", path, err))
+			return
+		}
+	}
+
+	c.writeMessage(StatusFileOK, "Removed dir "+path)
 }
 
 func (c *clientHandler) handleSTATServer() error {

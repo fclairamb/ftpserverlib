@@ -88,22 +88,6 @@ func (c *clientHandler) handleMKD(param string) error {
 	return nil
 }
 
-func (c *clientHandler) handleMKDIR(params string) {
-	if params == "" {
-		c.writeMessage(StatusSyntaxErrorNotRecognised, "Missing path")
-
-		return
-	}
-
-	p := c.absPath(params)
-
-	if err := c.driver.MkdirAll(p, 0o755); err == nil {
-		c.writeMessage(StatusFileOK, "Created dir "+p)
-	} else {
-		c.writeMessage(StatusActionNotTaken, fmt.Sprintf("Couldn't create dir %s: %v", p, err))
-	}
-}
-
 func (c *clientHandler) handleRMD(param string) error {
 	var err error
 
@@ -122,22 +106,6 @@ func (c *clientHandler) handleRMD(param string) error {
 	}
 
 	return nil
-}
-
-func (c *clientHandler) handleRMDIR(params string) {
-	if params == "" {
-		c.writeMessage(StatusSyntaxErrorNotRecognised, "Missing path")
-
-		return
-	}
-
-	p := c.absPath(params)
-
-	if err := c.driver.RemoveAll(p); err == nil {
-		c.writeMessage(StatusFileOK, "Removed dir "+p)
-	} else {
-		c.writeMessage(StatusActionNotTaken, fmt.Sprintf("Couldn't remove dir %s: %v", p, err))
-	}
 }
 
 func (c *clientHandler) handleCDUP(_ string) error {

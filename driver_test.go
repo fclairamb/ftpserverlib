@@ -488,6 +488,154 @@ func (driver *TestClientDriver) Symlink(oldname, newname string) error {
 	return errSymlinkNotImplemented
 }
 
+// SITE command extension methods
+func (driver *TestClientDriver) SiteChmod(path string, mode os.FileMode) error {
+	return driver.Fs.Chmod(path, mode)
+}
+
+func (driver *TestClientDriver) SiteChown(path string, uid, gid int) error {
+	if uid != 0 && uid != authUserID {
+		return errInvalidChownUser
+	}
+
+	if gid != -1 && gid != 0 && gid != authGroupID {
+		return errInvalidChownGroup
+	}
+
+	return driver.Chown(path, uid, gid)
+}
+
+func (driver *TestClientDriver) SiteMkdir(path string) error {
+	return driver.Fs.MkdirAll(path, 0o755)
+}
+
+func (driver *TestClientDriver) SiteRmdir(path string) error {
+	return driver.Fs.RemoveAll(path)
+}
+
+// TestClientDriverNoSiteExt is a test driver that does NOT implement the SITE command extension
+// to test fallback behavior
+type TestClientDriverNoSiteExt struct {
+	afero.Fs
+}
+
+// NewTestClientDriverNoSiteExt creates a client driver without SITE extension
+func NewTestClientDriverNoSiteExt(server *TestServerDriver) *TestClientDriverNoSiteExt {
+	return &TestClientDriverNoSiteExt{
+		Fs: server.fs,
+	}
+}
+
+// Implement the same methods as TestClientDriver but without SITE extension methods
+func (driver *TestClientDriverNoSiteExt) OpenFile(path string, flag int, perm os.FileMode) (afero.File, error) {
+	if strings.Contains(path, "fail-to-open") {
+		return nil, errFailOpen
+	}
+
+	if strings.Contains(path, "quota-exceeded") {
+		return nil, ErrStorageExceeded
+	}
+
+	file, err := driver.Fs.OpenFile(path, flag, perm)
+	if err != nil {
+		return nil, err
+	}
+
+	if strings.Contains(path, "fail-to-close") {
+		return &testFile{File: file, errTransfer: errFailClose}, nil
+	}
+
+	if strings.Contains(path, "fail-to-write") {
+		return &testFile{File: file, errTransfer: errFailWrite}, nil
+	}
+
+	if strings.Contains(path, "fail-to-seek") {
+		return &testFile{File: file, errTransfer: errFailSeek}, nil
+	}
+
+	return file, err
+}
+
+func (driver *TestClientDriverNoSiteExt) Open(name string) (afero.File, error) {
+	if strings.Contains(name, "fail-to-open") {
+		return nil, errFailOpen
+	}
+
+	file, err := driver.Fs.Open(name)
+	if err != nil {
+		return nil, err
+	}
+
+	if strings.Contains(name, "fail-to-readdir") {
+		return &testFile{File: file, errTransfer: errFailReaddir}, nil
+	}
+
+	return file, err
+}
+
+func (driver *TestClientDriverNoSiteExt) Rename(oldname, newname string) error {
+	if strings.Contains(newname, "not-allowed") {
+		return ErrFileNameNotAllowed
+	}
+
+	return driver.Fs.Rename(oldname, newname)
+}
+
+func (driver *TestClientDriverNoSiteExt) AllocateSpace(size int) error {
+	if size < 1*1024*1024 {
+		return nil
+	}
+
+	return errTooMuchSpaceRequested
+}
+
+func (driver *TestClientDriverNoSiteExt) GetAvailableSpace(dirName string) (int64, error) {
+	if dirName == "/noavbl" {
+		return 0, errAvblNotPermitted
+	}
+
+	return int64(123), nil
+}
+
+func (driver *TestClientDriverNoSiteExt) Chown(name string, uid int, gid int) error {
+	if uid != 0 && uid != authUserID {
+		return errInvalidChownUser
+	}
+
+	if gid != 0 && gid != authGroupID {
+		return errInvalidChownGroup
+	}
+
+	err := driver.Fs.Chown(name, uid, gid)
+
+	return err
+}
+
+func (driver *TestClientDriverNoSiteExt) Symlink(oldname, newname string) error {
+	if linker, ok := driver.Fs.(afero.Linker); ok {
+		return linker.SymlinkIfPossible(oldname, newname)
+	}
+
+	return errSymlinkNotImplemented
+}
+
+// TestServerDriverNoSiteExt is a test server driver that creates clients without SITE extension
+type TestServerDriverNoSiteExt struct {
+	*TestServerDriver
+}
+
+// AuthUser with authenticate users and return a client driver without SITE extension
+func (driver *TestServerDriverNoSiteExt) AuthUser(_ ClientContext, user, pass string) (ClientDriver, error) {
+	if user == authUser && pass == authPass {
+		clientdriver := NewTestClientDriverNoSiteExt(driver.TestServerDriver)
+		return clientdriver, nil
+	} else if user == "nil" && pass == "nil" {
+		return nil, nil //nolint:nilnil
+	}
+
+	return nil, errBadUserNameOrPassword
+}
+
 // (copied from net/http/httptest)
 // localhostCert is a PEM-encoded TLS cert with SAN IPs
 // "127.0.0.1" and "[::1]", expiring at the last second of 2049 (the end
