@@ -101,12 +101,14 @@ func (c *clientHandler) handleSiteCHMOD(params string) {
 	spl := strings.SplitN(params, " ", 2)
 	if len(spl) != 2 {
 		c.writeMessage(StatusSyntaxErrorParameters, "bad command")
+
 		return
 	}
 
 	modeNb, err := strconv.ParseUint(spl[0], 8, 32)
 	if err != nil {
 		c.writeMessage(StatusActionNotTaken, err.Error())
+
 		return
 	}
 
@@ -123,6 +125,7 @@ func (c *clientHandler) handleSiteCHMOD(params string) {
 
 	if err != nil {
 		c.writeMessage(StatusActionNotTaken, err.Error())
+
 		return
 	}
 
@@ -133,6 +136,7 @@ func (c *clientHandler) handleSiteCHOWN(params string) {
 	spl := strings.SplitN(params, " ", 3)
 	if len(spl) != 2 {
 		c.writeMessage(StatusSyntaxErrorParameters, "bad command")
+
 		return
 	}
 
@@ -170,6 +174,7 @@ func (c *clientHandler) handleSiteCHOWN(params string) {
 
 	if err != nil {
 		c.writeMessage(StatusActionNotTaken, fmt.Sprintf("Couldn't chown: %v", err))
+
 		return
 	}
 
@@ -179,6 +184,7 @@ func (c *clientHandler) handleSiteCHOWN(params string) {
 func (c *clientHandler) handleSiteMKDIR(params string) {
 	if params == "" {
 		c.writeMessage(StatusSyntaxErrorNotRecognised, "Missing path")
+
 		return
 	}
 
@@ -189,12 +195,14 @@ func (c *clientHandler) handleSiteMKDIR(params string) {
 		err := siteExt.SiteMkdir(path)
 		if err != nil {
 			c.writeMessage(StatusActionNotTaken, fmt.Sprintf("Couldn't create dir %s: %v", path, err))
+
 			return
 		}
 	} else {
 		// Fallback to default implementation
 		if err := c.driver.MkdirAll(path, 0o755); err != nil {
 			c.writeMessage(StatusActionNotTaken, fmt.Sprintf("Couldn't create dir %s: %v", path, err))
+
 			return
 		}
 	}
@@ -205,6 +213,7 @@ func (c *clientHandler) handleSiteMKDIR(params string) {
 func (c *clientHandler) handleSiteRMDIR(params string) {
 	if params == "" {
 		c.writeMessage(StatusSyntaxErrorNotRecognised, "Missing path")
+
 		return
 	}
 
@@ -215,12 +224,14 @@ func (c *clientHandler) handleSiteRMDIR(params string) {
 		err := siteExt.SiteRmdir(path)
 		if err != nil {
 			c.writeMessage(StatusActionNotTaken, fmt.Sprintf("Couldn't remove dir %s: %v", path, err))
+
 			return
 		}
 	} else {
 		// Fallback to default implementation
 		if err := c.driver.RemoveAll(path); err != nil {
 			c.writeMessage(StatusActionNotTaken, fmt.Sprintf("Couldn't remove dir %s: %v", path, err))
+
 			return
 		}
 	}

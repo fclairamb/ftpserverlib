@@ -35,6 +35,8 @@ const (
 	authGroupID = 500
 )
 
+const nilUserPass = "nil"
+
 var errInvalidTLSCertificate = errors.New("invalid TLS certificate")
 
 // NewTestServer provides a test server with or without debugging
@@ -258,7 +260,7 @@ func (driver *TestServerDriver) AuthUser(_ ClientContext, user, pass string) (Cl
 		clientdriver := NewTestClientDriver(driver)
 
 		return clientdriver, nil
-	} else if user == "nil" && pass == "nil" {
+	} else if user == nilUserPass && pass == nilUserPass {
 		// Definitely a bad behavior (but can be done on the driver side)
 		return nil, nil //nolint:nilnil
 	}
@@ -490,7 +492,7 @@ func (driver *TestClientDriver) Symlink(oldname, newname string) error {
 
 // SITE command extension methods
 func (driver *TestClientDriver) SiteChmod(path string, mode os.FileMode) error {
-	return driver.Fs.Chmod(path, mode)
+	return driver.Chmod(path, mode)
 }
 
 func (driver *TestClientDriver) SiteChown(path string, uid, gid int) error {
@@ -506,11 +508,11 @@ func (driver *TestClientDriver) SiteChown(path string, uid, gid int) error {
 }
 
 func (driver *TestClientDriver) SiteMkdir(path string) error {
-	return driver.Fs.MkdirAll(path, 0o755)
+	return driver.MkdirAll(path, 0o755)
 }
 
 func (driver *TestClientDriver) SiteRmdir(path string) error {
-	return driver.Fs.RemoveAll(path)
+	return driver.RemoveAll(path)
 }
 
 // TestClientDriverNoSiteExt is a test driver that does NOT implement the SITE command extension
@@ -628,8 +630,9 @@ type TestServerDriverNoSiteExt struct {
 func (driver *TestServerDriverNoSiteExt) AuthUser(_ ClientContext, user, pass string) (ClientDriver, error) {
 	if user == authUser && pass == authPass {
 		clientdriver := NewTestClientDriverNoSiteExt(driver.TestServerDriver)
+
 		return clientdriver, nil
-	} else if user == "nil" && pass == "nil" {
+	} else if user == nilUserPass && pass == nilUserPass {
 		return nil, nil //nolint:nilnil
 	}
 
