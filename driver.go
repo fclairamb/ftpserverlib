@@ -2,6 +2,7 @@ package ftpserver
 
 import (
 	"crypto/tls"
+	"errors"
 	"io"
 	"net"
 	"os"
@@ -129,6 +130,15 @@ type ClientDriverExtensionHasher interface {
 type ClientDriverExtensionAvailableSpace interface {
 	GetAvailableSpace(dirName string) (int64, error)
 }
+
+// ClientDriverExtensionSite is an extension to implement if you want to handle SITE command
+// yourself. You have to set DisableSite to false for this extension to be called
+type ClientDriverExtensionSite interface {
+	Site(param string) error
+}
+
+// ErrProceedWithDefaultBehavior is returned to tell the server to proceed with the default behavior
+var ErrProceedWithDefaultBehavior = errors.New("proceed with default behavior")
 
 // ClientContext is implemented on the server side to provide some access to few data around the client
 type ClientContext interface {
