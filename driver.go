@@ -224,13 +224,16 @@ type PortRange struct {
 	End   int // Range end
 }
 
+// FetchNext returns the next port to try for passive connections
 func (r PortRange) FetchNext() (int, int, bool) {
-	port := r.Start + rand.Intn(r.End-r.Start+1)
+	port := r.Start + rand.Intn(r.End-r.Start+1) //nolint:gosec // weak random is acceptable for port selection
+
 	return port, port, true
 }
 
+// NumberAttempts returns the number of ports available in the range
 func (r PortRange) NumberAttempts() int {
-	return r.End - r.Start
+	return r.End - r.Start + 1
 }
 
 // PortMappingRange is a range of mapped ports
@@ -240,11 +243,14 @@ type PortMappingRange struct {
 	Count         int
 }
 
+// FetchNext returns the next exposed and listened port pair for passive connections
 func (r PortMappingRange) FetchNext() (int, int, bool) {
-	n := rand.Intn(r.Count)
+	n := rand.Intn(r.Count) //nolint:gosec // weak random is acceptable for port selection
+
 	return r.ExposedStart + n, r.ListenedStart + n, true
 }
 
+// NumberAttempts returns the number of port pairs available in the range
 func (r PortMappingRange) NumberAttempts() int {
 	return r.Count
 }
