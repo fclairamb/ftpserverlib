@@ -2,7 +2,7 @@ module github.com/fclairamb/ftpserverlib
 
 go 1.23.0
 
-toolchain go1.24.3
+toolchain go1.24.4
 
 require (
 	github.com/fclairamb/go-log v0.5.0
