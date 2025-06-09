@@ -46,11 +46,11 @@ func TestAdditionalErrorCases(t *testing.T) {
 	req := require.New(t)
 
 	// Test ErrStorageExceeded
-	req.Equal("storage exceeded", ErrStorageExceeded.Error())
+	req.Equal("storage limit exceeded", ErrStorageExceeded.Error())
 
 	// Test ErrFileNameNotAllowed
-	req.Equal("file name not allowed", ErrFileNameNotAllowed.Error())
+	req.Equal("filename not allowed", ErrFileNameNotAllowed.Error())
 
 	// Test ErrNoAvailableListeningPort
-	req.Equal("no available listening port", ErrNoAvailableListeningPort.Error())
+	req.Equal("could not find any port to listen to", ErrNoAvailableListeningPort.Error())
 }
