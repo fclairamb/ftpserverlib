@@ -94,22 +94,21 @@ func (c *clientHandler) findListenerWithinPortRange(portMapping PasvPortGetter) 
 	}
 
 	for i := 0; i < nbAttempts; i++ {
-		//nolint: gosec
-		ep, lp, ok := portMapping.FetchNext()
+		exposedPort, listenedPort, ok := portMapping.FetchNext()
 		if !ok {
 			break
 		}
-		laddr, errResolve := net.ResolveTCPAddr("tcp", fmt.Sprintf("0.0.0.0:%d", lp))
+		laddr, errResolve := net.ResolveTCPAddr("tcp", fmt.Sprintf("0.0.0.0:%d", listenedPort))
 
 		if errResolve != nil {
-			c.logger.Error("Problem resolving local port", "err", errResolve, "port", lp)
+			c.logger.Error("Problem resolving local port", "err", errResolve, "port", listenedPort)
 
-			return 0, nil, newNetworkError(fmt.Sprintf("could not resolve port %d", lp), errResolve)
+			return 0, nil, newNetworkError(fmt.Sprintf("could not resolve port %d", listenedPort), errResolve)
 		}
 
 		tcpListener, errListen := net.ListenTCP("tcp", laddr)
 		if errListen == nil {
-			return ep, tcpListener, nil
+			return exposedPort, tcpListener, nil
 		}
 	}
 
@@ -166,9 +165,11 @@ func (c *clientHandler) handlePASV(_ string) error {
 	}
 
 	if exposedPort == 0 {
-		exposedPort = tcpListener.Addr().(*net.TCPAddr).Port
+		if tcpAddr, ok := tcpListener.Addr().(*net.TCPAddr); ok {
+			exposedPort = tcpAddr.Port
+		}
 	}
-	transferHandler := &passiveTransferHandler{ //nolint:forcetypeassert
+	transferHandler := &passiveTransferHandler{
 		tcpListener:   tcpListener,
 		listener:      listener,
 		Port:          exposedPort,
