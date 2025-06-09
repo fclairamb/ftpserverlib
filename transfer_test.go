@@ -48,9 +48,9 @@ func createTemporaryFile(t *testing.T, targetSize int) *os.File {
 
 	t.Cleanup(func() {
 		err = file.Close()
-		assert.NoError(t, err, fmt.Sprintf("Problem closing file %#v", file.Name()))
+		assert.NoError(t, err, "Problem closing file", file.Name())
 		err := os.Remove(file.Name())
-		require.NoError(t, err, fmt.Sprintf("Problem deleting file %#v", file.Name()))
+		require.NoError(t, err, "Problem deleting file", file.Name())
 	})
 
 	return file
@@ -334,7 +334,7 @@ func TestActiveModeDisabled(t *testing.T) {
 	file := createTemporaryFile(t, 10*1024)
 	err = client.Store("file.bin", file)
 	require.Error(t, err, "active mode is disabled, upload must fail")
-	require.True(t, strings.Contains(err.Error(), "421-PORT command is disabled"))
+	require.Contains(t, err.Error(), "421-PORT command is disabled")
 }
 
 // TestFailedTransfer validates the handling of failed transfer caused by file access issues
@@ -448,7 +448,7 @@ func TestFailingFileTransfer(t *testing.T) {
 		c, file := createClientOnServer(t)
 		err := c.Store("fail-to-write.bin", file)
 		require.Error(t, err)
-		require.True(t, strings.Contains(err.Error(), errFailWrite.Error()), err)
+		require.Contains(t, err.Error(), errFailWrite.Error())
 	})
 
 	t.Run("on close", func(t *testing.T) {
@@ -456,7 +456,7 @@ func TestFailingFileTransfer(t *testing.T) {
 		c, file := createClientOnServer(t)
 		err := c.Store("fail-to-close.bin", file)
 		require.Error(t, err)
-		require.True(t, strings.Contains(err.Error(), errFailClose.Error()), err)
+		require.Contains(t, err.Error(), errFailClose.Error())
 	})
 
 	t.Run("on seek", func(t *testing.T) {
@@ -475,7 +475,7 @@ func TestFailingFileTransfer(t *testing.T) {
 		err = appendFile.Close()
 		require.NoError(t, err)
 
-		appendFile, err = os.OpenFile(appendFile.Name(), os.O_APPEND|os.O_WRONLY, os.ModePerm)
+		appendFile, err = os.OpenFile(appendFile.Name(), os.O_APPEND|os.O_WRONLY, 0600)
 		require.NoError(t, err)
 
 		data := []byte("some more data")
@@ -486,7 +486,7 @@ func TestFailingFileTransfer(t *testing.T) {
 		require.Equal(t, int64(len(initialData)+len(data)), info.Size())
 		_, err = client.TransferFromOffset("fail-to-seek.bin", nil, appendFile, int64(len(initialData)))
 		require.Error(t, err)
-		require.True(t, strings.Contains(err.Error(), errFailSeek.Error()), err)
+		require.Contains(t, err.Error(), errFailSeek.Error())
 		err = appendFile.Close()
 		require.NoError(t, err)
 	})
@@ -1188,6 +1188,109 @@ func TestPassivePortExhaustion(t *testing.T) {
 	}
 }
 
+func TestPortMappingRange(t *testing.T) {
+	// Test PortMappingRange functionality
+	portMapping := PortMappingRange{
+		ExposedStart:  50000,
+		ListenedStart: 60000,
+		Count:         10,
+	}
+
+	// Test FetchNext method
+	exposedPort, listenedPort, ok := portMapping.FetchNext()
+	require.True(t, ok)
+	require.GreaterOrEqual(t, exposedPort, 50000)
+	require.Less(t, exposedPort, 50010)
+	require.GreaterOrEqual(t, listenedPort, 60000)
+	require.Less(t, listenedPort, 60010)
+	require.Equal(t, exposedPort-50000, listenedPort-60000) // Should have same offset
+
+	// Test NumberAttempts method
+	require.Equal(t, 10, portMapping.NumberAttempts())
+
+	// Test with server
+	server := NewTestServer(t, false)
+	server.settings.PassiveTransferPortRange = &portMapping
+
+	client, err := goftp.DialConfig(goftp.Config{
+		User:     authUser,
+		Password: authPass,
+	}, server.Addr())
+	require.NoError(t, err, "Couldn't connect")
+
+	defer func() { panicOnError(client.Close()) }()
+
+	raw, err := client.OpenRawConn()
+	require.NoError(t, err, "Couldn't open raw connection")
+
+	defer func() { require.NoError(t, raw.Close()) }()
+
+	// Test PASV command with port mapping
+	returnCode, message, err := raw.SendCommand("PASV")
+	require.NoError(t, err)
+	require.Equal(t, StatusEnteringPASV, returnCode, message)
+
+	// Extract port from PASV response and verify it's in the exposed range
+	port := getPortFromPASVResponse(t, message)
+	require.GreaterOrEqual(t, port, 50000)
+	require.Less(t, port, 50010)
+
+	// Test EPSV command with port mapping as well
+	returnCode, message, err = raw.SendCommand("EPSV")
+	require.NoError(t, err)
+	require.Equal(t, StatusEnteringEPSV, returnCode, message)
+
+	// Extract port from EPSV response and verify it's in the exposed range
+	epsvPort := getPortFromEPSVResponse(t, message)
+	require.GreaterOrEqual(t, epsvPort, 50000)
+	require.Less(t, epsvPort, 50010)
+}
+
+func TestPortRangeBackwardCompatibility(t *testing.T) {
+	// Test that PortRange still works as PasvPortGetter
+	portRange := PortRange{
+		Start: 45000,
+		End:   45010,
+	}
+
+	// Test FetchNext method
+	exposedPort, listenedPort, ok := portRange.FetchNext()
+	require.True(t, ok)
+	require.GreaterOrEqual(t, exposedPort, 45000)
+	require.LessOrEqual(t, exposedPort, 45010)
+	require.Equal(t, exposedPort, listenedPort) // Should be the same for PortRange
+
+	// Test NumberAttempts method
+	require.Equal(t, 11, portRange.NumberAttempts())
+
+	// Test with server to ensure backward compatibility
+	server := NewTestServer(t, false)
+	server.settings.PassiveTransferPortRange = &portRange
+
+	client, err := goftp.DialConfig(goftp.Config{
+		User:     authUser,
+		Password: authPass,
+	}, server.Addr())
+	require.NoError(t, err, "Couldn't connect")
+
+	defer func() { panicOnError(client.Close()) }()
+
+	raw, err := client.OpenRawConn()
+	require.NoError(t, err, "Couldn't open raw connection")
+
+	defer func() { require.NoError(t, raw.Close()) }()
+
+	// Test PASV command
+	rc, message, err := raw.SendCommand("PASV")
+	require.NoError(t, err)
+	require.Equal(t, StatusEnteringPASV, rc, message)
+
+	// Extract port from PASV response and verify it's in the range
+	port := getPortFromPASVResponse(t, message)
+	require.GreaterOrEqual(t, port, 45000)
+	require.LessOrEqual(t, port, 45010)
+}
+
 func loginConnection(t *testing.T, conn net.Conn) {
 	t.Helper()
 
@@ -1228,6 +1331,25 @@ func getPortFromPASVResponse(t *testing.T, resp string) int {
 
 		port |= portOctet << (byte(1-i) * 8)
 	}
+
+	return port
+}
+
+func getPortFromEPSVResponse(t *testing.T, resp string) int {
+	t.Helper()
+
+	// EPSV response format: "229 Entering Extended Passive Mode (|||port|)"
+	resp = strings.Replace(resp, "229 Entering Extended Passive Mode", "", 1)
+	resp = strings.Replace(resp, "(", "", 1)
+	resp = strings.Replace(resp, ")", "", 1)
+	resp = strings.TrimSpace(resp)
+
+	// Extract port from |||port| format
+	parts := strings.Split(resp, "|")
+	require.Len(t, parts, 5) // Should be ["", "", "", "port", ""]
+
+	port, err := strconv.Atoi(parts[3])
+	require.NoError(t, err)
 
 	return port
 }

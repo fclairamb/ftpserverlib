@@ -408,7 +408,7 @@ func (c *clientHandler) handleSIZE(param string) error {
 	path := c.absPath(param)
 	if info, err := c.driver.Stat(path); err == nil {
 		if info.IsDir() {
-			c.writeMessage(StatusActionNotTaken, fmt.Sprintf("%s is a directory", path))
+			c.writeMessage(StatusActionNotTaken, path+" is a directory")
 		} else {
 			c.writeMessage(StatusFileStatus, strconv.FormatInt(info.Size(), 10))
 		}

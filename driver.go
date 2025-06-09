@@ -4,6 +4,7 @@ import (
 	"crypto/tls"
 	"errors"
 	"io"
+	"math/rand"
 	"net"
 	"os"
 
@@ -219,10 +220,49 @@ type FileTransferError interface {
 	TransferError(err error)
 }
 
+// PasvPortGetter defined how the driver fetch a pair of ports used in passive transfer
+type PasvPortGetter interface {
+	// FetchNext returns the exposed one, the listened one and whether succeeded
+	FetchNext() (int, int, bool)
+	// NumberAttempts returns maximum number of attempts on finding an available passive transfer port
+	NumberAttempts() int
+}
+
 // PortRange is a range of ports
 type PortRange struct {
 	Start int // Range start
 	End   int // Range end
+}
+
+// FetchNext returns the next port to try for passive connections
+func (r PortRange) FetchNext() (int, int, bool) {
+	port := r.Start + rand.Intn(r.End-r.Start+1) //nolint:gosec // weak random is acceptable for port selection
+
+	return port, port, true
+}
+
+// NumberAttempts returns the number of ports available in the range
+func (r PortRange) NumberAttempts() int {
+	return r.End - r.Start + 1
+}
+
+// PortMappingRange is a range of mapped ports
+type PortMappingRange struct {
+	ExposedStart  int
+	ListenedStart int
+	Count         int
+}
+
+// FetchNext returns the next exposed and listened port pair for passive connections
+func (r PortMappingRange) FetchNext() (int, int, bool) {
+	n := rand.Intn(r.Count) //nolint:gosec // weak random is acceptable for port selection
+
+	return r.ExposedStart + n, r.ListenedStart + n, true
+}
+
+// NumberAttempts returns the number of port pairs available in the range
+func (r PortMappingRange) NumberAttempts() int {
+	return r.Count
 }
 
 // PublicIPResolver takes a ClientContext for a connection and returns the public IP
@@ -259,7 +299,7 @@ type Settings struct {
 	ListenAddr               string           // Listening address
 	PublicHost               string           // Public IP to expose (only an IP address is accepted at this stage)
 	PublicIPResolver         PublicIPResolver // (Optional) To fetch a public IP lookup
-	PassiveTransferPortRange *PortRange       // (Optional) Port Range for data connections. Random if not specified
+	PassiveTransferPortRange PasvPortGetter   // (Optional) Port Mapping for data connections. Random if not specified
 	ActiveTransferPortNon20  bool             // Do not impose the port 20 for active data transfer (#88, RFC 1579)
 	IdleTimeout              int              // Maximum inactivity time before disconnecting (#58)
 	ConnectionTimeout        int              // Maximum time to establish passive or active transfer connections
