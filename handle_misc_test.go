@@ -370,53 +370,25 @@ func TestQuitWithTransferInProgress(t *testing.T) {
 }
 
 func TestTYPE(t *testing.T) {
-	server := NewTestServer(t, false)
-	conf := goftp.Config{
-		User:     authUser,
-		Password: authPass,
+	raw := newClientWithRawConn(t)
+
+	cases := []struct {
+		cmd    string
+		expect int
+	}{
+		{"TYPE I", StatusOK},
+		{"TYPE A", StatusOK},
+		{"TYPE A N", StatusOK},
+		{"TYPE i", StatusOK},
+		{"TYPE a", StatusOK},
+		{"TYPE l 8", StatusOK},
+		{"TYPE l 7", StatusOK},
+		{"TYPE wrong", StatusNotImplementedParam},
 	}
 
-	client, err := goftp.DialConfig(conf, server.Addr())
-	require.NoError(t, err, "Couldn't connect")
-
-	defer func() { panicOnError(client.Close()) }()
-
-	raw, err := client.OpenRawConn()
-	require.NoError(t, err, "Couldn't open raw connection")
-
-	defer func() { require.NoError(t, raw.Close()) }()
-
-	returnCode, _, err := raw.SendCommand("TYPE I")
-	require.NoError(t, err)
-	require.Equal(t, StatusOK, returnCode)
-
-	returnCode, _, err = raw.SendCommand("TYPE A")
-	require.NoError(t, err)
-	require.Equal(t, StatusOK, returnCode)
-
-	returnCode, _, err = raw.SendCommand("TYPE A N")
-	require.NoError(t, err)
-	require.Equal(t, StatusOK, returnCode)
-
-	returnCode, _, err = raw.SendCommand("TYPE i")
-	require.NoError(t, err)
-	require.Equal(t, StatusOK, returnCode)
-
-	returnCode, _, err = raw.SendCommand("TYPE a")
-	require.NoError(t, err)
-	require.Equal(t, StatusOK, returnCode)
-
-	returnCode, _, err = raw.SendCommand("TYPE l 8")
-	require.NoError(t, err)
-	require.Equal(t, StatusOK, returnCode)
-
-	returnCode, _, err = raw.SendCommand("TYPE l 7")
-	require.NoError(t, err)
-	require.Equal(t, StatusOK, returnCode)
-
-	returnCode, _, err = raw.SendCommand("TYPE wrong")
-	require.NoError(t, err)
-	require.Equal(t, StatusNotImplementedParam, returnCode)
+	for _, c := range cases {
+		sendAndCheck(t, raw, c.cmd, c.expect)
+	}
 }
 
 func TestMode(t *testing.T) {

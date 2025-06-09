@@ -257,8 +257,6 @@ const (
 )
 
 // Settings defines all the server settings
-//
-//nolint:maligned
 type Settings struct {
 	Listener                 net.Listener     // (Optional) To provide an already initialized listener
 	ListenAddr               string           // Listening address

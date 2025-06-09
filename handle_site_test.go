@@ -91,58 +91,25 @@ func TestSiteCommandsWithoutExtension(t *testing.T) {
 }
 
 func TestSiteCommandErrors(t *testing.T) {
-	server := NewTestServer(t, false)
-	conf := goftp.Config{
-		User:     authUser,
-		Password: authPass,
+	raw := newClientWithRawConn(t)
+
+	cases := []struct {
+		cmd    string
+		expect int
+	}{
+		{"SITE CHMOD", StatusSyntaxErrorParameters},
+		{"SITE CHMOD 755", StatusSyntaxErrorParameters},
+		{"SITE CHMOD invalid /", StatusActionNotTaken},
+		{"SITE CHOWN", StatusSyntaxErrorParameters},
+		{"SITE CHOWN 1000", StatusSyntaxErrorParameters},
+		{"SITE CHOWN 9999:9999 /", StatusActionNotTaken},
+		{"SITE MKDIR", StatusSyntaxErrorNotRecognised},
+		{"SITE RMDIR", StatusSyntaxErrorNotRecognised},
 	}
 
-	client, err := goftp.DialConfig(conf, server.Addr())
-	require.NoError(t, err, "Couldn't connect")
-
-	defer func() { panicOnError(client.Close()) }()
-
-	raw, err := client.OpenRawConn()
-	require.NoError(t, err, "Couldn't open raw connection")
-
-	defer func() { require.NoError(t, raw.Close()) }()
-
-	// Test SITE CHMOD with invalid parameters
-	returnCode, _, err := raw.SendCommand("SITE CHMOD")
-	require.NoError(t, err)
-	require.Equal(t, StatusSyntaxErrorParameters, returnCode)
-
-	returnCode, _, err = raw.SendCommand("SITE CHMOD 755")
-	require.NoError(t, err)
-	require.Equal(t, StatusSyntaxErrorParameters, returnCode)
-
-	returnCode, _, err = raw.SendCommand("SITE CHMOD invalid /")
-	require.NoError(t, err)
-	require.Equal(t, StatusActionNotTaken, returnCode)
-
-	// Test SITE CHOWN with invalid parameters
-	returnCode, _, err = raw.SendCommand("SITE CHOWN")
-	require.NoError(t, err)
-	require.Equal(t, StatusSyntaxErrorParameters, returnCode)
-
-	returnCode, _, err = raw.SendCommand("SITE CHOWN 1000")
-	require.NoError(t, err)
-	require.Equal(t, StatusSyntaxErrorParameters, returnCode)
-
-	// Test SITE CHOWN with invalid user/group
-	returnCode, _, err = raw.SendCommand("SITE CHOWN 9999:9999 /")
-	require.NoError(t, err)
-	require.Equal(t, StatusActionNotTaken, returnCode)
-
-	// Test SITE MKDIR with missing path
-	returnCode, _, err = raw.SendCommand("SITE MKDIR")
-	require.NoError(t, err)
-	require.Equal(t, StatusSyntaxErrorNotRecognised, returnCode)
-
-	// Test SITE RMDIR with missing path
-	returnCode, _, err = raw.SendCommand("SITE RMDIR")
-	require.NoError(t, err)
-	require.Equal(t, StatusSyntaxErrorNotRecognised, returnCode)
+	for _, c := range cases {
+		sendAndCheck(t, raw, c.cmd, c.expect)
+	}
 }
 
 func TestSiteCommandDisabled(t *testing.T) {
