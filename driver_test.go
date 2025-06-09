@@ -154,7 +154,7 @@ var (
 
 func (f *testFile) Read(out []byte) (int, error) {
 	// simulating a slow reading allows us to test ABOR
-	if strings.Contains(f.File.Name(), "delay-io") {
+	if strings.Contains(f.Name(), "delay-io") {
 		time.Sleep(500 * time.Millisecond)
 	}
 
@@ -162,12 +162,12 @@ func (f *testFile) Read(out []byte) (int, error) {
 }
 
 func (f *testFile) Write(out []byte) (int, error) {
-	if strings.Contains(f.File.Name(), "fail-to-write") {
+	if strings.Contains(f.Name(), "fail-to-write") {
 		return 0, errFailWrite
 	}
 
 	// simulating a slow writing allows us to test ABOR
-	if strings.Contains(f.File.Name(), "delay-io") {
+	if strings.Contains(f.Name(), "delay-io") {
 		time.Sleep(500 * time.Millisecond)
 	}
 
@@ -175,7 +175,7 @@ func (f *testFile) Write(out []byte) (int, error) {
 }
 
 func (f *testFile) Close() error {
-	if strings.Contains(f.File.Name(), "fail-to-close") {
+	if strings.Contains(f.Name(), "fail-to-close") {
 		return errFailClose
 	}
 
@@ -187,11 +187,11 @@ func (f *testFile) Seek(offset int64, whence int) (int64, error) {
 	// we can delay the opening of the transfer and then test an ABOR before
 	// opening a transfer. I'm not sure if this can really happen but it is
 	// better to be prepared for buggy clients too
-	if strings.Contains(f.File.Name(), "delay-io") {
+	if strings.Contains(f.Name(), "delay-io") {
 		time.Sleep(500 * time.Millisecond)
 	}
 
-	if strings.Contains(f.File.Name(), "fail-to-seek") {
+	if strings.Contains(f.Name(), "fail-to-seek") {
 		return 0, errFailSeek
 	}
 
@@ -199,11 +199,11 @@ func (f *testFile) Seek(offset int64, whence int) (int64, error) {
 }
 
 func (f *testFile) Readdir(count int) ([]os.FileInfo, error) {
-	if strings.Contains(f.File.Name(), "delay-io") {
+	if strings.Contains(f.Name(), "delay-io") {
 		time.Sleep(500 * time.Millisecond)
 	}
 
-	if strings.Contains(f.File.Name(), "fail-to-readdir") {
+	if strings.Contains(f.Name(), "fail-to-readdir") {
 		return nil, errFailReaddir
 	}
 
@@ -473,7 +473,7 @@ func (driver *TestClientDriver) Chown(name string, uid int, gid int) error {
 		return errInvalidChownGroup
 	}
 
-	_, err := driver.Fs.Stat(name)
+	_, err := driver.Stat(name)
 
 	return err
 }

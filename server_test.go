@@ -19,6 +19,7 @@ func TestMain(m *testing.M) {
 		panic(err)
 	}
 
+	//nolint:gosmopolitan // Intentional modification for testing timezone behavior
 	time.Local = loc
 
 	os.Exit(m.Run())

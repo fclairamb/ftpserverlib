@@ -524,7 +524,7 @@ func testListDirArgs(t *testing.T, server *FtpServer) {
 		server.settings.DisableLISTArgs = true
 
 		_, err = client.ReadDir(arg)
-		require.Error(t, err, fmt.Sprintf("list args are disabled \"list %v\" must fail", arg))
+		require.Error(t, err, "list args are disabled \"list", arg, "\" must fail")
 
 		server.settings.DisableLISTArgs = false
 
