@@ -462,3 +462,54 @@ func TestREIN(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, StatusCommandNotImplemented, returnCode)
 }
+
+// Custom driver for testing ClientDriverExtensionSite
+// Implements Site(param string) error
+type customSiteDriver struct {
+	TestServerDriver
+}
+
+func (d *customSiteDriver) Site(param string) error {
+	switch param {
+	case "CUSTOMERR":
+		return fmt.Errorf("custom site error")
+	case "PROCEED":
+		return ErrProceedWithDefaultBehavior
+	case "OK":
+		return nil
+	default:
+		return ErrProceedWithDefaultBehavior
+	}
+}
+
+func TestClientDriverExtensionSite(t *testing.T) {
+	driver := &customSiteDriver{}
+	driver.Init()
+	server := NewTestServerWithDriver(t, driver)
+	conf := goftp.Config{
+		User:     authUser,
+		Password: authPass,
+	}
+	client, err := goftp.DialConfig(conf, server.Addr())
+	require.NoError(t, err, "Couldn't connect")
+	defer func() { panicOnError(client.Close()) }()
+	raw, err := client.OpenRawConn()
+	require.NoError(t, err, "Couldn't open raw connection")
+	defer func() { require.NoError(t, raw.Close()) }()
+
+	// Custom error from Site
+	rc, response, err := raw.SendCommand("SITE CUSTOMERR")
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "custom site error")
+
+	// Default behavior fallback (should get unknown subcommand)
+	rc, response, err = raw.SendCommand("SITE PROCEED")
+	require.NoError(t, err)
+	require.Equal(t, StatusSyntaxErrorNotRecognised, rc)
+	require.Contains(t, response, "Unknown SITE subcommand")
+
+	// Short-circuit: Site returns nil, so command is accepted (no error, no message)
+	rc, response, err = raw.SendCommand("SITE OK")
+	require.NoError(t, err)
+	require.Equal(t, 0, len(response))
+}
