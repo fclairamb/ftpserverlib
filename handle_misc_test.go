@@ -466,50 +466,68 @@ func TestREIN(t *testing.T) {
 // Custom driver for testing ClientDriverExtensionSite
 // Implements Site(param string) error
 type customSiteDriver struct {
-	TestServerDriver
+	TestClientDriver
 }
 
-func (d *customSiteDriver) Site(param string) error {
+var _ ClientDriverExtensionSite = (*customSiteDriver)(nil)
+
+func (d *customSiteDriver) Site(param string) *AnswerCommand {
 	switch param {
 	case "CUSTOMERR":
-		return fmt.Errorf("custom site error")
+		return &AnswerCommand{
+			Code:    StatusSyntaxErrorNotRecognised,
+			Message: "custom site error",
+		}
 	case "PROCEED":
-		return ErrProceedWithDefaultBehavior
-	case "OK":
 		return nil
+	case "OK":
+		return &AnswerCommand{
+			Code:    StatusOK,
+			Message: "OK",
+		}
 	default:
-		return ErrProceedWithDefaultBehavior
+		return nil
 	}
 }
 
 func TestClientDriverExtensionSite(t *testing.T) {
-	driver := &customSiteDriver{}
-	driver.Init()
-	server := NewTestServerWithDriver(t, driver)
+	t.Parallel()
+
+	req := require.New(t)
+
+	server := NewTestServerWithTestDriver(t, &TestServerDriver{
+		Debug: false,
+		AuthProvider: func(_, _ string) (ClientDriver, error) {
+			return &customSiteDriver{}, nil
+		},
+	})
 	conf := goftp.Config{
 		User:     authUser,
 		Password: authPass,
 	}
+
 	client, err := goftp.DialConfig(conf, server.Addr())
-	require.NoError(t, err, "Couldn't connect")
+	req.NoError(err, "Couldn't connect")
 	defer func() { panicOnError(client.Close()) }()
 	raw, err := client.OpenRawConn()
-	require.NoError(t, err, "Couldn't open raw connection")
+	req.NoError(err, "Couldn't open raw connection")
 	defer func() { require.NoError(t, raw.Close()) }()
 
 	// Custom error from Site
-	rc, response, err := raw.SendCommand("SITE CUSTOMERR")
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "custom site error")
+	returnCode, response, err := raw.SendCommand("SITE CUSTOMERR")
+	req.NoError(err)
+	req.Equal(StatusSyntaxErrorNotRecognised, returnCode)
+	req.Contains(response, "custom site error")
 
 	// Default behavior fallback (should get unknown subcommand)
-	rc, response, err = raw.SendCommand("SITE PROCEED")
+	returnCode, response, err = raw.SendCommand("SITE PROCEED")
 	require.NoError(t, err)
-	require.Equal(t, StatusSyntaxErrorNotRecognised, rc)
+	require.Equal(t, StatusSyntaxErrorNotRecognised, returnCode)
 	require.Contains(t, response, "Unknown SITE subcommand")
 
 	// Short-circuit: Site returns nil, so command is accepted (no error, no message)
-	rc, response, err = raw.SendCommand("SITE OK")
+	returnCode, response, err = raw.SendCommand("SITE OK")
 	require.NoError(t, err)
-	require.Equal(t, 0, len(response))
+	require.Equal(t, StatusOK, returnCode)
+	require.Equal(t, "OK", response)
 }
