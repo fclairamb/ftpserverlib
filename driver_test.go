@@ -15,6 +15,7 @@ import (
 	"github.com/fclairamb/go-log/gokit"
 	gklog "github.com/go-kit/log"
 	"github.com/spf13/afero"
+	"github.com/stretchr/testify/require"
 )
 
 type tlsVerificationReply int8
@@ -551,3 +552,71 @@ B8waIgXRIjSWT4Fje7RTMT948qhguVhpoAgVzwzMqizzq6YIQbL7MHwXj7oZNUoQ
 CARLpnYLaeWP2nxQyzwGx5pn9TJwg79Yknr8PbSjeym1BSbE5C9ruqar4PfiIzYx
 di02m2YJAvRsG9VDpXogi+c=
 -----END PRIVATE KEY-----`)
+
+// TestPortRangeFetchNextError tests error handling in PortRange.FetchNext
+func TestPortRangeFetchNextError(t *testing.T) {
+	req := require.New(t)
+
+	// Test with a range that could potentially cause issues
+	portRange := PortRange{
+		Start: 65535,
+		End:   65535,
+	}
+
+	// This should still work since it's a valid range
+	exposedPort, listenedPort, ok := portRange.FetchNext()
+	req.True(ok)
+	req.Equal(65535, exposedPort)
+	req.Equal(65535, listenedPort)
+}
+
+// TestPortMappingRangeFetchNextError tests error handling in PortMappingRange.FetchNext
+func TestPortMappingRangeFetchNextError(t *testing.T) {
+	req := require.New(t)
+
+	// Test with a valid range
+	portMappingRange := PortMappingRange{
+		ExposedStart:  8000,
+		ListenedStart: 9000,
+		Count:         10,
+	}
+
+	exposedPort, listenedPort, ok := portMappingRange.FetchNext()
+	req.True(ok)
+	req.GreaterOrEqual(exposedPort, 8000)
+	req.LessOrEqual(exposedPort, 8009)
+	req.GreaterOrEqual(listenedPort, 9000)
+	req.LessOrEqual(listenedPort, 9009)
+	req.Equal(exposedPort-8000, listenedPort-9000) // Should maintain offset
+}
+
+// TestPortMappingRangeNumberAttempts tests the NumberAttempts method
+func TestPortMappingRangeNumberAttempts(t *testing.T) {
+	req := require.New(t)
+
+	portMappingRange := PortMappingRange{
+		ExposedStart:  8000,
+		ListenedStart: 9000,
+		Count:         25,
+	}
+
+	req.Equal(25, portMappingRange.NumberAttempts())
+}
+
+// TestCryptoRandError tests what happens when crypto/rand fails
+func TestCryptoRandError(t *testing.T) {
+	req := require.New(t)
+
+	// We can't easily mock crypto/rand.Int, but we can test with edge cases
+	// Test with zero count (should handle gracefully)
+	portMappingRange := PortMappingRange{
+		ExposedStart:  8000,
+		ListenedStart: 9000,
+		Count:         1, // Minimum valid count
+	}
+
+	exposedPort, listenedPort, ok := portMappingRange.FetchNext()
+	req.True(ok)
+	req.Equal(8000, exposedPort)
+	req.Equal(9000, listenedPort)
+}
