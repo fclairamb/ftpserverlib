@@ -1,9 +1,10 @@
 package ftpserver
 
 import (
+	"crypto/rand"
 	"crypto/tls"
 	"io"
-	"math/rand"
+	"math/big"
 	"net"
 	"os"
 
@@ -236,14 +237,18 @@ type PortRange struct {
 	End   int // Range end
 }
 
-// FetchNext returns the next port to try for passive connections
+// FetchNext returns the next port to try for the range
 func (r PortRange) FetchNext() (int, int, bool) {
-	port := r.Start + rand.Intn(r.End-r.Start+1) //nolint:gosec // weak random is acceptable for port selection
+	n, err := rand.Int(rand.Reader, big.NewInt(int64(r.End-r.Start+1)))
+	if err != nil {
+		return 0, 0, false
+	}
+	port := r.Start + int(n.Int64())
 
 	return port, port, true
 }
 
-// NumberAttempts returns the number of ports available in the range
+// NumberAttempts returns the number of attempts for the range
 func (r PortRange) NumberAttempts() int {
 	return r.End - r.Start + 1
 }
@@ -255,14 +260,17 @@ type PortMappingRange struct {
 	Count         int
 }
 
-// FetchNext returns the next exposed and listened port pair for passive connections
+// FetchNext returns the next port mapping to try for the range
 func (r PortMappingRange) FetchNext() (int, int, bool) {
-	n := rand.Intn(r.Count) //nolint:gosec // weak random is acceptable for port selection
+	n, err := rand.Int(rand.Reader, big.NewInt(int64(r.Count)))
+	if err != nil {
+		return 0, 0, false
+	}
 
-	return r.ExposedStart + n, r.ListenedStart + n, true
+	return r.ExposedStart + int(n.Int64()), r.ListenedStart + int(n.Int64()), true
 }
 
-// NumberAttempts returns the number of port pairs available in the range
+// NumberAttempts returns the number of attempts for the range
 func (r PortMappingRange) NumberAttempts() int {
 	return r.Count
 }
@@ -294,8 +302,6 @@ const (
 )
 
 // Settings defines all the server settings
-//
-//nolint:maligned
 type Settings struct {
 	Listener                 net.Listener     // (Optional) To provide an already initialized listener
 	ListenAddr               string           // Listening address
