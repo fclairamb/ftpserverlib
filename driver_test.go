@@ -119,6 +119,8 @@ func NewTestServerWithDriver(t *testing.T, driver MainDriver) *FtpServer {
 	return NewTestServerWithDriverAndLogger(t, driver, nil)
 }
 
+type authUserProvider func(user, pass string) (ClientDriver, error)
+
 // TestServerDriver defines a minimal serverftp server driver
 type TestServerDriver struct {
 	Debug          bool // To display connection logs information
@@ -132,6 +134,7 @@ type TestServerDriver struct {
 	TLSVerificationReply tlsVerificationReply
 	errPassiveListener   error
 	TLSRequirement       TLSRequirement
+	AuthProvider         authUserProvider
 }
 
 // TestClientDriver defines a minimal serverftp client driver
@@ -254,6 +257,10 @@ var errBadUserNameOrPassword = errors.New("bad username or password")
 
 // AuthUser with authenticate users
 func (driver *TestServerDriver) AuthUser(_ ClientContext, user, pass string) (ClientDriver, error) {
+	if driver.AuthProvider != nil {
+		return driver.AuthProvider(user, pass)
+	}
+
 	if user == authUser && pass == authPass {
 		clientdriver := NewTestClientDriver(driver)
 
