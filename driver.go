@@ -132,6 +132,18 @@ type ClientDriverExtensionAvailableSpace interface {
 	GetAvailableSpace(dirName string) (int64, error)
 }
 
+// AnswerCommand is a struct to answer a command to the client
+type AnswerCommand struct {
+	Code    int
+	Message string
+}
+
+// ClientDriverExtensionSite is an extension to implement if you want to handle SITE command
+// yourself. You have to set DisableSite to false for this extension to be called
+type ClientDriverExtensionSite interface {
+	Site(param string) *AnswerCommand
+}
+
 // ClientContext is implemented on the server side to provide some access to few data around the client
 type ClientContext interface {
 	// Path provides the path of the current connection
