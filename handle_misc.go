@@ -68,6 +68,17 @@ func (c *clientHandler) handleSITE(param string) error {
 		return nil
 	}
 
+	// If the driver implements ClientDriverExtensionSite, we call its Site method
+	// If it returns ErrProceedWithDefaultBehavior, we proceed with the default behavior
+	// Otherwise, we return the error
+	if site, ok := c.driver.(ClientDriverExtensionSite); ok {
+		if answer := site.Site(param); answer != nil {
+			c.writeMessage(answer.Code, answer.Message)
+
+			return nil
+		}
+	}
+
 	spl := strings.SplitN(param, " ", 2)
 	cmd := strings.ToUpper(spl[0])
 	var params string
