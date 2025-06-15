@@ -13,8 +13,7 @@ on:
 jobs:
   claude-review:
     if: |
-      contains(github.event.pull_request.labels.*.name, 'claude') ||
-      contains(join(github.event.pull_request.assignees.*.login, ','), 'claude')
+      contains(github.event.pull_request.labels.*.name, 'claude')
     #   github.event.pull_request.user.login == 'external-contributor' ||
     #   github.event.pull_request.user.login == 'new-developer' ||
     #   github.event.pull_request.author_association == 'FIRST_TIME_CONTRIBUTOR'
