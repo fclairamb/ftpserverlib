@@ -77,7 +77,6 @@ func getHashName(algo HASHAlgo) string {
 	return hashName
 }
 
-//nolint:maligned
 type clientHandler struct {
 	id                  uint32          // ID of the client
 	server              *FtpServer      // Server on which the connection was accepted
