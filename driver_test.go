@@ -123,18 +123,17 @@ type authUserProvider func(user, pass string) (ClientDriver, error)
 
 // TestServerDriver defines a minimal serverftp server driver
 type TestServerDriver struct {
-	Debug          bool // To display connection logs information
-	TLS            bool
-	CloseOnConnect bool // disconnect the client as soon as it connects
-
-	Settings             *Settings // Settings
+	Clients              []ClientContext
+	errPassiveListener   error
 	fs                   afero.Fs
 	clientMU             sync.Mutex
-	Clients              []ClientContext
-	TLSVerificationReply tlsVerificationReply
-	errPassiveListener   error
-	TLSRequirement       TLSRequirement
 	AuthProvider         authUserProvider
+	Settings             *Settings // Settings
+	TLSVerificationReply tlsVerificationReply
+	TLSRequirement       TLSRequirement
+	Debug                bool // To display connection logs information
+	TLS                  bool
+	CloseOnConnect       bool // disconnect the client as soon as it connects
 }
 
 // TestClientDriver defines a minimal serverftp client driver
