@@ -107,8 +107,8 @@ type clientHandler struct {
 	controlTLS          bool            // Use TLS for control connection
 	isTransferOpen      bool            // indicate if the transfer connection is opened
 	isTransferAborted   bool            // indicate if the transfer was aborted
+	connClosed          bool            //indicates if the connection has been commanded to close
 	tlsRequirement      TLSRequirement  // TLS requirement to respect
-
 }
 
 // newClientHandler initializes a client handler when someone connects
@@ -131,13 +131,23 @@ func (server *FtpServer) newClientHandler(
 	}
 }
 
-func (c *clientHandler) disconnect() {
-	if err := c.conn.Close(); err != nil {
+// disconnects the connection without any other messaging
+func (c *clientHandler) disconnect() error {
+	if c.connClosed {
+		return nil
+	}
+
+	err := c.conn.Close()
+	if err != nil {
+		err = newNetworkError("error closing control connection", err)
 		c.logger.Warn(
 			"Problem disconnecting a client",
 			"err", err,
 		)
 	}
+
+	c.connClosed = true
+	return err
 }
 
 // Path provides the current working directory of the client
@@ -321,21 +331,24 @@ func (c *clientHandler) setLastDataChannel(channel DataChannel) {
 
 func (c *clientHandler) closeTransfer() error {
 	var err error
-	if c.transfer != nil {
-		err = c.transfer.Close()
-		c.isTransferOpen = false
-		c.transfer = nil
+	if c.transfer == nil {
+		return nil
+	}
 
-		if c.debug {
-			c.logger.Debug("Transfer connection closed")
-		}
+	err = c.transfer.Close()
+	c.isTransferOpen = false
+	c.transfer = nil
+
+	if c.debug {
+		c.logger.Debug("Transfer connection closed")
 	}
 
 	if err != nil {
 		err = fmt.Errorf("error closing transfer connection: %w", err)
+		return err
 	}
 
-	return err
+	return nil
 }
 
 // Close closes the active transfer, if any, and the control connection
@@ -361,34 +374,24 @@ func (c *clientHandler) Close() error {
 	// 2) the client could wait for another response and so we break the protocol
 	//
 	// closing the connection from a different goroutine should be safe
-	err := c.conn.Close()
-	if err != nil {
-		err = newNetworkError("error closing control connection", err)
-	}
-
-	return err
+	return c.disconnect()
 }
 
+// disconnects client and ends transfer notifying the driver
 func (c *clientHandler) end() {
 	c.server.driver.ClientDisconnected(c)
 	c.server.clientDeparture(c)
 
-	if err := c.conn.Close(); err != nil {
-		c.logger.Debug(
-			"Problem closing control connection",
-			"err", err,
-		)
-	}
-
 	c.transferMu.Lock()
-	defer c.transferMu.Unlock()
-
 	if err := c.closeTransfer(); err != nil {
 		c.logger.Warn(
 			"Problem closing a transfer",
 			"err", err,
 		)
 	}
+	c.transferMu.Unlock()
+
+	c.disconnect()
 }
 
 func (c *clientHandler) isCommandAborted() bool {
