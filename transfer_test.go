@@ -1096,6 +1096,12 @@ func TestPASVConnectionWait(t *testing.T) {
 // On Mac Os X, this requires to issue the following command:
 // sudo ifconfig lo0 alias 127.0.1.1 up
 func TestPASVIPMatch(t *testing.T) {
+	// Check if 127.0.1.1 is available before running the test
+	testAddr := &net.TCPAddr{IP: net.ParseIP("127.0.1.1"), Port: 0}
+	if _, err := net.DialTCP("tcp", testAddr, &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: 22}); err != nil {
+		t.Skip("Skipping test: 127.0.1.1 not available. Run 'sudo ifconfig lo0 alias 127.0.1.1 up' to enable this test.")
+	}
+
 	server := NewTestServer(t, false)
 
 	conn, err := net.DialTimeout("tcp", server.Addr(), 5*time.Second)
