@@ -79,35 +79,36 @@ func getHashName(algo HASHAlgo) string {
 
 //nolint:maligned
 type clientHandler struct {
-	id                  uint32          // ID of the client
-	server              *FtpServer      // Server on which the connection was accepted
+	connectedAt         time.Time       // Date of connection
+	paramsMutex         sync.RWMutex    // mutex to protect the parameters exposed to the library users
 	driver              ClientDriver    // Client handling driver
 	conn                net.Conn        // TCP connection
-	writer              *bufio.Writer   // Writer on the TCP connection
-	reader              *bufio.Reader   // Reader on the TCP connection
 	user                string          // Authenticated user
 	path                string          // Current path
 	listPath            string          // Path for NLST/LIST requests
 	clnt                string          // Identified client
 	command             string          // Command received on the connection
-	connectedAt         time.Time       // Date of connection
 	ctxRnfr             string          // Rename from
+	logger              log.Logger      // Client handler logging
+	transferWg          sync.WaitGroup  // wait group for command that open a transfer connection
+	transfer            transferHandler // Transfer connection (passive or active)s
+	extra               any             // Additional application-specific data
+	server              *FtpServer      // Server on which the connection was accepted
+	writer              *bufio.Writer   // Writer on the TCP connection
+	reader              *bufio.Reader   // Reader on the TCP connection
 	ctxRest             int64           // Restart point
+	transferMu          sync.Mutex      // this mutex will protect the transfer parameters
+	id                  uint32          // ID of the client
+	selectedHashAlgo    HASHAlgo        // algorithm used when we receive the HASH command
+	currentTransferType TransferType    // current transfer type
+	lastDataChannel     DataChannel     // Last data channel mode (passive or active)
 	debug               bool            // Show debugging info on the server side
 	transferTLS         bool            // Use TLS for transfer connection
 	controlTLS          bool            // Use TLS for control connection
-	selectedHashAlgo    HASHAlgo        // algorithm used when we receive the HASH command
-	logger              log.Logger      // Client handler logging
-	currentTransferType TransferType    // current transfer type
-	transferWg          sync.WaitGroup  // wait group for command that open a transfer connection
-	transferMu          sync.Mutex      // this mutex will protect the transfer parameters
-	transfer            transferHandler // Transfer connection (passive or active)s
-	lastDataChannel     DataChannel     // Last data channel mode (passive or active)
 	isTransferOpen      bool            // indicate if the transfer connection is opened
 	isTransferAborted   bool            // indicate if the transfer was aborted
+	connClosed          bool            // indicates if the connection has been commanded to close
 	tlsRequirement      TLSRequirement  // TLS requirement to respect
-	extra               any             // Additional application-specific data
-	paramsMutex         sync.RWMutex    // mutex to protect the parameters exposed to the library users
 }
 
 // newClientHandler initializes a client handler when someone connects
@@ -130,13 +131,24 @@ func (server *FtpServer) newClientHandler(
 	}
 }
 
-func (c *clientHandler) disconnect() {
-	if err := c.conn.Close(); err != nil {
+// disconnects the connection without any other messaging
+func (c *clientHandler) disconnect() error {
+	if c.connClosed {
+		return nil
+	}
+
+	err := c.conn.Close()
+	if err != nil {
+		err = newNetworkError("error closing control connection", err)
 		c.logger.Warn(
 			"Problem disconnecting a client",
 			"err", err,
 		)
 	}
+
+	c.connClosed = true
+
+	return err
 }
 
 // Path provides the current working directory of the client
@@ -320,21 +332,25 @@ func (c *clientHandler) setLastDataChannel(channel DataChannel) {
 
 func (c *clientHandler) closeTransfer() error {
 	var err error
-	if c.transfer != nil {
-		err = c.transfer.Close()
-		c.isTransferOpen = false
-		c.transfer = nil
+	if c.transfer == nil {
+		return nil
+	}
 
-		if c.debug {
-			c.logger.Debug("Transfer connection closed")
-		}
+	err = c.transfer.Close()
+	c.isTransferOpen = false
+	c.transfer = nil
+
+	if c.debug {
+		c.logger.Debug("Transfer connection closed")
 	}
 
 	if err != nil {
 		err = fmt.Errorf("error closing transfer connection: %w", err)
+
+		return err
 	}
 
-	return err
+	return nil
 }
 
 // Close closes the active transfer, if any, and the control connection
@@ -360,31 +376,26 @@ func (c *clientHandler) Close() error {
 	// 2) the client could wait for another response and so we break the protocol
 	//
 	// closing the connection from a different goroutine should be safe
-	err := c.conn.Close()
-	if err != nil {
-		err = newNetworkError("error closing control connection", err)
-	}
-
-	return err
+	return c.disconnect()
 }
 
+// disconnects client and ends transfer notifying the driver
 func (c *clientHandler) end() {
 	c.server.driver.ClientDisconnected(c)
 	c.server.clientDeparture(c)
 
-	if err := c.conn.Close(); err != nil {
-		c.logger.Debug(
-			"Problem closing control connection",
-			"err", err,
-		)
-	}
-
 	c.transferMu.Lock()
-	defer c.transferMu.Unlock()
-
 	if err := c.closeTransfer(); err != nil {
 		c.logger.Warn(
 			"Problem closing a transfer",
+			"err", err,
+		)
+	}
+	c.transferMu.Unlock()
+
+	if err := c.disconnect(); err != nil {
+		c.logger.Warn(
+			"Problem disconnecting client on end",
 			"err", err,
 		)
 	}
