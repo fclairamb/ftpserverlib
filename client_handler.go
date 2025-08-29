@@ -107,7 +107,7 @@ type clientHandler struct {
 	controlTLS          bool            // Use TLS for control connection
 	isTransferOpen      bool            // indicate if the transfer connection is opened
 	isTransferAborted   bool            // indicate if the transfer was aborted
-	connClosed          bool            //indicates if the connection has been commanded to close
+	connClosed          bool            // indicates if the connection has been commanded to close
 	tlsRequirement      TLSRequirement  // TLS requirement to respect
 }
 
@@ -147,6 +147,7 @@ func (c *clientHandler) disconnect() error {
 	}
 
 	c.connClosed = true
+
 	return err
 }
 
@@ -345,6 +346,7 @@ func (c *clientHandler) closeTransfer() error {
 
 	if err != nil {
 		err = fmt.Errorf("error closing transfer connection: %w", err)
+
 		return err
 	}
 
@@ -391,7 +393,12 @@ func (c *clientHandler) end() {
 	}
 	c.transferMu.Unlock()
 
-	c.disconnect()
+	if err := c.disconnect(); err != nil {
+		c.logger.Warn(
+			"Problem disconnecting client on end",
+			"err", err,
+		)
+	}
 }
 
 func (c *clientHandler) isCommandAborted() bool {
