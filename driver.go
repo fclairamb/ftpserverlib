@@ -306,15 +306,15 @@ type Settings struct {
 	Listener                 net.Listener     // (Optional) To provide an already initialized listener
 	ListenAddr               string           // Listening address
 	PublicHost               string           // Public IP to expose (only an IP address is accepted at this stage)
-	PublicIPResolver         PublicIPResolver // (Optional) To fetch a public IP lookup
+	Banner                   string           // Banner to use in server status response
 	PassiveTransferPortRange PasvPortGetter   // (Optional) Port Mapping for data connections. Random if not specified
-	ActiveTransferPortNon20  bool             // Do not impose the port 20 for active data transfer (#88, RFC 1579)
+	PublicIPResolver         PublicIPResolver // (Optional) To fetch a public IP lookup
 	IdleTimeout              int              // Maximum inactivity time before disconnecting (#58)
 	ConnectionTimeout        int              // Maximum time to establish passive or active transfer connections
+	ActiveTransferPortNon20  bool             // Do not impose the port 20 for active data transfer (#88, RFC 1579)
 	DisableMLSD              bool             // Disable MLSD support
 	DisableMLST              bool             // Disable MLST support
 	DisableMFMT              bool             // Disable MFMT support (modify file mtime)
-	Banner                   string           // Banner to use in server status response
 	TLSRequired              TLSRequirement   // defines the TLS mode
 	DisableLISTArgs          bool             // Disable ls like options (-a,-la etc.) for directory listing
 	DisableSite              bool             // Disable SITE command
