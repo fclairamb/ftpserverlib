@@ -44,6 +44,9 @@ go test -v -run TestTransfer
 
 # Run benchmarks
 go test -bench=.
+
+# Test with module management
+go mod tidy && go test -v ./...
 ```
 
 ## File Organization
@@ -70,8 +73,10 @@ The test suite uses a **reference driver implementation** (`driver_test.go`) wit
 
 ## Key Dependencies
 
-- `github.com/spf13/afero`: File system abstraction for driver implementations
-- `github.com/fclairamb/go-log`: Logging abstraction supporting multiple frameworks
+- **Go Version**: 1.23.0 minimum (toolchain: go1.24.4)
+- `github.com/spf13/afero v1.14.0`: File system abstraction for driver implementations
+- `github.com/fclairamb/go-log v0.6.0`: Logging abstraction supporting multiple frameworks
+- `github.com/secsy/goftp`: FTP client for testing (forked to github.com/drakkan/goftp)
 
 ## Code Conventions
 
