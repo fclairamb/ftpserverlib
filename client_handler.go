@@ -77,7 +77,6 @@ func getHashName(algo HASHAlgo) string {
 	return hashName
 }
 
-//nolint:maligned
 type clientHandler struct {
 	connectedAt         time.Time       // Date of connection
 	paramsMutex         sync.RWMutex    // mutex to protect the parameters exposed to the library users
