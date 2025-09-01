@@ -266,8 +266,6 @@ func (server *FtpServer) Serve() error {
 // It returns a boolean indicating if the error should stop the server and the error itself or none if it's a standard
 // scenario (e.g. a closed listener)
 func (server *FtpServer) handleAcceptError(err error, tempDelay *time.Duration) (bool, error) {
-	server.Logger.Error("Serve error", "err", err)
-
 	if errOp := (&net.OpError{}); errors.As(err, &errOp) {
 		// This means we just closed the connection and it's OK
 		if errOp.Err.Error() == "use of closed network connection" {
@@ -276,6 +274,8 @@ func (server *FtpServer) handleAcceptError(err error, tempDelay *time.Duration) 
 			return true, nil
 		}
 	}
+
+	server.Logger.Error("Serve error", "err", err)
 
 	// see https://github.com/golang/go/blob/4aa1efed4853ea067d665a952eee77c52faac774/src/net/http/server.go#L3046
 	// & https://github.com/fclairamb/ftpserverlib/pull/352#pullrequestreview-1077459896
