@@ -2,6 +2,7 @@
 package ftpserver
 
 import (
+	"context"
 	"crypto/tls"
 	"errors"
 	"fmt"
@@ -208,7 +209,8 @@ func (server *FtpServer) Listen() error {
 }
 
 func (server *FtpServer) createListener() (net.Listener, error) {
-	listener, err := net.Listen("tcp", server.settings.ListenAddr)
+	lc := &net.ListenConfig{}
+	listener, err := lc.Listen(context.Background(), "tcp", server.settings.ListenAddr)
 	if err != nil {
 		server.Logger.Error("cannot listen on main port", "err", err, "listenAddr", server.settings.ListenAddr)
 

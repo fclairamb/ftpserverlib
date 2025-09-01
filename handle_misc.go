@@ -316,7 +316,7 @@ func (c *clientHandler) handleQUIT(_ string) error {
 	}
 
 	c.writeMessage(StatusClosingControlConn, msg)
-	c.disconnect()
+	_ = c.disconnect()
 	c.reader = nil
 
 	return nil

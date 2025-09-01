@@ -1,6 +1,7 @@
 package ftpserver
 
 import (
+	"context"
 	"crypto/tls"
 	"fmt"
 	"io"
@@ -460,7 +461,8 @@ func TestPerClientTLSTransfer(t *testing.T) {
 
 func TestDirListingBeforeLogin(t *testing.T) {
 	s := NewTestServer(t, false)
-	conn, err := net.DialTimeout("tcp", s.Addr(), 5*time.Second)
+	dialer := &net.Dialer{Timeout: 5 * time.Second}
+	conn, err := dialer.DialContext(context.Background(), "tcp", s.Addr())
 	require.NoError(t, err)
 
 	defer func() {

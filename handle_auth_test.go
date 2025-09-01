@@ -1,6 +1,7 @@
 package ftpserver
 
 import (
+	"context"
 	"crypto/tls"
 	"net"
 	"testing"
@@ -19,7 +20,8 @@ func panicOnError(err error) {
 func TestLoginSuccess(t *testing.T) {
 	server := NewTestServer(t, false)
 	// send a NOOP before the login, this doesn't seems possible using secsy/goftp so use the old way ...
-	conn, err := net.DialTimeout("tcp", server.Addr(), 5*time.Second)
+	dialer := &net.Dialer{Timeout: 5 * time.Second}
+	conn, err := dialer.DialContext(context.Background(), "tcp", server.Addr())
 	require.NoError(t, err)
 
 	defer func() {

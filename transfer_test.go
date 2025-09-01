@@ -2,6 +2,7 @@ package ftpserver
 
 import (
 	"bytes"
+	"context"
 	"crypto/sha256"
 	"crypto/tls"
 	"encoding/hex"
@@ -1104,7 +1105,8 @@ func TestPASVIPMatch(t *testing.T) {
 
 	server := NewTestServer(t, false)
 
-	conn, err := net.DialTimeout("tcp", server.Addr(), 5*time.Second)
+	dialer := &net.Dialer{Timeout: 5 * time.Second}
+	conn, err := dialer.DialContext(context.Background(), "tcp", server.Addr())
 	require.NoError(t, err)
 
 	defer func() {

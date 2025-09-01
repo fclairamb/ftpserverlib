@@ -31,11 +31,11 @@ func TestServerStopDoesNotLogError(t *testing.T) {
 
 	// Start serving in a goroutine
 	var serveErr error
-	var wg sync.WaitGroup
-	wg.Add(1)
+	var waitGroup sync.WaitGroup
+	waitGroup.Add(1)
 
 	go func() {
-		defer wg.Done()
+		defer waitGroup.Done()
 		serveErr = server.Serve()
 	}()
 
@@ -47,7 +47,7 @@ func TestServerStopDoesNotLogError(t *testing.T) {
 	req.NoError(err)
 
 	// Wait for the Serve goroutine to finish
-	wg.Wait()
+	waitGroup.Wait()
 
 	// Serve should return nil (no error) when stopped normally
 	req.NoError(serveErr)
@@ -65,26 +65,26 @@ type MockLogger struct {
 	DebugLogs []string
 }
 
-func (m *MockLogger) Debug(message string, keyvals ...interface{}) {
+func (m *MockLogger) Debug(message string, _ ...interface{}) {
 	m.DebugLogs = append(m.DebugLogs, message)
 }
 
-func (m *MockLogger) Info(message string, keyvals ...interface{}) {
+func (m *MockLogger) Info(message string, _ ...interface{}) {
 	m.InfoLogs = append(m.InfoLogs, message)
 }
 
-func (m *MockLogger) Warn(message string, keyvals ...interface{}) {
+func (m *MockLogger) Warn(message string, _ ...interface{}) {
 	m.WarnLogs = append(m.WarnLogs, message)
 }
 
-func (m *MockLogger) Error(message string, keyvals ...interface{}) {
+func (m *MockLogger) Error(message string, _ ...interface{}) {
 	m.ErrorLogs = append(m.ErrorLogs, message)
 }
 
-func (m *MockLogger) Panic(message string, keyvals ...interface{}) {
+func (m *MockLogger) Panic(message string, _ ...interface{}) {
 	panic(message)
 }
 
-func (m *MockLogger) With(keyvals ...interface{}) log.Logger {
+func (m *MockLogger) With(_ ...interface{}) log.Logger {
 	return m
 }

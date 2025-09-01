@@ -1,6 +1,7 @@
 package ftpserver
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"sync"
@@ -47,7 +48,8 @@ func TestConcurrency(t *testing.T) {
 
 func TestDOS(t *testing.T) {
 	server := NewTestServer(t, true)
-	conn, err := net.DialTimeout("tcp", server.Addr(), 5*time.Second)
+	dialer := &net.Dialer{Timeout: 5 * time.Second}
+	conn, err := dialer.DialContext(context.Background(), "tcp", server.Addr())
 	require.NoError(t, err)
 
 	defer func() {
@@ -149,7 +151,8 @@ func TestConnectionNotAllowed(t *testing.T) {
 	}
 	s := NewTestServerWithTestDriver(t, driver)
 
-	conn, err := net.DialTimeout("tcp", s.Addr(), 5*time.Second)
+	dialer := &net.Dialer{Timeout: 5 * time.Second}
+	conn, err := dialer.DialContext(context.Background(), "tcp", s.Addr())
 	require.NoError(t, err)
 
 	defer func() {

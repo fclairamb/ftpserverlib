@@ -1,6 +1,7 @@
 package ftpserver
 
 import (
+	"context"
 	"errors"
 	"net"
 	"os"
@@ -84,7 +85,8 @@ func newFakeListener(err error) net.Listener {
 func TestCannotListen(t *testing.T) {
 	req := require.New(t)
 
-	portBlockerListener, err := net.Listen("tcp", "127.0.0.1:0")
+	lc := &net.ListenConfig{}
+	portBlockerListener, err := lc.Listen(context.Background(), "tcp", "127.0.0.1:0")
 	req.NoError(err)
 
 	defer func() { req.NoError(portBlockerListener.Close()) }()
@@ -107,7 +109,8 @@ func TestCannotListen(t *testing.T) {
 func TestListenWithBadTLSSettings(t *testing.T) {
 	req := require.New(t)
 
-	portBlockerListener, err := net.Listen("tcp", "127.0.0.1:0")
+	lc := &net.ListenConfig{}
+	portBlockerListener, err := lc.Listen(context.Background(), "tcp", "127.0.0.1:0")
 	req.NoError(err)
 
 	defer func() { req.NoError(portBlockerListener.Close()) }()
