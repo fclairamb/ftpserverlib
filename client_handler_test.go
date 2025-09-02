@@ -1,7 +1,6 @@
 package ftpserver
 
 import (
-	"context"
 	"fmt"
 	"net"
 	"slices"

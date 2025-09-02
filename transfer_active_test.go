@@ -2,7 +2,6 @@
 package ftpserver
 
 import (
-	"context"
 	"net"
 	"regexp"
 	"testing"
