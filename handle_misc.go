@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-var errUnknowHash = errors.New("unknown hash algorithm")
+var errUnknownHash = errors.New("unknown hash algorithm")
 
 func (c *clientHandler) handleAUTH(_ string) error {
 	if tlsConfig, err := c.server.driver.GetTLSConfig(); err == nil {
