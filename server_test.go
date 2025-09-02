@@ -86,7 +86,7 @@ func TestCannotListen(t *testing.T) {
 	req := require.New(t)
 
 	lc := &net.ListenConfig{}
-	portBlockerListener, err := lc.Listen(context.Background(), "tcp", "127.0.0.1:0")
+	portBlockerListener, err := lc.Listen(t.Context(), "tcp", "127.0.0.1:0")
 	req.NoError(err)
 
 	defer func() { req.NoError(portBlockerListener.Close()) }()
@@ -110,7 +110,7 @@ func TestListenWithBadTLSSettings(t *testing.T) {
 	req := require.New(t)
 
 	lc := &net.ListenConfig{}
-	portBlockerListener, err := lc.Listen(context.Background(), "tcp", "127.0.0.1:0")
+	portBlockerListener, err := lc.Listen(t.Context(), "tcp", "127.0.0.1:0")
 	req.NoError(err)
 
 	defer func() { req.NoError(portBlockerListener.Close()) }()
