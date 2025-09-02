@@ -49,7 +49,7 @@ func TestConcurrency(t *testing.T) {
 func TestDOS(t *testing.T) {
 	server := NewTestServer(t, true)
 	dialer := &net.Dialer{Timeout: 5 * time.Second}
-	conn, err := dialer.DialContext(context.Background(), "tcp", server.Addr())
+	conn, err := dialer.DialContext(t.Context(), "tcp", server.Addr())
 	require.NoError(t, err)
 
 	defer func() {
@@ -152,7 +152,7 @@ func TestConnectionNotAllowed(t *testing.T) {
 	s := NewTestServerWithTestDriver(t, driver)
 
 	dialer := &net.Dialer{Timeout: 5 * time.Second}
-	conn, err := dialer.DialContext(context.Background(), "tcp", s.Addr())
+	conn, err := dialer.DialContext(t.Context(), "tcp", s.Addr())
 	require.NoError(t, err)
 
 	defer func() {

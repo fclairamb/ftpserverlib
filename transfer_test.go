@@ -1106,7 +1106,7 @@ func TestPASVIPMatch(t *testing.T) {
 	server := NewTestServer(t, false)
 
 	dialer := &net.Dialer{Timeout: 5 * time.Second}
-	conn, err := dialer.DialContext(context.Background(), "tcp", server.Addr())
+	conn, err := dialer.DialContext(t.Context(), "tcp", server.Addr())
 	require.NoError(t, err)
 
 	defer func() {

@@ -28,7 +28,7 @@ func TestRemoteAddrFormat(t *testing.T) {
 
 func TestActiveTransferFromPort20(t *testing.T) {
 	lc := &net.ListenConfig{}
-	listener, err := lc.Listen(context.Background(), "tcp", ":20")
+	listener, err := lc.Listen(t.Context(), "tcp", ":20")
 	if err != nil {
 		t.Skipf("Binding on port 20 is not supported here: %v", err)
 	}
