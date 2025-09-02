@@ -65,26 +65,26 @@ type MockLogger struct {
 	DebugLogs []string
 }
 
-func (m *MockLogger) Debug(message string, _ ...interface{}) {
+func (m *MockLogger) Debug(message string, _ ...any) {
 	m.DebugLogs = append(m.DebugLogs, message)
 }
 
-func (m *MockLogger) Info(message string, _ ...interface{}) {
+func (m *MockLogger) Info(message string, _ ...any) {
 	m.InfoLogs = append(m.InfoLogs, message)
 }
 
-func (m *MockLogger) Warn(message string, _ ...interface{}) {
+func (m *MockLogger) Warn(message string, _ ...any) {
 	m.WarnLogs = append(m.WarnLogs, message)
 }
 
-func (m *MockLogger) Error(message string, _ ...interface{}) {
+func (m *MockLogger) Error(message string, _ ...any) {
 	m.ErrorLogs = append(m.ErrorLogs, message)
 }
 
-func (m *MockLogger) Panic(message string, _ ...interface{}) {
+func (m *MockLogger) Panic(message string, _ ...any) {
 	panic(message)
 }
 
-func (m *MockLogger) With(_ ...interface{}) log.Logger {
+func (m *MockLogger) With(_ ...any) log.Logger {
 	return m
 }

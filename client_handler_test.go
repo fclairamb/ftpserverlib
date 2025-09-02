@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"slices"
 	"sync"
 	"testing"
 	"time"
@@ -21,7 +22,7 @@ func TestConcurrency(t *testing.T) {
 	waitGroup := sync.WaitGroup{}
 	waitGroup.Add(nbClients)
 
-	for i := 0; i < nbClients; i++ {
+	for range nbClients {
 		go func() {
 			conf := goftp.Config{
 				User:     authUser,
@@ -318,13 +319,7 @@ second line
 }
 
 func isStringInSlice(s string, list []string) bool {
-	for _, c := range list {
-		if s == c {
-			return true
-		}
-	}
-
-	return false
+	return slices.Contains(list, s)
 }
 
 func TestUnknownCommand(t *testing.T) {
@@ -489,7 +484,7 @@ func TestExtraData(t *testing.T) {
 	require.Len(t, info, 1)
 
 	for k, v := range info {
-		ccInfo, ok := v.(map[string]interface{})
+		ccInfo, ok := v.(map[string]any)
 		require.True(t, ok)
 		extra, ok := ccInfo["extra"].(uint32)
 		require.True(t, ok)

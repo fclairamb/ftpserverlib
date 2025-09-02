@@ -1189,7 +1189,7 @@ func TestPassivePortExhaustion(t *testing.T) {
 
 	defer func() { require.NoError(t, raw.Close()) }()
 
-	for i := 0; i < 20; i++ {
+	for range 20 {
 		rc, message, err := raw.SendCommand("PASV")
 		require.NoError(t, err)
 		require.Equal(t, StatusEnteringPASV, rc, message)
