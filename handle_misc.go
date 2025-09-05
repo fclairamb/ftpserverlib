@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-var errUnknowHash = errors.New("unknown hash algorithm")
+var errUnknownHash = errors.New("unknown hash algorithm")
 
 func (c *clientHandler) handleAUTH(_ string) error {
 	if tlsConfig, err := c.server.driver.GetTLSConfig(); err == nil {
@@ -316,7 +316,7 @@ func (c *clientHandler) handleQUIT(_ string) error {
 	}
 
 	c.writeMessage(StatusClosingControlConn, msg)
-	c.disconnect()
+	_ = c.disconnect()
 	c.reader = nil
 
 	return nil

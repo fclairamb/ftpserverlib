@@ -689,7 +689,7 @@ func (c *clientHandler) computeHashForFile(filePath string, algo HASHAlgo, start
 	case HASHAlgoSHA512:
 		chosenHashAlgo = sha512.New()
 	default:
-		return "", errUnknowHash
+		return "", errUnknownHash
 	}
 
 	file, err = c.getFileHandle(filePath, os.O_RDONLY, start)

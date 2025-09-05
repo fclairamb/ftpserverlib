@@ -11,7 +11,7 @@ func (c *clientHandler) handleUSER(user string) error {
 		err := verifier.PreAuthUser(c, user)
 		if err != nil {
 			c.writeMessage(StatusNotLoggedIn, fmt.Sprintf("User rejected: %v", err))
-			c.disconnect()
+			_ = c.disconnect()
 
 			return nil
 		}
@@ -19,7 +19,7 @@ func (c *clientHandler) handleUSER(user string) error {
 
 	if c.isTLSRequired() && !c.HasTLSForControl() {
 		c.writeMessage(StatusServiceNotAvailable, "TLS is required")
-		c.disconnect()
+		_ = c.disconnect()
 
 		return nil
 	}
@@ -52,7 +52,7 @@ func (c *clientHandler) handleUserTLS(user string) bool {
 	driver, err := verifier.VerifyConnection(c, user, tlsConn)
 	if err != nil {
 		c.writeMessage(StatusNotLoggedIn, fmt.Sprintf("TLS verification failed: %v", err))
-		c.disconnect()
+		_ = c.disconnect()
 
 		return true
 	}
@@ -82,14 +82,14 @@ func (c *clientHandler) handlePASS(param string) error {
 	switch {
 	case err == nil && c.driver == nil:
 		c.writeMessage(StatusNotLoggedIn, "Unexpected exception (driver is nil)")
-		c.disconnect()
+		_ = c.disconnect()
 	case err != nil:
 		if msg == "" {
 			msg = fmt.Sprintf("Authentication error: %v", err)
 		}
 
 		c.writeMessage(StatusNotLoggedIn, msg)
-		c.disconnect()
+		_ = c.disconnect()
 	default: // err == nil && c.driver != nil
 		if msg == "" {
 			msg = "Password ok, continue"

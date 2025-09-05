@@ -1104,7 +1104,8 @@ func TestPASVIPMatch(t *testing.T) {
 
 	server := NewTestServer(t, false)
 
-	conn, err := net.DialTimeout("tcp", server.Addr(), 5*time.Second)
+	dialer := &net.Dialer{Timeout: 5 * time.Second}
+	conn, err := dialer.DialContext(t.Context(), "tcp", server.Addr())
 	require.NoError(t, err)
 
 	defer func() {
@@ -1187,7 +1188,7 @@ func TestPassivePortExhaustion(t *testing.T) {
 
 	defer func() { require.NoError(t, raw.Close()) }()
 
-	for i := 0; i < 20; i++ {
+	for range 20 {
 		rc, message, err := raw.SendCommand("PASV")
 		require.NoError(t, err)
 		require.Equal(t, StatusEnteringPASV, rc, message)

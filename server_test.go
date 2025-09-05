@@ -84,7 +84,8 @@ func newFakeListener(err error) net.Listener {
 func TestCannotListen(t *testing.T) {
 	req := require.New(t)
 
-	portBlockerListener, err := net.Listen("tcp", "127.0.0.1:0")
+	lc := &net.ListenConfig{}
+	portBlockerListener, err := lc.Listen(t.Context(), "tcp", "127.0.0.1:0")
 	req.NoError(err)
 
 	defer func() { req.NoError(portBlockerListener.Close()) }()
@@ -107,7 +108,8 @@ func TestCannotListen(t *testing.T) {
 func TestListenWithBadTLSSettings(t *testing.T) {
 	req := require.New(t)
 
-	portBlockerListener, err := net.Listen("tcp", "127.0.0.1:0")
+	lc := &net.ListenConfig{}
+	portBlockerListener, err := lc.Listen(t.Context(), "tcp", "127.0.0.1:0")
 	req.NoError(err)
 
 	defer func() { req.NoError(portBlockerListener.Close()) }()
@@ -173,7 +175,6 @@ func TestQuoteDoubling(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			require.Equal(t, tt.want, quoteDoubling(tt.args.s))
 		})
