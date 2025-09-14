@@ -460,7 +460,8 @@ func TestPerClientTLSTransfer(t *testing.T) {
 
 func TestDirListingBeforeLogin(t *testing.T) {
 	s := NewTestServer(t, false)
-	conn, err := net.DialTimeout("tcp", s.Addr(), 5*time.Second)
+	dialer := &net.Dialer{Timeout: 5 * time.Second}
+	conn, err := dialer.DialContext(t.Context(), "tcp", s.Addr())
 	require.NoError(t, err)
 
 	defer func() {
