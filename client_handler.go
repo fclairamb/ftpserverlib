@@ -2,6 +2,7 @@ package ftpserver
 
 import (
 	"bufio"
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"io"
@@ -257,6 +258,15 @@ func (c *clientHandler) HasTLSForTransfers() bool {
 	defer c.paramsMutex.RUnlock()
 
 	return c.transferTLS
+}
+
+func (c *clientHandler) GetTLSCiphersuite() (uint16, error) {
+	conn := c.conn
+	tlsConn, ok := conn.(*tls.Conn)
+	if !ok {
+		return 0, errors.New("GetTLSCiphersuite called on a nonTLS connection")
+	}
+	return tlsConn.ConnectionState().CipherSuite, nil
 }
 
 func (c *clientHandler) SetExtra(extra any) {
