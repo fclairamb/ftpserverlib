@@ -10,7 +10,7 @@ require (
 	github.com/secsy/goftp v0.0.0-20200609142545-aa2de14babf4
 	github.com/spf13/afero v1.15.0
 	github.com/stretchr/testify v1.11.1
-	golang.org/x/sys v0.36.0
+	golang.org/x/sys v0.37.0
 )
 
 require (
