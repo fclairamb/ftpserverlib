@@ -189,7 +189,7 @@ type ClientContext interface {
 	HasTLSForTransfers() bool
 
 	// GetTlSCipherSuite returns ID
-	GetTlSCipherSuite() (uint16, error)
+	GetTLSCipherSuite() (uint16, error)
 
 	// GetLastCommand returns the last received command
 	GetLastCommand() string

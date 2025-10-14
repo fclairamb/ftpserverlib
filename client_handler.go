@@ -260,7 +260,7 @@ func (c *clientHandler) HasTLSForTransfers() bool {
 	return c.transferTLS
 }
 
-func (c *clientHandler) GetTLSCiphersuite() (uint16, error) {
+func (c *clientHandler) GetTLSCipherSuite() (uint16, error) {
 	conn := c.conn
 	tlsConn, ok := conn.(*tls.Conn)
 	if !ok {
