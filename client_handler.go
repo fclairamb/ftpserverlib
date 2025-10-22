@@ -52,6 +52,7 @@ var (
 	errNoTransferConnection  = errors.New("unable to open transfer: no transfer connection")
 	errTLSRequired           = errors.New("unable to open transfer: TLS is required")
 	errInvalidTLSRequirement = errors.New("invalid TLS requirement")
+	errNonTLSConnection      = errors.New("GetTLSCiphersuite called on a nonTLS connection")
 )
 
 func getHashMapping() map[string]HASHAlgo {
@@ -264,8 +265,9 @@ func (c *clientHandler) GetTLSCipherSuite() (uint16, error) {
 	conn := c.conn
 	tlsConn, ok := conn.(*tls.Conn)
 	if !ok {
-		return 0, errors.New("GetTLSCiphersuite called on a nonTLS connection")
+		return 0, errNonTLSConnection
 	}
+
 	return tlsConn.ConnectionState().CipherSuite, nil
 }
 
