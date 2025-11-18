@@ -476,6 +476,25 @@ func (c *clientHandler) handleCommandsStreamError(err error) {
 	var errNetError net.Error
 	if errors.As(err, &errNetError) { //nolint:nestif // too much effort to change for now
 		if errNetError.Timeout() {
+			// Check if there's an active data transfer before closing the control connection
+			c.transferMu.Lock()
+			hasActiveTransfer := c.isTransferOpen
+			c.transferMu.Unlock()
+
+			if hasActiveTransfer {
+				// If there's an active data transfer, extend the deadline and continue
+				extendedDeadline := time.Now().Add(time.Duration(time.Second.Nanoseconds() * int64(c.server.settings.IdleTimeout)))
+				if errSet := c.conn.SetDeadline(extendedDeadline); errSet != nil {
+					c.logger.Error("Could not extend read deadline during active transfer", "err", errSet)
+				}
+
+				if c.debug {
+					c.logger.Debug("Idle timeout occurred during active transfer, extending deadline")
+				}
+
+				return
+			}
+
 			// We have to extend the deadline now
 			if errSet := c.conn.SetDeadline(time.Now().Add(time.Minute)); errSet != nil {
 				c.logger.Error("Could not set read deadline", "err", errSet)
