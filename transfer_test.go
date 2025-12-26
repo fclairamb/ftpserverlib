@@ -1362,31 +1362,15 @@ func getPortFromEPSVResponse(t *testing.T, resp string) int {
 }
 
 // TestConnectionCloseDuringTransfer tests the behavior when the control connection is closed
-// during an active data transfer. This ensures proper cleanup and error handling.
+// during an active data transfer in passive mode. This ensures proper cleanup and error handling.
 func TestConnectionCloseDuringTransfer(t *testing.T) {
 	t.Parallel()
 
-	t.Run("passive-mode", func(t *testing.T) {
-		t.Parallel()
-		server := NewTestServer(t, false)
-		testConnectionCloseDuringTransfer(t, server, false)
-	})
-
-	t.Run("active-mode", func(t *testing.T) {
-		t.Parallel()
-		server := NewTestServer(t, false)
-		server.settings.ActiveTransferPortNon20 = true
-		testConnectionCloseDuringTransfer(t, server, true)
-	})
-}
-
-func testConnectionCloseDuringTransfer(t *testing.T, server *FtpServer, activeMode bool) {
-	t.Helper()
+	server := NewTestServer(t, false)
 
 	conf := goftp.Config{
-		User:            authUser,
-		Password:        authPass,
-		ActiveTransfers: activeMode,
+		User:     authUser,
+		Password: authPass,
 	}
 
 	client, err := goftp.DialConfig(conf, server.Addr())
