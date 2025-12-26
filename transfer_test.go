@@ -1394,7 +1394,7 @@ func testConnectionClosureDuringTransfer(t *testing.T, activeMode bool, upload b
 	client, file := setupConnectionClosureTest(t, activeMode, upload)
 	defer func() { panicOnError(client.Close()) }()
 
-	raw, dataConn := initiateTransferAndGetDataConn(t, client, file, upload)
+	raw, dataConn := initiateTransferAndGetDataConn(t, client, upload)
 	defer func() { require.NoError(t, raw.Close()) }()
 
 	// Perform partial transfer and close connection
@@ -1471,8 +1471,7 @@ func setupConnectionClosureTest(t *testing.T, activeMode bool, upload bool) (*go
 	return client, file
 }
 
-func initiateTransferAndGetDataConn(t *testing.T, client *goftp.Client, file *os.File,
-	upload bool) (goftp.RawConn, net.Conn) {
+func initiateTransferAndGetDataConn(t *testing.T, client *goftp.Client, upload bool) (goftp.RawConn, net.Conn) {
 	t.Helper()
 
 	raw, err := client.OpenRawConn()
