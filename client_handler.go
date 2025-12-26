@@ -455,9 +455,9 @@ func (c *clientHandler) readCommand() bool {
 	}
 
 	if err != nil {
-		c.handleCommandsStreamError(err)
+		shouldDisconnect := c.handleCommandsStreamError(err)
 
-		return true
+		return shouldDisconnect
 	}
 
 	line := string(lineSlice)
@@ -471,11 +471,31 @@ func (c *clientHandler) readCommand() bool {
 	return false
 }
 
-func (c *clientHandler) handleCommandsStreamError(err error) {
+func (c *clientHandler) handleCommandsStreamError(err error) bool {
 	// florent(2018-01-14): #58: IDLE timeout: Adding some code to deal with the deadline
 	var errNetError net.Error
 	if errors.As(err, &errNetError) { //nolint:nestif // too much effort to change for now
 		if errNetError.Timeout() {
+			// Check if there's an active data transfer before closing the control connection
+			c.transferMu.Lock()
+			hasActiveTransfer := c.isTransferOpen
+			c.transferMu.Unlock()
+
+			if hasActiveTransfer {
+				// If there's an active data transfer, extend the deadline and continue
+				extendedDeadline := time.Now().Add(time.Duration(time.Second.Nanoseconds() * int64(c.server.settings.IdleTimeout)))
+				if errSet := c.conn.SetDeadline(extendedDeadline); errSet != nil {
+					c.logger.Error("Could not extend read deadline during active transfer", "err", errSet)
+				}
+
+				if c.debug {
+					c.logger.Debug("Idle timeout occurred during active transfer, extending deadline")
+				}
+
+				// Don't disconnect - the transfer is still active
+				return false
+			}
+
 			// We have to extend the deadline now
 			if errSet := c.conn.SetDeadline(time.Now().Add(time.Minute)); errSet != nil {
 				c.logger.Error("Could not set read deadline", "err", errSet)
@@ -490,19 +510,23 @@ func (c *clientHandler) handleCommandsStreamError(err error) {
 				c.logger.Error("Flush error", "err", errFlush)
 			}
 
-			return
+			return true
 		}
 
 		c.logger.Error("Network error", "err", err)
-	} else {
-		if errors.Is(err, io.EOF) {
-			if c.debug {
-				c.logger.Debug("Client disconnected", "clean", false)
-			}
-		} else {
-			c.logger.Error("Read error", "err", err)
-		}
+
+		return true
 	}
+
+	if errors.Is(err, io.EOF) {
+		if c.debug {
+			c.logger.Debug("Client disconnected", "clean", false)
+		}
+	} else {
+		c.logger.Error("Read error", "err", err)
+	}
+
+	return true
 }
 
 // handleCommand takes care of executing the received line
