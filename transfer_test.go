@@ -1360,3 +1360,82 @@ func getPortFromEPSVResponse(t *testing.T, resp string) int {
 
 	return port
 }
+
+// TestConnectionCloseDuringTransfer tests the behavior when the control connection is closed
+// during an active data transfer. This ensures proper cleanup and error handling.
+func TestConnectionCloseDuringTransfer(t *testing.T) {
+	t.Parallel()
+
+	t.Run("passive-mode", func(t *testing.T) {
+		t.Parallel()
+		server := NewTestServer(t, false)
+		testConnectionCloseDuringTransfer(t, server, false)
+	})
+
+	t.Run("active-mode", func(t *testing.T) {
+		t.Parallel()
+		server := NewTestServer(t, false)
+		server.settings.ActiveTransferPortNon20 = true
+		testConnectionCloseDuringTransfer(t, server, true)
+	})
+}
+
+func testConnectionCloseDuringTransfer(t *testing.T, server *FtpServer, activeMode bool) {
+	t.Helper()
+
+	conf := goftp.Config{
+		User:            authUser,
+		Password:        authPass,
+		ActiveTransfers: activeMode,
+	}
+
+	client, err := goftp.DialConfig(conf, server.Addr())
+	require.NoError(t, err, "Couldn't connect")
+
+	// Upload a file first so we have something to download
+	file := createTemporaryFile(t, 10*1024*1024) // 10MB file
+	err = client.Store("large-file.bin", file)
+	require.NoError(t, err, "Failed to upload file")
+
+	// Open a raw connection to have more control
+	raw, err := client.OpenRawConn()
+	require.NoError(t, err)
+
+	// Prepare data connection
+	_, err = raw.PrepareDataConn()
+	require.NoError(t, err)
+
+	// Start the RETR command
+	returnCode, response, err := raw.SendCommand("RETR large-file.bin")
+	require.NoError(t, err)
+	require.Equal(t, StatusFileStatusOK, returnCode, response)
+
+	// Give the transfer a moment to start
+	time.Sleep(50 * time.Millisecond)
+
+	// Now close the raw connection abruptly during the transfer
+	// This simulates a network disconnection or client crash
+	err = raw.Close()
+	require.NoError(t, err)
+
+	// Close the main client connection as well
+	err = client.Close()
+	// We expect an error here since the connection is already closed/broken
+	// but we don't want to fail the test - this is expected behavior
+
+	// Give the server time to clean up
+	time.Sleep(100 * time.Millisecond)
+
+	// Verify we can establish a new connection and the server is still functional
+	newClient, err := goftp.DialConfig(conf, server.Addr())
+	require.NoError(t, err, "Server should still be functional after connection close during transfer")
+
+	defer func() {
+		err := newClient.Close()
+		require.NoError(t, err)
+	}()
+
+	// Verify the file is still there and accessible
+	_, err = newClient.Stat("large-file.bin")
+	require.NoError(t, err, "File should still be accessible after interrupted transfer")
+}
