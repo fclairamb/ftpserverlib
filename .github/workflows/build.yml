@@ -10,12 +10,12 @@ on:
   pull_request:
 
 permissions:
-    # Required: allow read access to the content for analysis.
-    contents: read
-    # Optional: allow read access to pull request. Use with `only-new-issues` option.
-    pull-requests: read
-    # Optional: Allow write access to checks to allow the action to annotate code in the PR.
-    checks: write
+  # Required: allow read access to the content for analysis.
+  contents: read
+  # Optional: allow read access to pull request. Use with `only-new-issues` option.
+  pull-requests: read
+  # Optional: Allow write access to checks to allow the action to annotate code in the PR.
+  checks: write
 
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
@@ -26,27 +26,27 @@ jobs:
 
     strategy:
       matrix:
-        go: [ '1.25', '1.24' ]
+        go: ["1.25", "1.24"]
         include:
-          - go: '1.25'
+          - go: "1.25"
             lint: true
-  
+
     # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
       # Checks-out your repository under $GITHUB_WORKSPACE
-      - uses: actions/checkout@v5.0.0
+      - uses: actions/checkout@v6.0.1
 
       # Running golangci-lint
       - name: Linting
         if: matrix.lint
-        uses: golangci/golangci-lint-action@v8.0.0
+        uses: golangci/golangci-lint-action@v9.2.0
         with:
           version: v2.4.0
           only-new-issues: true
 
       # Install Go
       - name: Setup go
-        uses: actions/setup-go@v6.0.0
+        uses: actions/setup-go@v6.1.0
         with:
           go-version: ${{ matrix.go }}
 
@@ -58,7 +58,7 @@ jobs:
           go test -parallel 20 -v -race -coverprofile=coverage.txt -covermode=atomic ./...
 
       - name: Codecov
-        uses: codecov/codecov-action@v5.5.1
+        uses: codecov/codecov-action@v5.5.2
         with:
           fail_ci_if_error: true # optional (default = false)
         env:
