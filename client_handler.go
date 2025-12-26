@@ -5,12 +5,11 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net"
 	"strings"
 	"sync"
 	"time"
-
-	log "github.com/fclairamb/go-log"
 )
 
 // HASHAlgo is the enumerable that represents the supported HASH algorithms.
@@ -88,7 +87,7 @@ type clientHandler struct {
 	clnt                string          // Identified client
 	command             string          // Command received on the connection
 	ctxRnfr             string          // Rename from
-	logger              log.Logger      // Client handler logging
+	logger              *slog.Logger    // Client handler logging
 	transferWg          sync.WaitGroup  // wait group for command that open a transfer connection
 	transfer            transferHandler // Transfer connection (passive or active)s
 	extra               any             // Additional application-specific data

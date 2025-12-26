@@ -333,7 +333,8 @@ func (c *clientHandler) handleABOR(param string) error {
 
 		if err := c.closeTransfer(); err != nil {
 			c.logger.Warn(
-				"Problem aborting transfer for command", param,
+				"Problem aborting transfer for command",
+				"command", param,
 				"err", err,
 			)
 		}

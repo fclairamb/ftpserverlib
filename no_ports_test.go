@@ -1,10 +1,11 @@
 package ftpserver
 
 import (
+	"io"
+	"log/slog"
 	"net"
 	"testing"
 
-	lognoop "github.com/fclairamb/go-log/noop"
 	"github.com/stretchr/testify/require"
 )
 
@@ -27,7 +28,7 @@ func TestPortRangeFetchNextFailure(t *testing.T) {
 	handler := &clientHandler{
 		server: server,
 		driver: driver,
-		logger: lognoop.NewNoOpLogger(),
+		logger: slog.New(slog.NewTextHandler(io.Discard, nil)), //nolint:sloglint // DiscardHandler requires Go 1.23+
 	}
 
 	// Set the mock port mapping
