@@ -1391,105 +1391,24 @@ func TestConnectionClosureDuringTransfer(t *testing.T) {
 func testConnectionClosureDuringTransfer(t *testing.T, activeMode bool, upload bool) {
 	t.Helper()
 
-	server := NewTestServer(t, false)
-	server.settings.ActiveTransferPortNon20 = true
-
-	conf := goftp.Config{
-		User:            authUser,
-		Password:        authPass,
-		ActiveTransfers: activeMode,
-	}
-
-	client, err := goftp.DialConfig(conf, server.Addr())
-	require.NoError(t, err, "Couldn't connect")
-
+	client, file := setupConnectionClosureTest(t, activeMode, upload)
 	defer func() { panicOnError(client.Close()) }()
 
-	// Create a large file (5MB) to ensure we have time to close the connection mid-transfer
-	file := createTemporaryFile(t, 5*1024*1024)
-
-	if upload {
-		// For upload test, we need to first upload the file normally
-		// Then we'll test closing during a second upload attempt
-		ftpUpload(t, client, file, "largefile.bin")
-		_, err = file.Seek(0, 0)
-		require.NoError(t, err)
-	} else {
-		// For download test, upload the file first so we can download it
-		ftpUpload(t, client, file, "largefile.bin")
-	}
-
-	// Open raw connection to have more control
-	raw, err := client.OpenRawConn()
-	require.NoError(t, err)
-
+	raw, dataConn := initiateTransferAndGetDataConn(t, client, file, upload)
 	defer func() { require.NoError(t, raw.Close()) }()
 
-	// Prepare data connection
-	dcGetter, err := raw.PrepareDataConn()
-	require.NoError(t, err)
-
-	// Send the command
-	var returnCode int
-	var response string
-
-	if upload {
-		returnCode, response, err = raw.SendCommand("STOR testclose.bin")
-	} else {
-		returnCode, response, err = raw.SendCommand("RETR largefile.bin")
-	}
-
-	require.NoError(t, err)
-	require.Equal(t, StatusFileStatusOK, returnCode, response)
-
-	// Get the data connection
-	dataConn, err := dcGetter()
-	require.NoError(t, err)
-
+	// Perform partial transfer and close connection
 	if upload {
 		performPartialUpload(t, file, dataConn)
 	} else {
 		performPartialDownload(dataConn)
 	}
 
-	// Close the data connection abruptly mid-transfer
-	err = dataConn.Close()
+	err := dataConn.Close()
 	require.NoError(t, err)
 
-	// The server should detect the connection closure and respond appropriately
-	// We expect either a transfer aborted message or a connection close error
-	returnCode, response, err = raw.ReadResponse()
-
-	// The server should return an error status since the transfer was interrupted
-	// Valid responses could be StatusActionAborted, StatusClosingDataConn, or StatusActionNotTaken
-	if err == nil {
-		// If we got a response, it should indicate the transfer failed or was aborted
-		validStatuses := []int{
-			StatusActionAborted,
-			StatusClosingDataConn,
-			StatusActionNotTaken,
-			StatusTransferAborted,
-		}
-
-		found := false
-		for _, status := range validStatuses {
-			if returnCode == status {
-				found = true
-
-				break
-			}
-		}
-
-		if !found {
-			t.Logf("Unexpected status code: %d, response: %s", returnCode, response)
-		}
-	}
-	// If err != nil, the connection was closed which is also acceptable
-
-	// Verify we can still use the control connection
-	returnCode, _, err = raw.SendCommand("NOOP")
-	require.NoError(t, err)
-	require.Equal(t, StatusOK, returnCode)
+	// Verify server response and connection state
+	verifyTransferInterruption(t, raw)
 }
 
 func performPartialUpload(t *testing.T, file *os.File, dataConn net.Conn) {
@@ -1520,4 +1439,97 @@ func performPartialDownload(dataConn net.Conn) {
 			break
 		}
 	}
+}
+
+func setupConnectionClosureTest(t *testing.T, activeMode bool, upload bool) (*goftp.Client, *os.File) {
+	t.Helper()
+
+	server := NewTestServer(t, false)
+	server.settings.ActiveTransferPortNon20 = true
+
+	conf := goftp.Config{
+		User:            authUser,
+		Password:        authPass,
+		ActiveTransfers: activeMode,
+	}
+
+	client, err := goftp.DialConfig(conf, server.Addr())
+	require.NoError(t, err, "Couldn't connect")
+
+	// Create a large file (5MB) to ensure we have time to close the connection mid-transfer
+	file := createTemporaryFile(t, 5*1024*1024)
+
+	// Upload the file for both upload and download tests
+	ftpUpload(t, client, file, "largefile.bin")
+
+	if upload {
+		// Reset file position for upload test
+		_, err = file.Seek(0, 0)
+		require.NoError(t, err)
+	}
+
+	return client, file
+}
+
+func initiateTransferAndGetDataConn(t *testing.T, client *goftp.Client, file *os.File,
+	upload bool) (goftp.RawConn, net.Conn) {
+	t.Helper()
+
+	raw, err := client.OpenRawConn()
+	require.NoError(t, err)
+
+	dcGetter, err := raw.PrepareDataConn()
+	require.NoError(t, err)
+
+	// Send the appropriate command
+	var cmd string
+	if upload {
+		cmd = "STOR testclose.bin"
+	} else {
+		cmd = "RETR largefile.bin"
+	}
+
+	returnCode, response, err := raw.SendCommand(cmd)
+	require.NoError(t, err)
+	require.Equal(t, StatusFileStatusOK, returnCode, response)
+
+	dataConn, err := dcGetter()
+	require.NoError(t, err)
+
+	return raw, dataConn
+}
+
+func verifyTransferInterruption(t *testing.T, raw goftp.RawConn) {
+	t.Helper()
+
+	// The server should detect the connection closure and respond appropriately
+	returnCode, response, err := raw.ReadResponse()
+
+	// Valid responses indicating transfer was interrupted
+	if err == nil {
+		validStatuses := []int{
+			StatusActionAborted,
+			StatusClosingDataConn,
+			StatusActionNotTaken,
+			StatusTransferAborted,
+		}
+
+		found := false
+		for _, status := range validStatuses {
+			if returnCode == status {
+				found = true
+
+				break
+			}
+		}
+
+		if !found {
+			t.Logf("Unexpected status code: %d, response: %s", returnCode, response)
+		}
+	}
+
+	// Verify we can still use the control connection
+	returnCode, _, err = raw.SendCommand("NOOP")
+	require.NoError(t, err)
+	require.Equal(t, StatusOK, returnCode)
 }
