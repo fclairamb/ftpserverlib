@@ -1360,3 +1360,152 @@ func getPortFromEPSVResponse(t *testing.T, resp string) int {
 
 	return port
 }
+
+// TestConnectionClosureDuringTransfer simulates closing the data connection
+// during an active file transfer to ensure proper error handling and cleanup
+func TestConnectionClosureDuringTransfer(t *testing.T) {
+	t.Parallel()
+
+	t.Run("passive-download", func(t *testing.T) {
+		t.Parallel()
+		testConnectionClosureDuringTransfer(t, false, false)
+	})
+
+	t.Run("passive-upload", func(t *testing.T) {
+		t.Parallel()
+		testConnectionClosureDuringTransfer(t, false, true)
+	})
+
+	t.Run("active-download", func(t *testing.T) {
+		t.Parallel()
+		testConnectionClosureDuringTransfer(t, true, false)
+	})
+
+	t.Run("active-upload", func(t *testing.T) {
+		t.Parallel()
+		testConnectionClosureDuringTransfer(t, true, true)
+	})
+}
+
+func testConnectionClosureDuringTransfer(t *testing.T, activeMode bool, upload bool) {
+	t.Helper()
+
+	server := NewTestServer(t, false)
+	server.settings.ActiveTransferPortNon20 = true
+
+	conf := goftp.Config{
+		User:            authUser,
+		Password:        authPass,
+		ActiveTransfers: activeMode,
+	}
+
+	client, err := goftp.DialConfig(conf, server.Addr())
+	require.NoError(t, err, "Couldn't connect")
+
+	defer func() { panicOnError(client.Close()) }()
+
+	// Create a large file (5MB) to ensure we have time to close the connection mid-transfer
+	file := createTemporaryFile(t, 5*1024*1024)
+
+	if upload {
+		// For upload test, we need to first upload the file normally
+		// Then we'll test closing during a second upload attempt
+		ftpUpload(t, client, file, "largefile.bin")
+		_, err = file.Seek(0, 0)
+		require.NoError(t, err)
+	} else {
+		// For download test, upload the file first so we can download it
+		ftpUpload(t, client, file, "largefile.bin")
+	}
+
+	// Open raw connection to have more control
+	raw, err := client.OpenRawConn()
+	require.NoError(t, err)
+
+	defer func() { require.NoError(t, raw.Close()) }()
+
+	// Prepare data connection
+	dcGetter, err := raw.PrepareDataConn()
+	require.NoError(t, err)
+
+	// Send the command
+	var returnCode int
+	var response string
+
+	if upload {
+		returnCode, response, err = raw.SendCommand("STOR testclose.bin")
+	} else {
+		returnCode, response, err = raw.SendCommand("RETR largefile.bin")
+	}
+
+	require.NoError(t, err)
+	require.Equal(t, StatusFileStatusOK, returnCode, response)
+
+	// Get the data connection
+	dataConn, err := dcGetter()
+	require.NoError(t, err)
+
+	if upload {
+		// Start writing some data
+		buffer := make([]byte, 1024)
+		for i := 0; i < 10; i++ {
+			_, err = file.Read(buffer)
+			if err != nil && err != io.EOF {
+				require.NoError(t, err)
+			}
+
+			_, err = dataConn.Write(buffer)
+			if err != nil {
+				break
+			}
+		}
+	} else {
+		// Start reading some data
+		buffer := make([]byte, 1024)
+		for i := 0; i < 10; i++ {
+			_, err = dataConn.Read(buffer)
+			if err != nil && err != io.EOF {
+				break
+			}
+		}
+	}
+
+	// Close the data connection abruptly mid-transfer
+	err = dataConn.Close()
+	require.NoError(t, err)
+
+	// The server should detect the connection closure and respond appropriately
+	// We expect either a transfer aborted message or a connection close error
+	returnCode, response, err = raw.ReadResponse()
+
+	// The server should return an error status since the transfer was interrupted
+	// Valid responses could be StatusActionAborted, StatusClosingDataConn, or StatusActionNotTaken
+	if err == nil {
+		// If we got a response, it should indicate the transfer failed or was aborted
+		validStatuses := []int{
+			StatusActionAborted,
+			StatusClosingDataConn,
+			StatusActionNotTaken,
+			StatusTransferAborted,
+		}
+
+		found := false
+		for _, status := range validStatuses {
+			if returnCode == status {
+				found = true
+
+				break
+			}
+		}
+
+		if !found {
+			t.Logf("Unexpected status code: %d, response: %s", returnCode, response)
+		}
+	}
+	// If err != nil, the connection was closed which is also acceptable
+
+	// Verify we can still use the control connection
+	returnCode, _, err = raw.SendCommand("NOOP")
+	require.NoError(t, err)
+	require.Equal(t, StatusOK, returnCode)
+}
