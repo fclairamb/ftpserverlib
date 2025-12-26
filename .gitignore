@@ -5,4 +5,4 @@ ftpserver
 debug
 __debug_bin*
 *.toml
-.opencode/
+coverage.txt
