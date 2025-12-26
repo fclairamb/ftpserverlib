@@ -455,9 +455,9 @@ func (c *clientHandler) readCommand() bool {
 	}
 
 	if err != nil {
-		c.handleCommandsStreamError(err)
+		shouldDisconnect := c.handleCommandsStreamError(err)
 
-		return true
+		return shouldDisconnect
 	}
 
 	line := string(lineSlice)
@@ -471,7 +471,7 @@ func (c *clientHandler) readCommand() bool {
 	return false
 }
 
-func (c *clientHandler) handleCommandsStreamError(err error) {
+func (c *clientHandler) handleCommandsStreamError(err error) bool {
 	// florent(2018-01-14): #58: IDLE timeout: Adding some code to deal with the deadline
 	var errNetError net.Error
 	if errors.As(err, &errNetError) { //nolint:nestif // too much effort to change for now
@@ -492,7 +492,8 @@ func (c *clientHandler) handleCommandsStreamError(err error) {
 					c.logger.Debug("Idle timeout occurred during active transfer, extending deadline")
 				}
 
-				return
+				// Don't disconnect - the transfer is still active
+				return false
 			}
 
 			// We have to extend the deadline now
@@ -509,19 +510,23 @@ func (c *clientHandler) handleCommandsStreamError(err error) {
 				c.logger.Error("Flush error", "err", errFlush)
 			}
 
-			return
+			return true
 		}
 
 		c.logger.Error("Network error", "err", err)
-	} else {
-		if errors.Is(err, io.EOF) {
-			if c.debug {
-				c.logger.Debug("Client disconnected", "clean", false)
-			}
-		} else {
-			c.logger.Error("Read error", "err", err)
-		}
+
+		return true
 	}
+
+	if errors.Is(err, io.EOF) {
+		if c.debug {
+			c.logger.Debug("Client disconnected", "clean", false)
+		}
+	} else {
+		c.logger.Error("Read error", "err", err)
+	}
+
+	return true
 }
 
 // handleCommand takes care of executing the received line
