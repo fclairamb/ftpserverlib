@@ -1419,7 +1419,7 @@ func testConnectionCloseDuringTransfer(t *testing.T, server *FtpServer, activeMo
 	require.NoError(t, err)
 
 	// Close the main client connection as well
-	err = client.Close()
+	_ = client.Close()
 	// We expect an error here since the connection is already closed/broken
 	// but we don't want to fail the test - this is expected behavior
 
@@ -1431,7 +1431,7 @@ func testConnectionCloseDuringTransfer(t *testing.T, server *FtpServer, activeMo
 	require.NoError(t, err, "Server should still be functional after connection close during transfer")
 
 	defer func() {
-		err := newClient.Close()
+		err = newClient.Close()
 		require.NoError(t, err)
 	}()
 
