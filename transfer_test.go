@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"crypto/tls"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io"
 	"math/rand"
@@ -1446,28 +1447,9 @@ func testConnectionClosureDuringTransfer(t *testing.T, activeMode bool, upload b
 	require.NoError(t, err)
 
 	if upload {
-		// Start writing some data
-		buffer := make([]byte, 1024)
-		for i := 0; i < 10; i++ {
-			_, err = file.Read(buffer)
-			if err != nil && err != io.EOF {
-				require.NoError(t, err)
-			}
-
-			_, err = dataConn.Write(buffer)
-			if err != nil {
-				break
-			}
-		}
+		performPartialUpload(t, file, dataConn)
 	} else {
-		// Start reading some data
-		buffer := make([]byte, 1024)
-		for i := 0; i < 10; i++ {
-			_, err = dataConn.Read(buffer)
-			if err != nil && err != io.EOF {
-				break
-			}
-		}
+		performPartialDownload(dataConn)
 	}
 
 	// Close the data connection abruptly mid-transfer
@@ -1508,4 +1490,34 @@ func testConnectionClosureDuringTransfer(t *testing.T, activeMode bool, upload b
 	returnCode, _, err = raw.SendCommand("NOOP")
 	require.NoError(t, err)
 	require.Equal(t, StatusOK, returnCode)
+}
+
+func performPartialUpload(t *testing.T, file *os.File, dataConn net.Conn) {
+	t.Helper()
+	// Start writing some data
+	buffer := make([]byte, 1024)
+
+	for i := 0; i < 10; i++ {
+		_, err := file.Read(buffer)
+		if err != nil && !errors.Is(err, io.EOF) {
+			require.NoError(t, err)
+		}
+
+		_, err = dataConn.Write(buffer)
+		if err != nil {
+			break
+		}
+	}
+}
+
+func performPartialDownload(dataConn net.Conn) {
+	// Start reading some data
+	buffer := make([]byte, 1024)
+
+	for i := 0; i < 10; i++ {
+		_, err := dataConn.Read(buffer)
+		if err != nil && !errors.Is(err, io.EOF) {
+			break
+		}
+	}
 }
