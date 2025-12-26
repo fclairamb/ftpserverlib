@@ -2,13 +2,14 @@ package ftpserver
 
 import (
 	"errors"
+	"io"
+	"log/slog"
 	"net"
 	"os"
 	"syscall"
 	"testing"
 	"time"
 
-	lognoop "github.com/fclairamb/go-log/noop"
 	"github.com/stretchr/testify/require"
 )
 
@@ -91,7 +92,7 @@ func TestCannotListen(t *testing.T) {
 	defer func() { req.NoError(portBlockerListener.Close()) }()
 
 	server := FtpServer{
-		Logger: lognoop.NewNoOpLogger(),
+		Logger: slog.New(slog.NewTextHandler(io.Discard, nil)), //nolint:sloglint // DiscardHandler requires Go 1.23+
 		driver: &TestServerDriver{
 			Settings: &Settings{
 				ListenAddr: portBlockerListener.Addr().String(),
@@ -115,7 +116,7 @@ func TestListenWithBadTLSSettings(t *testing.T) {
 	defer func() { req.NoError(portBlockerListener.Close()) }()
 
 	server := FtpServer{
-		Logger: lognoop.NewNoOpLogger(),
+		Logger: slog.New(slog.NewTextHandler(io.Discard, nil)), //nolint:sloglint // DiscardHandler requires Go 1.23+
 		driver: &TestServerDriver{
 			Settings: &Settings{
 				TLSRequired: ImplicitEncryption,
@@ -135,7 +136,7 @@ func TestListenerAcceptErrors(t *testing.T) {
 
 	server := FtpServer{
 		listener: newFakeListener(errNetFake),
-		Logger:   lognoop.NewNoOpLogger(),
+		Logger:   slog.New(slog.NewTextHandler(io.Discard, nil)), //nolint:sloglint // DiscardHandler requires Go 1.23+
 	}
 	err := server.Serve()
 	require.ErrorContains(t, err, errListenerAccept.Error())
@@ -183,7 +184,7 @@ func TestQuoteDoubling(t *testing.T) {
 
 func TestServerSettingsIPError(t *testing.T) {
 	server := FtpServer{
-		Logger: lognoop.NewNoOpLogger(),
+		Logger: slog.New(slog.NewTextHandler(io.Discard, nil)), //nolint:sloglint // DiscardHandler requires Go 1.23+
 	}
 
 	t.Run("IPv4 with 3 numbers", func(t *testing.T) {
@@ -225,7 +226,7 @@ func TestServerSettingsIPError(t *testing.T) {
 func TestServerSettingsNilSettings(t *testing.T) {
 	req := require.New(t)
 	server := FtpServer{
-		Logger: lognoop.NewNoOpLogger(),
+		Logger: slog.New(slog.NewTextHandler(io.Discard, nil)), //nolint:sloglint // DiscardHandler requires Go 1.23+
 		driver: &TestServerDriver{
 			Settings: nil,
 		},

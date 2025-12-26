@@ -71,7 +71,7 @@ The test suite uses a **reference driver implementation** (`driver_test.go`) wit
 ## Key Dependencies
 
 - `github.com/spf13/afero`: File system abstraction for driver implementations
-- `github.com/fclairamb/go-log`: Logging abstraction supporting multiple frameworks
+- `log/slog`: Go standard library structured logging (no external logging dependencies)
 
 ## Code Conventions
 

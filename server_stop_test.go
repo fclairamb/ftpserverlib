@@ -1,11 +1,12 @@
 package ftpserver
 
 import (
+	"context"
+	"log/slog"
 	"sync"
 	"testing"
 	"time"
 
-	log "github.com/fclairamb/go-log"
 	"github.com/stretchr/testify/require"
 )
 
@@ -22,8 +23,8 @@ func TestServerStopDoesNotLogError(t *testing.T) {
 	})
 
 	// Use a custom logger that tracks error logs
-	mockLogger := &MockLogger{}
-	server.Logger = mockLogger
+	mockHandler := &MockLogHandler{}
+	server.Logger = slog.New(mockHandler)
 
 	// Start listening
 	err := server.Listen()
@@ -54,37 +55,45 @@ func TestServerStopDoesNotLogError(t *testing.T) {
 
 	// Check that no error was logged for the "use of closed network connection"
 	// The mock logger should not have received any error logs
-	req.Empty(mockLogger.ErrorLogs, "Expected no error logs when stopping server, but got: %v", mockLogger.ErrorLogs)
+	req.Empty(mockHandler.ErrorLogs, "Expected no error logs when stopping server, but got: %v", mockHandler.ErrorLogs)
 }
 
-// MockLogger captures log calls to verify behavior
-type MockLogger struct {
+// MockLogHandler captures log calls to verify behavior
+type MockLogHandler struct {
 	ErrorLogs []string
 	WarnLogs  []string
 	InfoLogs  []string
 	DebugLogs []string
+	mu        sync.Mutex
 }
 
-func (m *MockLogger) Debug(message string, _ ...any) {
-	m.DebugLogs = append(m.DebugLogs, message)
+func (m *MockLogHandler) Enabled(_ context.Context, _ slog.Level) bool {
+	return true
 }
 
-func (m *MockLogger) Info(message string, _ ...any) {
-	m.InfoLogs = append(m.InfoLogs, message)
+//nolint:gocritic // slog.Handler interface requires value receiver
+func (m *MockLogHandler) Handle(_ context.Context, record slog.Record) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	switch record.Level {
+	case slog.LevelDebug:
+		m.DebugLogs = append(m.DebugLogs, record.Message)
+	case slog.LevelInfo:
+		m.InfoLogs = append(m.InfoLogs, record.Message)
+	case slog.LevelWarn:
+		m.WarnLogs = append(m.WarnLogs, record.Message)
+	case slog.LevelError:
+		m.ErrorLogs = append(m.ErrorLogs, record.Message)
+	}
+
+	return nil
 }
 
-func (m *MockLogger) Warn(message string, _ ...any) {
-	m.WarnLogs = append(m.WarnLogs, message)
+func (m *MockLogHandler) WithAttrs(_ []slog.Attr) slog.Handler {
+	return m
 }
 
-func (m *MockLogger) Error(message string, _ ...any) {
-	m.ErrorLogs = append(m.ErrorLogs, message)
-}
-
-func (m *MockLogger) Panic(message string, _ ...any) {
-	panic(message)
-}
-
-func (m *MockLogger) With(_ ...any) log.Logger {
+func (m *MockLogHandler) WithGroup(_ string) slog.Handler {
 	return m
 }

@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
+	"log/slog"
 	"math/rand"
 	"net"
 	"os"
@@ -17,7 +18,6 @@ import (
 	"testing"
 	"time"
 
-	lognoop "github.com/fclairamb/go-log/noop"
 	"github.com/secsy/goftp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -1069,7 +1069,7 @@ func TestPASVConnectionWait(t *testing.T) {
 		tcpListener:   tcpListener,
 		Port:          tcpListener.Addr().(*net.TCPAddr).Port,
 		settings:      cltHandler.server.settings,
-		logger:        lognoop.NewNoOpLogger(),
+		logger:        slog.New(slog.NewTextHandler(io.Discard, nil)), //nolint:sloglint // DiscardHandler requires Go 1.23+
 		checkDataConn: cltHandler.checkDataConnectionRequirement,
 	}
 
