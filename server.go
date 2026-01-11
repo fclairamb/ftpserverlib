@@ -2,15 +2,15 @@
 package ftpserver
 
 import (
+	"context"
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"io"
+	"log/slog"
 	"net"
 	"syscall"
 	"time"
-
-	log "github.com/fclairamb/go-log"
-	lognoop "github.com/fclairamb/go-log/noop"
 )
 
 // ErrNotListening is returned when we are performing an action that is only valid while listening
@@ -30,11 +30,17 @@ var commandsMap = map[string]*CommandDescription{ //nolint:gochecknoglobals
 	// Authentication
 	"USER": {Fn: (*clientHandler).handleUSER, Open: true},
 	"PASS": {Fn: (*clientHandler).handlePASS, Open: true},
+	"ACCT": {Fn: (*clientHandler).handleNotImplemented},
+	"ADAT": {Fn: (*clientHandler).handleNotImplemented},
 
 	// TLS handling
 	"AUTH": {Fn: (*clientHandler).handleAUTH, Open: true},
 	"PROT": {Fn: (*clientHandler).handlePROT, Open: true},
 	"PBSZ": {Fn: (*clientHandler).handlePBSZ, Open: true},
+	"CCC":  {Fn: (*clientHandler).handleNotImplemented},
+	"CONF": {Fn: (*clientHandler).handleNotImplemented},
+	"ENC":  {Fn: (*clientHandler).handleNotImplemented},
+	"MIC":  {Fn: (*clientHandler).handleNotImplemented},
 
 	// Misc
 	"CLNT": {Fn: (*clientHandler).handleCLNT, Open: true},
@@ -45,14 +51,26 @@ var commandsMap = map[string]*CommandDescription{ //nolint:gochecknoglobals
 	"QUIT": {Fn: (*clientHandler).handleQUIT, Open: true, SpecialAction: true},
 	"AVBL": {Fn: (*clientHandler).handleAVBL},
 	"ABOR": {Fn: (*clientHandler).handleABOR, SpecialAction: true},
+	"CSID": {Fn: (*clientHandler).handleNotImplemented},
+	"HELP": {Fn: (*clientHandler).handleNotImplemented},
+	"HOST": {Fn: (*clientHandler).handleNotImplemented},
+	"LANG": {Fn: (*clientHandler).handleNotImplemented},
+	"XRSQ": {Fn: (*clientHandler).handleNotImplemented},
+	"XSEM": {Fn: (*clientHandler).handleNotImplemented},
+	"XSEN": {Fn: (*clientHandler).handleNotImplemented},
 
 	// File access
 	"SIZE":    {Fn: (*clientHandler).handleSIZE},
+	"DSIZ":    {Fn: (*clientHandler).handleNotImplemented},
 	"STAT":    {Fn: (*clientHandler).handleSTAT, SpecialAction: true},
 	"MDTM":    {Fn: (*clientHandler).handleMDTM},
 	"MFMT":    {Fn: (*clientHandler).handleMFMT},
+	"MFF":     {Fn: (*clientHandler).handleNotImplemented},
+	"MFCT":    {Fn: (*clientHandler).handleNotImplemented},
 	"RETR":    {Fn: (*clientHandler).handleRETR, TransferRelated: true},
 	"STOR":    {Fn: (*clientHandler).handleSTOR, TransferRelated: true},
+	"STOU":    {Fn: (*clientHandler).handleNotImplemented},
+	"STRU":    {Fn: (*clientHandler).handleNotImplemented},
 	"APPE":    {Fn: (*clientHandler).handleAPPE, TransferRelated: true},
 	"DELE":    {Fn: (*clientHandler).handleDELE},
 	"RNFR":    {Fn: (*clientHandler).handleRNFR},
@@ -69,6 +87,8 @@ var commandsMap = map[string]*CommandDescription{ //nolint:gochecknoglobals
 	"XSHA256": {Fn: (*clientHandler).handleSHA256},
 	"XSHA512": {Fn: (*clientHandler).handleSHA512},
 	"COMB":    {Fn: (*clientHandler).handleCOMB},
+	"THMB":    {Fn: (*clientHandler).handleNotImplemented},
+	"XRCP":    {Fn: (*clientHandler).handleNotImplemented},
 
 	// Directory handling
 	"CWD":  {Fn: (*clientHandler).handleCWD},
@@ -82,16 +102,23 @@ var commandsMap = map[string]*CommandDescription{ //nolint:gochecknoglobals
 	"MLST": {Fn: (*clientHandler).handleMLST},
 	"MKD":  {Fn: (*clientHandler).handleMKD},
 	"RMD":  {Fn: (*clientHandler).handleRMD},
+	"RMDA": {Fn: (*clientHandler).handleNotImplemented},
 	"XMKD": {Fn: (*clientHandler).handleMKD},
 	"XRMD": {Fn: (*clientHandler).handleRMD},
+	"SMNT": {Fn: (*clientHandler).handleNotImplemented},
+	"XCUP": {Fn: (*clientHandler).handleNotImplemented},
 
 	// Connection handling
 	"TYPE": {Fn: (*clientHandler).handleTYPE},
 	"MODE": {Fn: (*clientHandler).handleMODE},
 	"PASV": {Fn: (*clientHandler).handlePASV},
 	"EPSV": {Fn: (*clientHandler).handlePASV},
+	"LPSV": {Fn: (*clientHandler).handleNotImplemented},
+	"SPSV": {Fn: (*clientHandler).handleNotImplemented},
 	"PORT": {Fn: (*clientHandler).handlePORT},
+	"LRPT": {Fn: (*clientHandler).handleNotImplemented},
 	"EPRT": {Fn: (*clientHandler).handlePORT},
+	"REIN": {Fn: (*clientHandler).handleNotImplemented},
 }
 
 var specialAttentionCommands = []string{"ABOR", "STAT", "QUIT"} //nolint:gochecknoglobals
@@ -99,7 +126,7 @@ var specialAttentionCommands = []string{"ABOR", "STAT", "QUIT"} //nolint:gocheck
 // FtpServer is where everything is stored
 // We want to keep it as simple as possible
 type FtpServer struct {
-	Logger        log.Logger   // fclairamb/go-log generic logger
+	Logger        *slog.Logger // Structured logger (log/slog)
 	settings      *Settings    // General settings
 	listener      net.Listener // listener used to receive files
 	clientCounter uint32       // Clients counter
@@ -185,7 +212,8 @@ func (server *FtpServer) Listen() error {
 }
 
 func (server *FtpServer) createListener() (net.Listener, error) {
-	listener, err := net.Listen("tcp", server.settings.ListenAddr)
+	lc := &net.ListenConfig{}
+	listener, err := lc.Listen(context.Background(), "tcp", server.settings.ListenAddr)
 	if err != nil {
 		server.Logger.Error("cannot listen on main port", "err", err, "listenAddr", server.settings.ListenAddr)
 
@@ -243,8 +271,6 @@ func (server *FtpServer) Serve() error {
 // It returns a boolean indicating if the error should stop the server and the error itself or none if it's a standard
 // scenario (e.g. a closed listener)
 func (server *FtpServer) handleAcceptError(err error, tempDelay *time.Duration) (bool, error) {
-	server.Logger.Error("Serve error", "err", err)
-
 	if errOp := (&net.OpError{}); errors.As(err, &errOp) {
 		// This means we just closed the connection and it's OK
 		if errOp.Err.Error() == "use of closed network connection" {
@@ -253,6 +279,8 @@ func (server *FtpServer) handleAcceptError(err error, tempDelay *time.Duration) 
 			return true, nil
 		}
 	}
+
+	server.Logger.Error("Serve error", "err", err)
 
 	// see https://github.com/golang/go/blob/4aa1efed4853ea067d665a952eee77c52faac774/src/net/http/server.go#L3046
 	// & https://github.com/fclairamb/ftpserverlib/pull/352#pullrequestreview-1077459896
@@ -266,12 +294,13 @@ func (server *FtpServer) handleAcceptError(err error, tempDelay *time.Duration) 
 			*tempDelay *= 2
 		}
 
-		if max := 1 * time.Second; *tempDelay > max {
-			*tempDelay = max
+		if maxDelay := 1 * time.Second; *tempDelay > maxDelay {
+			*tempDelay = maxDelay
 		}
 
 		server.Logger.Warn(
-			"accept error", err,
+			"accept error",
+			"err", err,
 			"retry delay", tempDelay)
 		time.Sleep(*tempDelay)
 
@@ -298,7 +327,7 @@ func (server *FtpServer) ListenAndServe() error {
 func NewFtpServer(driver MainDriver) *FtpServer {
 	return &FtpServer{
 		driver: driver,
-		Logger: lognoop.NewNoOpLogger(),
+		Logger: slog.New(slog.NewTextHandler(io.Discard, nil)), //nolint:sloglint // DiscardHandler requires Go 1.23+
 	}
 }
 

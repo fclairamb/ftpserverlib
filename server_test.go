@@ -2,13 +2,14 @@ package ftpserver
 
 import (
 	"errors"
+	"io"
+	"log/slog"
 	"net"
 	"os"
 	"syscall"
 	"testing"
 	"time"
 
-	lognoop "github.com/fclairamb/go-log/noop"
 	"github.com/stretchr/testify/require"
 )
 
@@ -19,6 +20,7 @@ func TestMain(m *testing.M) {
 		panic(err)
 	}
 
+	//nolint:gosmopolitan // Intentional modification for testing timezone behavior
 	time.Local = loc
 
 	os.Exit(m.Run())
@@ -83,13 +85,14 @@ func newFakeListener(err error) net.Listener {
 func TestCannotListen(t *testing.T) {
 	req := require.New(t)
 
-	portBlockerListener, err := net.Listen("tcp", "127.0.0.1:0")
+	lc := &net.ListenConfig{}
+	portBlockerListener, err := lc.Listen(t.Context(), "tcp", "127.0.0.1:0")
 	req.NoError(err)
 
 	defer func() { req.NoError(portBlockerListener.Close()) }()
 
 	server := FtpServer{
-		Logger: lognoop.NewNoOpLogger(),
+		Logger: slog.New(slog.NewTextHandler(io.Discard, nil)), //nolint:sloglint // DiscardHandler requires Go 1.23+
 		driver: &TestServerDriver{
 			Settings: &Settings{
 				ListenAddr: portBlockerListener.Addr().String(),
@@ -106,13 +109,14 @@ func TestCannotListen(t *testing.T) {
 func TestListenWithBadTLSSettings(t *testing.T) {
 	req := require.New(t)
 
-	portBlockerListener, err := net.Listen("tcp", "127.0.0.1:0")
+	lc := &net.ListenConfig{}
+	portBlockerListener, err := lc.Listen(t.Context(), "tcp", "127.0.0.1:0")
 	req.NoError(err)
 
 	defer func() { req.NoError(portBlockerListener.Close()) }()
 
 	server := FtpServer{
-		Logger: lognoop.NewNoOpLogger(),
+		Logger: slog.New(slog.NewTextHandler(io.Discard, nil)), //nolint:sloglint // DiscardHandler requires Go 1.23+
 		driver: &TestServerDriver{
 			Settings: &Settings{
 				TLSRequired: ImplicitEncryption,
@@ -132,7 +136,7 @@ func TestListenerAcceptErrors(t *testing.T) {
 
 	server := FtpServer{
 		listener: newFakeListener(errNetFake),
-		Logger:   lognoop.NewNoOpLogger(),
+		Logger:   slog.New(slog.NewTextHandler(io.Discard, nil)), //nolint:sloglint // DiscardHandler requires Go 1.23+
 	}
 	err := server.Serve()
 	require.ErrorContains(t, err, errListenerAccept.Error())
@@ -172,7 +176,6 @@ func TestQuoteDoubling(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			require.Equal(t, tt.want, quoteDoubling(tt.args.s))
 		})
@@ -181,7 +184,7 @@ func TestQuoteDoubling(t *testing.T) {
 
 func TestServerSettingsIPError(t *testing.T) {
 	server := FtpServer{
-		Logger: lognoop.NewNoOpLogger(),
+		Logger: slog.New(slog.NewTextHandler(io.Discard, nil)), //nolint:sloglint // DiscardHandler requires Go 1.23+
 	}
 
 	t.Run("IPv4 with 3 numbers", func(t *testing.T) {
@@ -223,7 +226,7 @@ func TestServerSettingsIPError(t *testing.T) {
 func TestServerSettingsNilSettings(t *testing.T) {
 	req := require.New(t)
 	server := FtpServer{
-		Logger: lognoop.NewNoOpLogger(),
+		Logger: slog.New(slog.NewTextHandler(io.Discard, nil)), //nolint:sloglint // DiscardHandler requires Go 1.23+
 		driver: &TestServerDriver{
 			Settings: nil,
 		},

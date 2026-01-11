@@ -1,11 +1,13 @@
 package ftpserver
 
 import (
+	"crypto/rand"
 	"crypto/sha256"
 	"crypto/tls"
 	"encoding/hex"
 	"fmt"
 	"io"
+	"math/big"
 	"os"
 	"regexp"
 	"strconv"
@@ -444,13 +446,13 @@ func TestRename(t *testing.T) {
 	// the test driver returns FileNameNotAllowedError in this case, the error code should be 553 instead of 550
 	err = client.Rename("file1", "not-allowed")
 	if assert.Error(t, err) {
-		assert.True(t, strings.Contains(err.Error(), "553-Couldn't rename"), err.Error())
+		assert.Contains(t, err.Error(), "553-Couldn't rename", err.Error())
 	}
 
 	// renaming a missing file must fail
 	err = client.Rename("missingfile", "file1")
 	if assert.Error(t, err) {
-		assert.True(t, strings.Contains(err.Error(), "550-Couldn't access"), err.Error())
+		assert.Contains(t, err.Error(), "550-Couldn't access", err.Error())
 	}
 
 	raw, err := client.OpenRawConn()
@@ -539,7 +541,7 @@ func TestHASHCommand(t *testing.T) {
 
 	tempFile, err := os.CreateTemp("", "ftpserver")
 	require.NoError(t, err)
-	err = os.WriteFile(tempFile.Name(), []byte("sample data with know checksum/hash\n"), os.ModePerm)
+	err = os.WriteFile(tempFile.Name(), []byte("sample data with know checksum/hash\n"), 0o600)
 	require.NoError(t, err)
 
 	crc32Sum := "21b0f382"
@@ -870,6 +872,13 @@ func TestSIZE(t *testing.T) {
 
 	defer func() { require.NoError(t, raw.Close()) }()
 
+	testSizeBasicOperations(t, client, raw)
+	testSizeWithDirectories(t, client, raw)
+	testSizeInASCIIMode(t, raw)
+}
+
+func testSizeBasicOperations(t *testing.T, client *goftp.Client, raw goftp.RawConn) {
+	t.Helper()
 	returnCode, response, err := raw.SendCommand("SIZE file.bin")
 	require.NoError(t, err)
 	require.Equal(t, StatusActionNotTaken, returnCode, response)
@@ -881,12 +890,56 @@ func TestSIZE(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, StatusFileStatus, returnCode, response)
 	require.Equal(t, "10", response)
+}
 
-	returnCode, response, err = raw.SendCommand("TYPE A")
+func testSizeWithDirectories(t *testing.T, client *goftp.Client, raw goftp.RawConn) {
+	t.Helper()
+	returnCode, response, err := raw.SendCommand("TYPE I")
+	require.NoError(t, err)
+	require.Equal(t, StatusOK, returnCode, response)
+
+	_, err = client.Mkdir("a-dir")
+	require.NoError(t, err)
+
+	returnCode, response, err = raw.SendCommand("SIZE a-dir")
+	require.NoError(t, err)
+	require.Equal(t, StatusActionNotTaken, returnCode, response)
+	require.True(t, strings.HasSuffix(response, "is a directory"))
+
+	// Generate a cryptographically secure random number for file size
+	nBig, err := rand.Int(rand.Reader, big.NewInt(10))
+	require.NoError(t, err)
+	fileSize := 11 + int(nBig.Int64())
+	ftpUpload(t, client, createTemporaryFile(t, fileSize), "a-dir/file.bin")
+
+	returnCode, response, err = raw.SendCommand("SIZE a-dir/file.bin")
+	require.NoError(t, err)
+	require.Equal(t, StatusFileStatus, returnCode, response)
+	require.Equal(t, strconv.Itoa(fileSize), response)
+
+	returnCode, response, err = raw.SendCommand("SIZE b-dir/file.bin")
+	require.NoError(t, err)
+	require.Equal(t, StatusActionNotTaken, returnCode, response)
+	require.True(t, strings.HasSuffix(response, "no such file or directory"))
+}
+
+func testSizeInASCIIMode(t *testing.T, raw goftp.RawConn) {
+	t.Helper()
+	returnCode, response, err := raw.SendCommand("TYPE A")
 	require.NoError(t, err)
 	require.Equal(t, StatusOK, returnCode, response)
 
 	returnCode, response, err = raw.SendCommand("SIZE file.bin")
+	require.NoError(t, err)
+	require.Equal(t, StatusActionNotTaken, returnCode, response)
+	require.Equal(t, "SIZE not allowed in ASCII mode", response)
+
+	returnCode, response, err = raw.SendCommand("SIZE a-dir")
+	require.NoError(t, err)
+	require.Equal(t, StatusActionNotTaken, returnCode, response)
+	require.Equal(t, "SIZE not allowed in ASCII mode", response)
+
+	returnCode, response, err = raw.SendCommand("SIZE a-dir/file.bin")
 	require.NoError(t, err)
 	require.Equal(t, StatusActionNotTaken, returnCode, response)
 	require.Equal(t, "SIZE not allowed in ASCII mode", response)

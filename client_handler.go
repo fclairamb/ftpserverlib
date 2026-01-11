@@ -6,12 +6,11 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net"
 	"strings"
 	"sync"
 	"time"
-
-	log "github.com/fclairamb/go-log"
 )
 
 // HASHAlgo is the enumerable that represents the supported HASH algorithms.
@@ -86,38 +85,38 @@ func getHashName(algo HASHAlgo) string {
 	return hashName
 }
 
-//nolint:maligned
 type clientHandler struct {
-	id                  uint32          // ID of the client
-	server              *FtpServer      // Server on which the connection was accepted
+	connectedAt         time.Time       // Date of connection
+	paramsMutex         sync.RWMutex    // mutex to protect the parameters exposed to the library users
 	driver              ClientDriver    // Client handling driver
 	conn                net.Conn        // TCP connection
-	writer              *bufio.Writer   // Writer on the TCP connection
-	reader              *bufio.Reader   // Reader on the TCP connection
 	user                string          // Authenticated user
 	path                string          // Current path
 	listPath            string          // Path for NLST/LIST requests
 	clnt                string          // Identified client
 	command             string          // Command received on the connection
-	connectedAt         time.Time       // Date of connection
 	ctxRnfr             string          // Rename from
+	logger              *slog.Logger    // Client handler logging
+	transferWg          sync.WaitGroup  // wait group for command that open a transfer connection
+	transfer            transferHandler // Transfer connection (passive or active)s
+	extra               any             // Additional application-specific data
+	server              *FtpServer      // Server on which the connection was accepted
+	writer              *bufio.Writer   // Writer on the TCP connection
+	reader              *bufio.Reader   // Reader on the TCP connection
 	ctxRest             int64           // Restart point
+	transferMu          sync.Mutex      // this mutex will protect the transfer parameters
+	id                  uint32          // ID of the client
+	selectedHashAlgo    HASHAlgo        // algorithm used when we receive the HASH command
+	currentTransferType TransferType    // current transfer type
+	lastDataChannel     DataChannel     // Last data channel mode (passive or active)
 	debug               bool            // Show debugging info on the server side
 	transferTLS         bool            // Use TLS for transfer connection
 	controlTLS          bool            // Use TLS for control connection
-	selectedHashAlgo    HASHAlgo        // algorithm used when we receive the HASH command
-	logger              log.Logger      // Client handler logging
-	currentTransferType TransferType    // current transfer type
-	transferMode        TransferMode    // Transfer mode (stream, block, compressed)
-	transferWg          sync.WaitGroup  // wait group for command that open a transfer connection
-	transferMu          sync.Mutex      // this mutex will protect the transfer parameters
-	transfer            transferHandler // Transfer connection (passive or active)s
-	lastDataChannel     DataChannel     // Last data channel mode (passive or active)
+	transferMode        TransferMode    // Transfer mode (stream, deflate)
 	isTransferOpen      bool            // indicate if the transfer connection is opened
 	isTransferAborted   bool            // indicate if the transfer was aborted
+	connClosed          bool            // indicates if the connection has been commanded to close
 	tlsRequirement      TLSRequirement  // TLS requirement to respect
-	extra               any             // Additional application-specific data
-	paramsMutex         sync.RWMutex    // mutex to protect the parameters exposed to the library users
 }
 
 // newClientHandler initializes a client handler when someone connects
@@ -140,13 +139,24 @@ func (server *FtpServer) newClientHandler(
 	}
 }
 
-func (c *clientHandler) disconnect() {
-	if err := c.conn.Close(); err != nil {
+// disconnects the connection without any other messaging
+func (c *clientHandler) disconnect() error {
+	if c.connClosed {
+		return nil
+	}
+
+	err := c.conn.Close()
+	if err != nil {
+		err = newNetworkError("error closing control connection", err)
 		c.logger.Warn(
 			"Problem disconnecting a client",
 			"err", err,
 		)
 	}
+
+	c.connClosed = true
+
+	return err
 }
 
 // Path provides the current working directory of the client
@@ -330,21 +340,25 @@ func (c *clientHandler) setLastDataChannel(channel DataChannel) {
 
 func (c *clientHandler) closeTransfer() error {
 	var err error
-	if c.transfer != nil {
-		err = c.transfer.Close()
-		c.isTransferOpen = false
-		c.transfer = nil
+	if c.transfer == nil {
+		return nil
+	}
 
-		if c.debug {
-			c.logger.Debug("Transfer connection closed")
-		}
+	err = c.transfer.Close()
+	c.isTransferOpen = false
+	c.transfer = nil
+
+	if c.debug {
+		c.logger.Debug("Transfer connection closed")
 	}
 
 	if err != nil {
 		err = fmt.Errorf("error closing transfer connection: %w", err)
+
+		return err
 	}
 
-	return err
+	return nil
 }
 
 // Close closes the active transfer, if any, and the control connection
@@ -370,31 +384,26 @@ func (c *clientHandler) Close() error {
 	// 2) the client could wait for another response and so we break the protocol
 	//
 	// closing the connection from a different goroutine should be safe
-	err := c.conn.Close()
-	if err != nil {
-		err = newNetworkError("error closing control connection", err)
-	}
-
-	return err
+	return c.disconnect()
 }
 
+// disconnects client and ends transfer notifying the driver
 func (c *clientHandler) end() {
 	c.server.driver.ClientDisconnected(c)
 	c.server.clientDeparture(c)
 
-	if err := c.conn.Close(); err != nil {
-		c.logger.Debug(
-			"Problem closing control connection",
-			"err", err,
-		)
-	}
-
 	c.transferMu.Lock()
-	defer c.transferMu.Unlock()
-
 	if err := c.closeTransfer(); err != nil {
 		c.logger.Warn(
 			"Problem closing a transfer",
+			"err", err,
+		)
+	}
+	c.transferMu.Unlock()
+
+	if err := c.disconnect(); err != nil {
+		c.logger.Warn(
+			"Problem disconnecting client on end",
 			"err", err,
 		)
 	}
@@ -455,9 +464,9 @@ func (c *clientHandler) readCommand() bool {
 	}
 
 	if err != nil {
-		c.handleCommandsStreamError(err)
+		shouldDisconnect := c.handleCommandsStreamError(err)
 
-		return true
+		return shouldDisconnect
 	}
 
 	line := string(lineSlice)
@@ -471,11 +480,31 @@ func (c *clientHandler) readCommand() bool {
 	return false
 }
 
-func (c *clientHandler) handleCommandsStreamError(err error) {
+func (c *clientHandler) handleCommandsStreamError(err error) bool {
 	// florent(2018-01-14): #58: IDLE timeout: Adding some code to deal with the deadline
 	var errNetError net.Error
 	if errors.As(err, &errNetError) { //nolint:nestif // too much effort to change for now
 		if errNetError.Timeout() {
+			// Check if there's an active data transfer before closing the control connection
+			c.transferMu.Lock()
+			hasActiveTransfer := c.isTransferOpen
+			c.transferMu.Unlock()
+
+			if hasActiveTransfer {
+				// If there's an active data transfer, extend the deadline and continue
+				extendedDeadline := time.Now().Add(time.Duration(time.Second.Nanoseconds() * int64(c.server.settings.IdleTimeout)))
+				if errSet := c.conn.SetDeadline(extendedDeadline); errSet != nil {
+					c.logger.Error("Could not extend read deadline during active transfer", "err", errSet)
+				}
+
+				if c.debug {
+					c.logger.Debug("Idle timeout occurred during active transfer, extending deadline")
+				}
+
+				// Don't disconnect - the transfer is still active
+				return false
+			}
+
 			// We have to extend the deadline now
 			if errSet := c.conn.SetDeadline(time.Now().Add(time.Minute)); errSet != nil {
 				c.logger.Error("Could not set read deadline", "err", errSet)
@@ -490,19 +519,23 @@ func (c *clientHandler) handleCommandsStreamError(err error) {
 				c.logger.Error("Flush error", "err", errFlush)
 			}
 
-			return
+			return true
 		}
 
 		c.logger.Error("Network error", "err", err)
-	} else {
-		if errors.Is(err, io.EOF) {
-			if c.debug {
-				c.logger.Debug("Client disconnected", "clean", false)
-			}
-		} else {
-			c.logger.Error("Read error", "err", err)
-		}
+
+		return true
 	}
+
+	if errors.Is(err, io.EOF) {
+		if c.debug {
+			c.logger.Debug("Client disconnected", "clean", false)
+		}
+	} else {
+		c.logger.Error("Read error", "err", err)
+	}
+
+	return true
 }
 
 // handleCommand takes care of executing the received line

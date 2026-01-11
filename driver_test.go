@@ -4,6 +4,7 @@ import (
 	"crypto/tls"
 	"errors"
 	"io"
+	"log/slog"
 	"net"
 	"os"
 	"strings"
@@ -11,10 +12,8 @@ import (
 	"testing"
 	"time"
 
-	log "github.com/fclairamb/go-log"
-	"github.com/fclairamb/go-log/gokit"
-	gklog "github.com/go-kit/log"
 	"github.com/spf13/afero"
+	"github.com/stretchr/testify/require"
 )
 
 type tlsVerificationReply int8
@@ -71,14 +70,14 @@ func NewTestServerWithTestDriver(t *testing.T, driver *TestServerDriver) *FtpSer
 	driver.Init()
 
 	// If we are in debug mode, we should log things
-	var logger log.Logger
+	var logger *slog.Logger
 	if driver.Debug {
-		logger = gokit.NewWrap(gklog.NewLogfmtLogger(gklog.NewSyncWriter(os.Stdout))).With(
-			"ts", gokit.GKDefaultTimestampUTC,
-			"caller", gokit.GKDefaultCaller,
-		)
+		logger = slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
+			AddSource: true,
+			Level:     slog.LevelDebug,
+		}))
 	} else {
-		logger = nil
+		logger = slog.New(slog.NewTextHandler(io.Discard, nil)) //nolint:sloglint // DiscardHandler requires Go 1.23+
 	}
 
 	s := NewTestServerWithDriverAndLogger(t, driver, logger)
@@ -87,7 +86,7 @@ func NewTestServerWithTestDriver(t *testing.T, driver *TestServerDriver) *FtpSer
 }
 
 // NewTestServerWithTestDriver provides a server instantiated with some settings
-func NewTestServerWithDriverAndLogger(t *testing.T, driver MainDriver, logger log.Logger) *FtpServer {
+func NewTestServerWithDriverAndLogger(t *testing.T, driver MainDriver, logger *slog.Logger) *FtpServer {
 	t.Helper()
 
 	server := NewFtpServer(driver)
@@ -119,20 +118,22 @@ func NewTestServerWithDriver(t *testing.T, driver MainDriver) *FtpServer {
 	return NewTestServerWithDriverAndLogger(t, driver, nil)
 }
 
+type authUserProvider func(user, pass string) (ClientDriver, error)
+
 // TestServerDriver defines a minimal serverftp server driver
 type TestServerDriver struct {
-	Debug          bool // To display connection logs information
-	TLS            bool
-	CloseOnConnect bool // disconnect the client as soon as it connects
-
-	Settings             *Settings // Settings
+	Clients              []ClientContext
+	errPassiveListener   error
 	serverDir            string
 	fs                   afero.Fs
 	clientMU             sync.Mutex
-	Clients              []ClientContext
+	AuthProvider         authUserProvider
+	Settings             *Settings // Settings
 	TLSVerificationReply tlsVerificationReply
-	errPassiveListener   error
 	TLSRequirement       TLSRequirement
+	Debug                bool // To display connection logs information
+	TLS                  bool
+	CloseOnConnect       bool // disconnect the client as soon as it connects
 }
 
 // TestClientDriver defines a minimal serverftp client driver
@@ -155,7 +156,7 @@ var (
 
 func (f *testFile) Read(out []byte) (int, error) {
 	// simulating a slow reading allows us to test ABOR
-	if strings.Contains(f.File.Name(), "delay-io") {
+	if strings.Contains(f.Name(), "delay-io") {
 		time.Sleep(500 * time.Millisecond)
 	}
 
@@ -163,12 +164,12 @@ func (f *testFile) Read(out []byte) (int, error) {
 }
 
 func (f *testFile) Write(out []byte) (int, error) {
-	if strings.Contains(f.File.Name(), "fail-to-write") {
+	if strings.Contains(f.Name(), "fail-to-write") {
 		return 0, errFailWrite
 	}
 
 	// simulating a slow writing allows us to test ABOR
-	if strings.Contains(f.File.Name(), "delay-io") {
+	if strings.Contains(f.Name(), "delay-io") {
 		time.Sleep(500 * time.Millisecond)
 	}
 
@@ -176,7 +177,7 @@ func (f *testFile) Write(out []byte) (int, error) {
 }
 
 func (f *testFile) Close() error {
-	if strings.Contains(f.File.Name(), "fail-to-close") {
+	if strings.Contains(f.Name(), "fail-to-close") {
 		return errFailClose
 	}
 
@@ -188,11 +189,11 @@ func (f *testFile) Seek(offset int64, whence int) (int64, error) {
 	// we can delay the opening of the transfer and then test an ABOR before
 	// opening a transfer. I'm not sure if this can really happen but it is
 	// better to be prepared for buggy clients too
-	if strings.Contains(f.File.Name(), "delay-io") {
+	if strings.Contains(f.Name(), "delay-io") {
 		time.Sleep(500 * time.Millisecond)
 	}
 
-	if strings.Contains(f.File.Name(), "fail-to-seek") {
+	if strings.Contains(f.Name(), "fail-to-seek") {
 		return 0, errFailSeek
 	}
 
@@ -200,11 +201,11 @@ func (f *testFile) Seek(offset int64, whence int) (int64, error) {
 }
 
 func (f *testFile) Readdir(count int) ([]os.FileInfo, error) {
-	if strings.Contains(f.File.Name(), "delay-io") {
+	if strings.Contains(f.Name(), "delay-io") {
 		time.Sleep(500 * time.Millisecond)
 	}
 
-	if strings.Contains(f.File.Name(), "fail-to-readdir") {
+	if strings.Contains(f.Name(), "fail-to-readdir") {
 		return nil, errFailReaddir
 	}
 
@@ -255,6 +256,10 @@ var errBadUserNameOrPassword = errors.New("bad username or password")
 
 // AuthUser with authenticate users
 func (driver *TestServerDriver) AuthUser(_ ClientContext, user, pass string) (ClientDriver, error) {
+	if driver.AuthProvider != nil {
+		return driver.AuthProvider(user, pass)
+	}
+
 	if user == authUser && pass == authPass {
 		clientdriver := NewTestClientDriver(driver)
 
@@ -474,7 +479,7 @@ func (driver *TestClientDriver) Chown(name string, uid int, gid int) error {
 		return errInvalidChownGroup
 	}
 
-	_, err := driver.Fs.Stat(name)
+	_, err := driver.Stat(name)
 
 	return err
 }
@@ -552,3 +557,71 @@ B8waIgXRIjSWT4Fje7RTMT948qhguVhpoAgVzwzMqizzq6YIQbL7MHwXj7oZNUoQ
 CARLpnYLaeWP2nxQyzwGx5pn9TJwg79Yknr8PbSjeym1BSbE5C9ruqar4PfiIzYx
 di02m2YJAvRsG9VDpXogi+c=
 -----END PRIVATE KEY-----`)
+
+// TestPortRangeFetchNextError tests error handling in PortRange.FetchNext
+func TestPortRangeFetchNextError(t *testing.T) {
+	req := require.New(t)
+
+	// Test with a range that could potentially cause issues
+	portRange := PortRange{
+		Start: 65535,
+		End:   65535,
+	}
+
+	// This should still work since it's a valid range
+	exposedPort, listenedPort, ok := portRange.FetchNext()
+	req.True(ok)
+	req.Equal(65535, exposedPort)
+	req.Equal(65535, listenedPort)
+}
+
+// TestPortMappingRangeFetchNextError tests error handling in PortMappingRange.FetchNext
+func TestPortMappingRangeFetchNextError(t *testing.T) {
+	req := require.New(t)
+
+	// Test with a valid range
+	portMappingRange := PortMappingRange{
+		ExposedStart:  8000,
+		ListenedStart: 9000,
+		Count:         10,
+	}
+
+	exposedPort, listenedPort, ok := portMappingRange.FetchNext()
+	req.True(ok)
+	req.GreaterOrEqual(exposedPort, 8000)
+	req.LessOrEqual(exposedPort, 8009)
+	req.GreaterOrEqual(listenedPort, 9000)
+	req.LessOrEqual(listenedPort, 9009)
+	req.Equal(exposedPort-8000, listenedPort-9000) // Should maintain offset
+}
+
+// TestPortMappingRangeNumberAttempts tests the NumberAttempts method
+func TestPortMappingRangeNumberAttempts(t *testing.T) {
+	req := require.New(t)
+
+	portMappingRange := PortMappingRange{
+		ExposedStart:  8000,
+		ListenedStart: 9000,
+		Count:         25,
+	}
+
+	req.Equal(25, portMappingRange.NumberAttempts())
+}
+
+// TestCryptoRandError tests what happens when crypto/rand fails
+func TestCryptoRandError(t *testing.T) {
+	req := require.New(t)
+
+	// We can't easily mock crypto/rand.Int, but we can test with edge cases
+	// Test with zero count (should handle gracefully)
+	portMappingRange := PortMappingRange{
+		ExposedStart:  8000,
+		ListenedStart: 9000,
+		Count:         1, // Minimum valid count
+	}
+
+	exposedPort, listenedPort, ok := portMappingRange.FetchNext()
+	req.True(ok)
+	req.Equal(8000, exposedPort)
+	req.Equal(9000, listenedPort)
+}

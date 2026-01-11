@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-var errUnknowHash = errors.New("unknown hash algorithm")
+var errUnknownHash = errors.New("unknown hash algorithm")
 
 func (c *clientHandler) handleAUTH(_ string) error {
 	if tlsConfig, err := c.server.driver.GetTLSConfig(); err == nil {
@@ -66,6 +66,17 @@ func (c *clientHandler) handleSITE(param string) error {
 		c.writeMessage(StatusSyntaxErrorNotRecognised, "SITE support is disabled")
 
 		return nil
+	}
+
+	// If the driver implements ClientDriverExtensionSite, we call its Site method
+	// If it returns ErrProceedWithDefaultBehavior, we proceed with the default behavior
+	// Otherwise, we return the error
+	if site, ok := c.driver.(ClientDriverExtensionSite); ok {
+		if answer := site.Site(param); answer != nil {
+			c.writeMessage(answer.Code, answer.Message)
+
+			return nil
+		}
 	}
 
 	spl := strings.SplitN(param, " ", 2)
@@ -310,7 +321,7 @@ func (c *clientHandler) handleQUIT(_ string) error {
 	}
 
 	c.writeMessage(StatusClosingControlConn, msg)
-	c.disconnect()
+	_ = c.disconnect()
 	c.reader = nil
 
 	return nil
@@ -326,10 +337,7 @@ func (c *clientHandler) handleABOR(param string) error {
 		c.isTransferAborted = true
 
 		if err := c.closeTransfer(); err != nil {
-			c.logger.Warn(
-				"Problem aborting transfer for command", param,
-				"err", err,
-			)
+			c.logger.Warn("Problem aborting transfer for command", "command", param, "err", err)
 		}
 
 		if c.debug {
@@ -376,6 +384,12 @@ func (c *clientHandler) handleAVBL(param string) error {
 	} else {
 		c.writeMessage(StatusNotImplemented, "This extension hasn't been implemented !")
 	}
+
+	return nil
+}
+
+func (c *clientHandler) handleNotImplemented(_ string) error {
+	c.writeMessage(StatusCommandNotImplemented, "This command hasn't been implemented !")
 
 	return nil
 }

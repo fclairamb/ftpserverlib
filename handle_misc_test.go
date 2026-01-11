@@ -442,3 +442,92 @@ func TestMode(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, StatusNotImplementedParam, returnCode)
 }
+
+func TestREIN(t *testing.T) {
+	server := NewTestServer(t, false)
+	conf := goftp.Config{
+		User:     authUser,
+		Password: authPass,
+	}
+
+	client, err := goftp.DialConfig(conf, server.Addr())
+	require.NoError(t, err, "Couldn't connect")
+
+	defer func() { panicOnError(client.Close()) }()
+
+	raw, err := client.OpenRawConn()
+	require.NoError(t, err, "Couldn't open raw connection")
+
+	returnCode, _, err := raw.SendCommand("REIN")
+	require.NoError(t, err)
+	require.Equal(t, StatusCommandNotImplemented, returnCode)
+}
+
+// Custom driver for testing ClientDriverExtensionSite
+// Implements Site(param string) error
+type customSiteDriver struct {
+	TestClientDriver
+}
+
+var _ ClientDriverExtensionSite = (*customSiteDriver)(nil)
+
+func (d *customSiteDriver) Site(param string) *AnswerCommand {
+	switch param {
+	case "CUSTOMERR":
+		return &AnswerCommand{
+			Code:    StatusSyntaxErrorNotRecognised,
+			Message: "custom site error",
+		}
+	case "PROCEED":
+		return nil
+	case "OK":
+		return &AnswerCommand{
+			Code:    StatusOK,
+			Message: "OK",
+		}
+	default:
+		return nil
+	}
+}
+
+func TestClientDriverExtensionSite(t *testing.T) {
+	t.Parallel()
+
+	req := require.New(t)
+
+	server := NewTestServerWithTestDriver(t, &TestServerDriver{
+		Debug: false,
+		AuthProvider: func(_, _ string) (ClientDriver, error) {
+			return &customSiteDriver{}, nil
+		},
+	})
+	conf := goftp.Config{
+		User:     authUser,
+		Password: authPass,
+	}
+
+	client, err := goftp.DialConfig(conf, server.Addr())
+	req.NoError(err, "Couldn't connect")
+	defer func() { panicOnError(client.Close()) }()
+	raw, err := client.OpenRawConn()
+	req.NoError(err, "Couldn't open raw connection")
+	defer func() { require.NoError(t, raw.Close()) }()
+
+	// Custom error from Site
+	returnCode, response, err := raw.SendCommand("SITE CUSTOMERR")
+	req.NoError(err)
+	req.Equal(StatusSyntaxErrorNotRecognised, returnCode)
+	req.Contains(response, "custom site error")
+
+	// Default behavior fallback (should get unknown subcommand)
+	returnCode, response, err = raw.SendCommand("SITE PROCEED")
+	require.NoError(t, err)
+	require.Equal(t, StatusSyntaxErrorNotRecognised, returnCode)
+	require.Contains(t, response, "Unknown SITE subcommand")
+
+	// Short-circuit: Site returns nil, so command is accepted (no error, no message)
+	returnCode, response, err = raw.SendCommand("SITE OK")
+	require.NoError(t, err)
+	require.Equal(t, StatusOK, returnCode)
+	require.Equal(t, "OK", response)
+}

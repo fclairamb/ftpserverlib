@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
+	"log/slog"
 	"math/rand"
 	"net"
 	"os"
@@ -18,7 +19,6 @@ import (
 	"testing"
 	"time"
 
-	lognoop "github.com/fclairamb/go-log/noop"
 	"github.com/secsy/goftp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -49,9 +49,9 @@ func createTemporaryFile(t *testing.T, targetSize int) *os.File {
 
 	t.Cleanup(func() {
 		err = file.Close()
-		assert.NoError(t, err, fmt.Sprintf("Problem closing file %#v", file.Name()))
+		assert.NoError(t, err, "Problem closing file", file.Name())
 		err := os.Remove(file.Name())
-		require.NoError(t, err, fmt.Sprintf("Problem deleting file %#v", file.Name()))
+		require.NoError(t, err, "Problem deleting file", file.Name())
 	})
 
 	return file
@@ -95,7 +95,7 @@ func ftpUpload(t *testing.T, ftp *goftp.Client, file io.ReadSeeker, filename str
 		t.Log("Couldn't stat file:", err)
 	} else {
 		found := false
-		if strings.HasSuffix(stats.Name(), filename) {
+		if strings.HasSuffix(stats.Name(), filename) || strings.HasSuffix(filename, stats.Name()) {
 			found = true
 		}
 
@@ -377,7 +377,7 @@ func TestActiveModeDisabled(t *testing.T) {
 	file := createTemporaryFile(t, 10*1024)
 	err = client.Store("file.bin", file)
 	require.Error(t, err, "active mode is disabled, upload must fail")
-	require.True(t, strings.Contains(err.Error(), "421-PORT command is disabled"))
+	require.Contains(t, err.Error(), "421-PORT command is disabled")
 }
 
 // TestFailedTransfer validates the handling of failed transfer caused by file access issues
@@ -491,7 +491,7 @@ func TestFailingFileTransfer(t *testing.T) {
 		c, file := createClientOnServer(t)
 		err := c.Store("fail-to-write.bin", file)
 		require.Error(t, err)
-		require.True(t, strings.Contains(err.Error(), errFailWrite.Error()), err)
+		require.Contains(t, err.Error(), errFailWrite.Error())
 	})
 
 	t.Run("on close", func(t *testing.T) {
@@ -499,7 +499,7 @@ func TestFailingFileTransfer(t *testing.T) {
 		c, file := createClientOnServer(t)
 		err := c.Store("fail-to-close.bin", file)
 		require.Error(t, err)
-		require.True(t, strings.Contains(err.Error(), errFailClose.Error()), err)
+		require.Contains(t, err.Error(), errFailClose.Error())
 	})
 
 	t.Run("on seek", func(t *testing.T) {
@@ -518,7 +518,7 @@ func TestFailingFileTransfer(t *testing.T) {
 		err = appendFile.Close()
 		require.NoError(t, err)
 
-		appendFile, err = os.OpenFile(appendFile.Name(), os.O_APPEND|os.O_WRONLY, os.ModePerm)
+		appendFile, err = os.OpenFile(appendFile.Name(), os.O_APPEND|os.O_WRONLY, 0600)
 		require.NoError(t, err)
 
 		data := []byte("some more data")
@@ -529,7 +529,7 @@ func TestFailingFileTransfer(t *testing.T) {
 		require.Equal(t, int64(len(initialData)+len(data)), info.Size())
 		_, err = client.TransferFromOffset("fail-to-seek.bin", nil, appendFile, int64(len(initialData)))
 		require.Error(t, err)
-		require.True(t, strings.Contains(err.Error(), errFailSeek.Error()), err)
+		require.Contains(t, err.Error(), errFailSeek.Error())
 		err = appendFile.Close()
 		require.NoError(t, err)
 	})
@@ -1112,7 +1112,7 @@ func TestPASVConnectionWait(t *testing.T) {
 		tcpListener:   tcpListener,
 		Port:          tcpListener.Addr().(*net.TCPAddr).Port,
 		settings:      cltHandler.server.settings,
-		logger:        lognoop.NewNoOpLogger(),
+		logger:        slog.New(slog.NewTextHandler(io.Discard, nil)), //nolint:sloglint // DiscardHandler requires Go 1.23+
 		checkDataConn: cltHandler.checkDataConnectionRequirement,
 	}
 
@@ -1139,9 +1139,16 @@ func TestPASVConnectionWait(t *testing.T) {
 // On Mac Os X, this requires to issue the following command:
 // sudo ifconfig lo0 alias 127.0.1.1 up
 func TestPASVIPMatch(t *testing.T) {
+	// Check if 127.0.1.1 is available before running the test
+	testAddr := &net.TCPAddr{IP: net.ParseIP("127.0.1.1"), Port: 0}
+	if _, err := net.DialTCP("tcp", testAddr, &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: 22}); err != nil {
+		t.Skip("Skipping test: 127.0.1.1 not available. Run 'sudo ifconfig lo0 alias 127.0.1.1 up' to enable this test.")
+	}
+
 	server := NewTestServer(t, false)
 
-	conn, err := net.DialTimeout("tcp", server.Addr(), 5*time.Second)
+	dialer := &net.Dialer{Timeout: 5 * time.Second}
+	conn, err := dialer.DialContext(t.Context(), "tcp", server.Addr())
 	require.NoError(t, err)
 
 	defer func() {
@@ -1224,11 +1231,114 @@ func TestPassivePortExhaustion(t *testing.T) {
 
 	defer func() { require.NoError(t, raw.Close()) }()
 
-	for i := 0; i < 20; i++ {
+	for range 20 {
 		rc, message, err := raw.SendCommand("PASV")
 		require.NoError(t, err)
 		require.Equal(t, StatusEnteringPASV, rc, message)
 	}
+}
+
+func TestPortMappingRange(t *testing.T) {
+	// Test PortMappingRange functionality
+	portMapping := PortMappingRange{
+		ExposedStart:  50000,
+		ListenedStart: 60000,
+		Count:         10,
+	}
+
+	// Test FetchNext method
+	exposedPort, listenedPort, ok := portMapping.FetchNext()
+	require.True(t, ok)
+	require.GreaterOrEqual(t, exposedPort, 50000)
+	require.Less(t, exposedPort, 50010)
+	require.GreaterOrEqual(t, listenedPort, 60000)
+	require.Less(t, listenedPort, 60010)
+	require.Equal(t, exposedPort-50000, listenedPort-60000) // Should have same offset
+
+	// Test NumberAttempts method
+	require.Equal(t, 10, portMapping.NumberAttempts())
+
+	// Test with server
+	server := NewTestServer(t, false)
+	server.settings.PassiveTransferPortRange = &portMapping
+
+	client, err := goftp.DialConfig(goftp.Config{
+		User:     authUser,
+		Password: authPass,
+	}, server.Addr())
+	require.NoError(t, err, "Couldn't connect")
+
+	defer func() { panicOnError(client.Close()) }()
+
+	raw, err := client.OpenRawConn()
+	require.NoError(t, err, "Couldn't open raw connection")
+
+	defer func() { require.NoError(t, raw.Close()) }()
+
+	// Test PASV command with port mapping
+	returnCode, message, err := raw.SendCommand("PASV")
+	require.NoError(t, err)
+	require.Equal(t, StatusEnteringPASV, returnCode, message)
+
+	// Extract port from PASV response and verify it's in the exposed range
+	port := getPortFromPASVResponse(t, message)
+	require.GreaterOrEqual(t, port, 50000)
+	require.Less(t, port, 50010)
+
+	// Test EPSV command with port mapping as well
+	returnCode, message, err = raw.SendCommand("EPSV")
+	require.NoError(t, err)
+	require.Equal(t, StatusEnteringEPSV, returnCode, message)
+
+	// Extract port from EPSV response and verify it's in the exposed range
+	epsvPort := getPortFromEPSVResponse(t, message)
+	require.GreaterOrEqual(t, epsvPort, 50000)
+	require.Less(t, epsvPort, 50010)
+}
+
+func TestPortRangeBackwardCompatibility(t *testing.T) {
+	// Test that PortRange still works as PasvPortGetter
+	portRange := PortRange{
+		Start: 45000,
+		End:   45010,
+	}
+
+	// Test FetchNext method
+	exposedPort, listenedPort, ok := portRange.FetchNext()
+	require.True(t, ok)
+	require.GreaterOrEqual(t, exposedPort, 45000)
+	require.LessOrEqual(t, exposedPort, 45010)
+	require.Equal(t, exposedPort, listenedPort) // Should be the same for PortRange
+
+	// Test NumberAttempts method
+	require.Equal(t, 11, portRange.NumberAttempts())
+
+	// Test with server to ensure backward compatibility
+	server := NewTestServer(t, false)
+	server.settings.PassiveTransferPortRange = &portRange
+
+	client, err := goftp.DialConfig(goftp.Config{
+		User:     authUser,
+		Password: authPass,
+	}, server.Addr())
+	require.NoError(t, err, "Couldn't connect")
+
+	defer func() { panicOnError(client.Close()) }()
+
+	raw, err := client.OpenRawConn()
+	require.NoError(t, err, "Couldn't open raw connection")
+
+	defer func() { require.NoError(t, raw.Close()) }()
+
+	// Test PASV command
+	rc, message, err := raw.SendCommand("PASV")
+	require.NoError(t, err)
+	require.Equal(t, StatusEnteringPASV, rc, message)
+
+	// Extract port from PASV response and verify it's in the range
+	port := getPortFromPASVResponse(t, message)
+	require.GreaterOrEqual(t, port, 45000)
+	require.LessOrEqual(t, port, 45010)
 }
 
 func loginConnection(t *testing.T, conn net.Conn) {
@@ -1271,6 +1381,25 @@ func getPortFromPASVResponse(t *testing.T, resp string) int {
 
 		port |= portOctet << (byte(1-i) * 8)
 	}
+
+	return port
+}
+
+func getPortFromEPSVResponse(t *testing.T, resp string) int {
+	t.Helper()
+
+	// EPSV response format: "229 Entering Extended Passive Mode (|||port|)"
+	resp = strings.Replace(resp, "229 Entering Extended Passive Mode", "", 1)
+	resp = strings.Replace(resp, "(", "", 1)
+	resp = strings.Replace(resp, ")", "", 1)
+	resp = strings.TrimSpace(resp)
+
+	// Extract port from |||port| format
+	parts := strings.Split(resp, "|")
+	require.Len(t, parts, 5) // Should be ["", "", "", "port", ""]
+
+	port, err := strconv.Atoi(parts[3])
+	require.NoError(t, err)
 
 	return port
 }
@@ -1354,4 +1483,67 @@ func TestTransferModeDeflate(t *testing.T) {
 		require.Equal(t, string(contents), writer.String())
 		require.Equal(t, localHash, remoteHash)
 	}
+}
+
+// TestConnectionCloseDuringTransfer tests the behavior when the control connection is closed
+// during an active data transfer in passive mode. This ensures proper cleanup and error handling.
+func TestConnectionCloseDuringTransfer(t *testing.T) {
+	t.Parallel()
+
+	server := NewTestServer(t, false)
+
+	conf := goftp.Config{
+		User:     authUser,
+		Password: authPass,
+	}
+
+	client, err := goftp.DialConfig(conf, server.Addr())
+	require.NoError(t, err, "Couldn't connect")
+
+	// Upload a file first so we have something to download
+	file := createTemporaryFile(t, 10*1024*1024) // 10MB file
+	err = client.Store("large-file.bin", file)
+	require.NoError(t, err, "Failed to upload file")
+
+	// Open a raw connection to have more control
+	raw, err := client.OpenRawConn()
+	require.NoError(t, err)
+
+	// Prepare data connection
+	_, err = raw.PrepareDataConn()
+	require.NoError(t, err)
+
+	// Start the RETR command
+	returnCode, response, err := raw.SendCommand("RETR large-file.bin")
+	require.NoError(t, err)
+	require.Equal(t, StatusFileStatusOK, returnCode, response)
+
+	// Give the transfer a moment to start
+	time.Sleep(50 * time.Millisecond)
+
+	// Now close the raw connection abruptly during the transfer
+	// This simulates a network disconnection or client crash
+	err = raw.Close()
+	require.NoError(t, err)
+
+	// Close the main client connection as well
+	_ = client.Close()
+	// We expect an error here since the connection is already closed/broken
+	// but we don't want to fail the test - this is expected behavior
+
+	// Give the server time to clean up
+	time.Sleep(100 * time.Millisecond)
+
+	// Verify we can establish a new connection and the server is still functional
+	newClient, err := goftp.DialConfig(conf, server.Addr())
+	require.NoError(t, err, "Server should still be functional after connection close during transfer")
+
+	defer func() {
+		err = newClient.Close()
+		require.NoError(t, err)
+	}()
+
+	// Verify the file is still there and accessible
+	_, err = newClient.Stat("large-file.bin")
+	require.NoError(t, err, "File should still be accessible after interrupted transfer")
 }

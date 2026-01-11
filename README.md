@@ -28,7 +28,7 @@ If you're interested in a fully featured FTP server, you should use [sftpgo](htt
  * Clean code: No sleep, no panic, no global sync (only around control/transfer connection per client)
  * Uses only the standard library except for:
    * [afero](https://github.com/spf13/afero) for generic file systems handling
-   * [fclairamb/go-log](https://github.com/fclairamb/go-log) for logging through your existing libraries [go-kit/log](https://github.com/go-kit/log), [log15](https://github.com/inconshreveable/log15), [zap](https://github.com/uber-go/zap), [zerolog](https://github.com/rs/zerolog/), [logrus](https://github.com/sirupsen/logrus)
+ * Uses standard library [log/slog](https://pkg.go.dev/log/slog) for structured logging
  * Supported extensions:
    * [AUTH](https://tools.ietf.org/html/rfc2228#page-6) - Control session protection
    * [AUTH TLS](https://tools.ietf.org/html/rfc4217#section-4.1) - TLS session
@@ -40,7 +40,7 @@ If you're interested in a fully featured FTP server, you should use [sftpgo](htt
    * [MLST](https://tools.ietf.org/html/rfc3659#page-23) - Simple file listing for machine processing
    * [MLSD](https://tools.ietf.org/html/rfc3659#page-23) - Directory listing for machine processing
    * [HASH](https://tools.ietf.org/html/draft-bryan-ftpext-hash-02) - Hashing of files
-   * [AVLB](https://tools.ietf.org/html/draft-peterson-streamlined-ftp-command-extensions-10#section-4) - Available space
+   * [AVBL](https://tools.ietf.org/html/draft-peterson-streamlined-ftp-command-extensions-10#section-4) - Available space
    * [COMB](https://help.globalscape.com/help/archive/eft6-4/mergedprojects/eft/allowingmultiparttransferscomb_command.htm) - Combine files
 
 ## Quick test
@@ -124,7 +124,7 @@ type Settings struct {
 	ListenAddr               string           // Listening address
 	PublicHost               string           // Public IP to expose (only an IP address is accepted at this stage)
 	PublicIPResolver         PublicIPResolver // (Optional) To fetch a public IP lookup
-	PassiveTransferPortRange *PortRange       // (Optional) Port Range for data connections. Random if not specified
+	PassiveTransferPortRange PasvPortGetter   // (Optional) Port Range for data connections. Random if not specified
 	ActiveTransferPortNon20  bool             // Do not impose the port 20 for active data transfer (#88, RFC 1579)
 	IdleTimeout              int              // Maximum inactivity time before disconnecting (#58)
 	ConnectionTimeout        int              // Maximum time to establish passive or active transfer connections

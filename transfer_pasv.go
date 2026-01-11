@@ -4,12 +4,10 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
-	"math/rand"
+	"log/slog"
 	"net"
 	"strings"
 	"time"
-
-	log "github.com/fclairamb/go-log"
 )
 
 // Active/Passive transfer connection handler
@@ -37,7 +35,7 @@ type passiveTransferHandler struct {
 	connection  net.Conn         // TCP Connection established
 	settings    *Settings        // Settings
 	info        string           // transfer info
-	logger      log.Logger       // Logger
+	logger      *slog.Logger     // Logger
 	// data connection requirement checker
 	checkDataConn func(dataConnIP net.IP, channelType DataChannel) error
 }
@@ -87,8 +85,8 @@ const (
 	portSearchMaxAttempts = 1000
 )
 
-func (c *clientHandler) findListenerWithinPortRange(portRange *PortRange) (*net.TCPListener, error) {
-	nbAttempts := portRange.End - portRange.Start
+func (c *clientHandler) findListenerWithinPortRange(portMapping PasvPortGetter) (int, *net.TCPListener, error) {
+	nbAttempts := portMapping.NumberAttempts()
 
 	// Making sure we trying a reasonable amount of ports before giving up
 	if nbAttempts < portSearchMinAttempts {
@@ -98,30 +96,30 @@ func (c *clientHandler) findListenerWithinPortRange(portRange *PortRange) (*net.
 	}
 
 	for i := 0; i < nbAttempts; i++ {
-		//nolint: gosec
-		port := portRange.Start + rand.Intn(portRange.End-portRange.Start+1)
-		laddr, errResolve := net.ResolveTCPAddr("tcp", fmt.Sprintf("0.0.0.0:%d", port))
+		exposedPort, listenedPort, ok := portMapping.FetchNext()
+		if !ok {
+			break
+		}
+		laddr, errResolve := net.ResolveTCPAddr("tcp", fmt.Sprintf("0.0.0.0:%d", listenedPort))
 
 		if errResolve != nil {
-			c.logger.Error("Problem resolving local port", "err", errResolve, "port", port)
+			c.logger.Error("Problem resolving local port", "err", errResolve, "port", listenedPort)
 
-			return nil, newNetworkError(fmt.Sprintf("could not resolve port %d", port), errResolve)
+			return 0, nil, newNetworkError(fmt.Sprintf("could not resolve port %d", listenedPort), errResolve)
 		}
 
 		tcpListener, errListen := net.ListenTCP("tcp", laddr)
 		if errListen == nil {
-			return tcpListener, nil
+			return exposedPort, tcpListener, nil
 		}
 	}
 
 	c.logger.Warn(
 		"Could not find any free port",
 		"nbAttempts", nbAttempts,
-		"portRangeStart", portRange.Start,
-		"portRAngeEnd", portRange.End,
 	)
 
-	return nil, ErrNoAvailableListeningPort
+	return 0, nil, ErrNoAvailableListeningPort
 }
 
 func (c *clientHandler) handlePASV(_ string) error {
@@ -129,10 +127,11 @@ func (c *clientHandler) handlePASV(_ string) error {
 	addr, _ := net.ResolveTCPAddr("tcp", ":0")
 	var tcpListener *net.TCPListener
 	var err error
-	portRange := c.server.settings.PassiveTransferPortRange
+	portMapping := c.server.settings.PassiveTransferPortRange
+	exposedPort := 0
 
-	if portRange != nil {
-		tcpListener, err = c.findListenerWithinPortRange(portRange)
+	if portMapping != nil {
+		exposedPort, tcpListener, err = c.findListenerWithinPortRange(portMapping)
 	} else {
 		tcpListener, err = net.ListenTCP("tcp", addr)
 	}
@@ -167,10 +166,15 @@ func (c *clientHandler) handlePASV(_ string) error {
 		}
 	}
 
-	transferHandler := &passiveTransferHandler{ //nolint:forcetypeassert
+	if exposedPort == 0 {
+		if tcpAddr, ok := tcpListener.Addr().(*net.TCPAddr); ok {
+			exposedPort = tcpAddr.Port
+		}
+	}
+	transferHandler := &passiveTransferHandler{
 		tcpListener:   tcpListener,
 		listener:      listener,
-		Port:          tcpListener.Addr().(*net.TCPAddr).Port,
+		Port:          exposedPort,
 		settings:      c.server.settings,
 		logger:        c.logger,
 		checkDataConn: c.checkDataConnectionRequirement,

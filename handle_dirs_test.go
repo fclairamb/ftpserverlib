@@ -460,7 +460,8 @@ func TestPerClientTLSTransfer(t *testing.T) {
 
 func TestDirListingBeforeLogin(t *testing.T) {
 	s := NewTestServer(t, false)
-	conn, err := net.DialTimeout("tcp", s.Addr(), 5*time.Second)
+	dialer := &net.Dialer{Timeout: 5 * time.Second}
+	conn, err := dialer.DialContext(t.Context(), "tcp", s.Addr())
 	require.NoError(t, err)
 
 	defer func() {
@@ -524,7 +525,7 @@ func testListDirArgs(t *testing.T, server *FtpServer) {
 		server.settings.DisableLISTArgs = true
 
 		_, err = client.ReadDir(arg)
-		require.Error(t, err, fmt.Sprintf("list args are disabled \"list %v\" must fail", arg))
+		require.Error(t, err, "list args are disabled \"list", arg, "\" must fail")
 
 		server.settings.DisableLISTArgs = false
 
