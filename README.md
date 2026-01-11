@@ -40,7 +40,7 @@ If you're interested in a fully featured FTP server, you should use [sftpgo](htt
    * [MLST](https://tools.ietf.org/html/rfc3659#page-23) - Simple file listing for machine processing
    * [MLSD](https://tools.ietf.org/html/rfc3659#page-23) - Directory listing for machine processing
    * [HASH](https://tools.ietf.org/html/draft-bryan-ftpext-hash-02) - Hashing of files
-   * [AVLB](https://tools.ietf.org/html/draft-peterson-streamlined-ftp-command-extensions-10#section-4) - Available space
+   * [AVBL](https://tools.ietf.org/html/draft-peterson-streamlined-ftp-command-extensions-10#section-4) - Available space
    * [COMB](https://help.globalscape.com/help/archive/eft6-4/mergedprojects/eft/allowingmultiparttransferscomb_command.htm) - Combine files
 
 ## Quick test
@@ -124,7 +124,7 @@ type Settings struct {
 	ListenAddr               string           // Listening address
 	PublicHost               string           // Public IP to expose (only an IP address is accepted at this stage)
 	PublicIPResolver         PublicIPResolver // (Optional) To fetch a public IP lookup
-	PassiveTransferPortRange *PortRange       // (Optional) Port Range for data connections. Random if not specified
+	PassiveTransferPortRange PasvPortGetter   // (Optional) Port Range for data connections. Random if not specified
 	ActiveTransferPortNon20  bool             // Do not impose the port 20 for active data transfer (#88, RFC 1579)
 	IdleTimeout              int              // Maximum inactivity time before disconnecting (#58)
 	ConnectionTimeout        int              // Maximum time to establish passive or active transfer connections
