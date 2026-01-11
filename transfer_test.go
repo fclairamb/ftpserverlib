@@ -204,7 +204,11 @@ func ftpUploadWithRawConnection(t *testing.T, raw goftp.RawConn, file io.Reader,
 	_, err = io.Copy(transfer, file)
 	req.NoError(err)
 
-	if transferFlusher, ok := transfer.(Flusher); ok {
+	// Finalize deflate transfer to write end-of-stream marker (BFINAL block)
+	if finalizer, ok := transfer.(TransferFinalizer); ok {
+		req.NoError(finalizer.FinalizeTransfer())
+	} else if transferFlusher, ok := transfer.(Flusher); ok {
+		// Only flush if not a TransferFinalizer (FinalizeTransfer already flushes for deflate)
 		req.NoError(transferFlusher.Flush())
 	}
 
