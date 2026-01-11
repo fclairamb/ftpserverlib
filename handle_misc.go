@@ -222,6 +222,7 @@ func (c *clientHandler) handleFEAT(_ string) error {
 		"SIZE",
 		"MDTM",
 		"REST STREAM",
+		"MODE Z",
 		"EPRT",
 		"EPSV",
 	}
