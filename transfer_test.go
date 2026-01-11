@@ -1462,26 +1462,26 @@ func TestTransferModeDeflate(t *testing.T) {
 		require.Equal(t, string(contents), string(readContents))
 	}
 
-	/*{
+	{ // Test switching to stream mode and back
 		rc, response, errMode := raw.SendCommand("MODE S")
 		require.NoError(t, errMode)
 		require.Equal(t, StatusOK, rc, response)
 	}
 
-	{ // Hash on standard connection
+	{ // Download in stream mode (verify mode switch works)
 		writer := bytes.NewBuffer(nil)
 		remoteHash := ftpDownloadAndHashWithRawConnection(t, raw, "file.txt", &ftpDownloadOptions{otherWriter: writer})
 		require.Equal(t, string(contents), writer.String())
 		require.Equal(t, localHash, remoteHash)
 	}
 
-	{
+	{ // Switch back to deflate mode
 		rc, response, errMode := raw.SendCommand("MODE Z")
 		require.NoError(t, errMode)
 		require.Equal(t, StatusOK, rc, response)
-	}*/
+	}
 
-	{ // Hash on deflate connection
+	{ // Download in deflate mode (verify mode switch back works)
 		writer := bytes.NewBuffer(nil)
 		remoteHash := ftpDownloadAndHashWithRawConnection(t, raw, "file.txt", &ftpDownloadOptions{deflateMode: true, otherWriter: writer})
 		require.Equal(t, string(contents), writer.String())
