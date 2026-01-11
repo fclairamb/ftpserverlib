@@ -6,12 +6,11 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"io"
+	"log/slog"
 	"net"
 	"syscall"
 	"time"
-
-	log "github.com/fclairamb/go-log"
-	lognoop "github.com/fclairamb/go-log/noop"
 )
 
 // ErrNotListening is returned when we are performing an action that is only valid while listening
@@ -127,7 +126,7 @@ var specialAttentionCommands = []string{"ABOR", "STAT", "QUIT"} //nolint:gocheck
 // FtpServer is where everything is stored
 // We want to keep it as simple as possible
 type FtpServer struct {
-	Logger        log.Logger   // fclairamb/go-log generic logger
+	Logger        *slog.Logger // Structured logger (log/slog)
 	settings      *Settings    // General settings
 	listener      net.Listener // listener used to receive files
 	clientCounter uint32       // Clients counter
@@ -296,7 +295,8 @@ func (server *FtpServer) handleAcceptError(err error, tempDelay *time.Duration) 
 		}
 
 		server.Logger.Warn(
-			"accept error", err,
+			"accept error",
+			"err", err,
 			"retry delay", tempDelay)
 		time.Sleep(*tempDelay)
 
@@ -323,7 +323,7 @@ func (server *FtpServer) ListenAndServe() error {
 func NewFtpServer(driver MainDriver) *FtpServer {
 	return &FtpServer{
 		driver: driver,
-		Logger: lognoop.NewNoOpLogger(),
+		Logger: slog.New(slog.NewTextHandler(io.Discard, nil)), //nolint:sloglint // DiscardHandler requires Go 1.23+
 	}
 }
 

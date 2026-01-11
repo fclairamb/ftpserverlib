@@ -4,6 +4,7 @@ import (
 	"crypto/tls"
 	"errors"
 	"io"
+	"log/slog"
 	"net"
 	"os"
 	"strings"
@@ -11,9 +12,6 @@ import (
 	"testing"
 	"time"
 
-	log "github.com/fclairamb/go-log"
-	"github.com/fclairamb/go-log/gokit"
-	gklog "github.com/go-kit/log"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/require"
 )
@@ -72,14 +70,14 @@ func NewTestServerWithTestDriver(t *testing.T, driver *TestServerDriver) *FtpSer
 	driver.Init()
 
 	// If we are in debug mode, we should log things
-	var logger log.Logger
+	var logger *slog.Logger
 	if driver.Debug {
-		logger = gokit.NewWrap(gklog.NewLogfmtLogger(gklog.NewSyncWriter(os.Stdout))).With(
-			"ts", gokit.GKDefaultTimestampUTC,
-			"caller", gokit.GKDefaultCaller,
-		)
+		logger = slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
+			AddSource: true,
+			Level:     slog.LevelDebug,
+		}))
 	} else {
-		logger = nil
+		logger = slog.New(slog.NewTextHandler(io.Discard, nil)) //nolint:sloglint // DiscardHandler requires Go 1.23+
 	}
 
 	s := NewTestServerWithDriverAndLogger(t, driver, logger)
@@ -88,7 +86,7 @@ func NewTestServerWithTestDriver(t *testing.T, driver *TestServerDriver) *FtpSer
 }
 
 // NewTestServerWithTestDriver provides a server instantiated with some settings
-func NewTestServerWithDriverAndLogger(t *testing.T, driver MainDriver, logger log.Logger) *FtpServer {
+func NewTestServerWithDriverAndLogger(t *testing.T, driver MainDriver, logger *slog.Logger) *FtpServer {
 	t.Helper()
 
 	server := NewFtpServer(driver)

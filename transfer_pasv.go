@@ -4,11 +4,10 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net"
 	"strings"
 	"time"
-
-	log "github.com/fclairamb/go-log"
 )
 
 // Active/Passive transfer connection handler
@@ -33,7 +32,7 @@ type passiveTransferHandler struct {
 	connection  net.Conn         // TCP Connection established
 	settings    *Settings        // Settings
 	info        string           // transfer info
-	logger      log.Logger       // Logger
+	logger      *slog.Logger     // Logger
 	// data connection requirement checker
 	checkDataConn func(dataConnIP net.IP, channelType DataChannel) error
 }

@@ -178,13 +178,12 @@ go test -v -run TestNamePattern ./...
 
 **Direct Dependencies**:
 - `github.com/spf13/afero` - Filesystem abstraction
-- `github.com/fclairamb/go-log` - Logging abstraction (supports go-kit, logrus, zap, zerolog)
+- `log/slog` - Go standard library structured logging (no external dependencies)
 - `golang.org/x/sys` - Platform syscalls
 
 **Test Dependencies**:
 - `github.com/stretchr/testify` - Assertions
 - `github.com/secsy/goftp` (replaced with `github.com/drakkan/goftp`) - FTP client
-- `github.com/go-kit/log` - Default logging backend for tests
 
 ## Common Tasks
 
