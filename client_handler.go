@@ -37,9 +37,12 @@ const (
 // TransferMode is the enumerable that represents the transfer mode (stream, block, compressed, deflate)
 type TransferMode int8
 
+// Transfer modes
 const (
-	TransferModeStream  TransferMode = iota // TransferModeStream is the standard mode
-	TransferModeDeflate                     // TransferModeDeflate is the deflate mode
+	// TransferModeStream is the standard uncompressed transfer mode
+	TransferModeStream TransferMode = iota
+	// TransferModeDeflate is the compressed transfer mode using deflate algorithm
+	TransferModeDeflate
 )
 
 // DataChannel is the enumerable that represents the data channel (active or passive)
@@ -740,7 +743,7 @@ type Flusher interface {
 // TransferFinalizer is the interface for transfer streams that need explicit
 // finalization (e.g., deflate streams need to write end-of-stream markers).
 // This is distinct from closing the underlying connection.
-// Note: We use FinalizeTransfer() instead of Close() to distinguish from io.Closer,
+// We use FinalizeTransfer() instead of Close() to distinguish from io.Closer,
 // since net.Conn already implements io.Closer and we don't want to accidentally
 // close the underlying connection.
 type TransferFinalizer interface {
@@ -772,7 +775,7 @@ func (c *clientHandler) TransferClose(transfer io.ReadWriter, err error) {
 	}
 
 	// Finally close the underlying connection.
-	// Note: "use of closed network connection" is normal in FTP - the client can close
+	// "Use of closed network connection" is normal in FTP - the client can close
 	// the connection when done, and we should treat this as success.
 	errClose := c.closeTransfer()
 	if errClose != nil && !isClosedConnError(errClose) {
