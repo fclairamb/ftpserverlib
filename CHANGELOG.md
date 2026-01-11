@@ -1,0 +1,14 @@
+# Changelog
+
+## [0.29.0](https://github.com/fclairamb/ftpserverlib/compare/v0.28.0...v0.29.0) (2026-01-11)
+
+
+### Features
+
+* **deflate:** Adding support for transfer compression ([#461](https://github.com/fclairamb/ftpserverlib/issues/461)) ([f90c6ac](https://github.com/fclairamb/ftpserverlib/commit/f90c6ac9ee1de783afc8a9cc5a935c5fba943f29))
+
+
+### Bug Fixes
+
+* **ci:** add release-please config files ([#600](https://github.com/fclairamb/ftpserverlib/issues/600)) ([cc8189b](https://github.com/fclairamb/ftpserverlib/commit/cc8189bcb6ff1a649dd794623ac4d2a11f89cae6))
+* **deps:** update module golang.org/x/sys to v0.40.0 ([#597](https://github.com/fclairamb/ftpserverlib/issues/597)) ([3960a3a](https://github.com/fclairamb/ftpserverlib/commit/3960a3ad10e1c2a4a4a3a1126d6c654335302bcc))
