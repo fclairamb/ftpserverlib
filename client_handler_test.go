@@ -1,6 +1,7 @@
 package ftpserver
 
 import (
+	"errors"
 	"fmt"
 	"net"
 	"slices"
@@ -489,4 +490,88 @@ func TestExtraData(t *testing.T) {
 		require.True(t, ok)
 		require.Equal(t, k, extra)
 	}
+}
+
+var (
+	errClosedConn    = net.ErrClosed
+	errConnReset     = errors.New("connection reset by peer")
+	errOther         = errors.New("some other error")
+	errWrappedClosed = fmt.Errorf("failed: %w", errClosedConn)
+)
+
+func TestIsClosedConnError(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		err      error
+		expected bool
+	}{
+		{name: "nil error", err: nil, expected: false},
+		{name: "net.ErrClosed", err: errClosedConn, expected: true},
+		{name: "connection reset by peer", err: errConnReset, expected: true},
+		{name: "wrapped closed connection error", err: errWrappedClosed, expected: true},
+		{name: "other error", err: errOther, expected: false},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			result := isClosedConnError(tc.err)
+			assert.Equal(t, tc.expected, result)
+		})
+	}
+}
+
+func TestDeflateReadWriterFlush(t *testing.T) {
+	t.Parallel()
+
+	// Create a buffer to write to
+	buf := &mockReadWriter{}
+
+	// Create deflate transfer
+	deflate, err := newDeflateTransfer(buf, 5)
+	require.NoError(t, err)
+
+	// Write some data
+	data := []byte("test data for deflate")
+	n, err := deflate.Write(data)
+	require.NoError(t, err)
+	require.Equal(t, len(data), n)
+
+	// Test Flush
+	err = deflate.Flush()
+	require.NoError(t, err)
+
+	// Verify data was written to buffer
+	require.Positive(t, buf.writeCount)
+}
+
+func TestNewDeflateTransferInvalidLevel(t *testing.T) {
+	t.Parallel()
+
+	buf := &mockReadWriter{}
+
+	// Test with invalid compression level (valid range is -2 to 9)
+	_, err := newDeflateTransfer(buf, 100)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "could not create deflate writer")
+}
+
+// mockReadWriter is a simple mock for testing
+type mockReadWriter struct {
+	writeCount int
+	readCount  int
+}
+
+func (m *mockReadWriter) Write(p []byte) (int, error) {
+	m.writeCount++
+
+	return len(p), nil
+}
+
+func (m *mockReadWriter) Read(_ []byte) (int, error) {
+	m.readCount++
+
+	return 0, nil
 }
