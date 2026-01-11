@@ -524,6 +524,12 @@ func (c *clientHandler) handleREST(param string) error {
 			return nil
 		}
 
+		if c.transferMode == TransferModeDeflate {
+			c.writeMessage(StatusSyntaxErrorParameters, "Resuming transfers not allowed in deflate mode")
+
+			return nil
+		}
+
 		c.ctxRest = size
 		c.writeMessage(StatusFileActionPending, "OK")
 	} else {

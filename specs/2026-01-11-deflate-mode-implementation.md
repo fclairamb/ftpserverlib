@@ -218,18 +218,18 @@ The current implementation handles this correctly since `deflateReadWriter` embe
 
 ## Implementation Checklist
 
-- [ ] Update `deflateReadWriter` with proper `Close()` method
-- [ ] Update `TransferClose` to call `Close()` before closing connection
-- [ ] Add MODE Z to FEAT response
-- [ ] Set default `DeflateCompressionLevel` to 5 if not configured
-- [ ] Add tests for:
-  - [ ] Upload with deflate mode
-  - [ ] Download with deflate mode
-  - [ ] MODE Z followed by MODE S (switch back to stream)
+- [x] Update `deflateReadWriter` with `FinalizeTransfer()` method
+- [x] Update `TransferClose` to call `FinalizeTransfer()` before closing connection
+- [x] Add MODE Z to FEAT response
+- [x] Set default `DeflateCompressionLevel` to 5 if not configured (was already done)
+- [x] Add tests for:
+  - [x] Upload with deflate mode
+  - [x] Download with deflate mode
+  - [x] MODE Z followed by MODE S (switch back to stream)
   - [ ] Deflate with ASCII mode (TYPE A + MODE Z)
   - [ ] Large file transfers with deflate
   - [ ] Error handling (connection drops during deflate transfer)
-- [ ] Consider REST + MODE Z interaction
+- [x] Disallow REST with MODE Z (streaming compression can't resume)
 - [ ] Update documentation
 
 ## Testing Strategy

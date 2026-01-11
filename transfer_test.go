@@ -1487,6 +1487,13 @@ func TestTransferModeDeflate(t *testing.T) {
 		require.Equal(t, string(contents), writer.String())
 		require.Equal(t, localHash, remoteHash)
 	}
+
+	{ // Verify REST is not allowed in deflate mode
+		rc, response, errRest := raw.SendCommand("REST 10")
+		require.NoError(t, errRest)
+		require.Equal(t, StatusSyntaxErrorParameters, rc, response)
+		require.Contains(t, response, "deflate mode")
+	}
 }
 
 // TestConnectionCloseDuringTransfer tests the behavior when the control connection is closed
