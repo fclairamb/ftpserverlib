@@ -222,6 +222,7 @@ func (c *clientHandler) handleFEAT(_ string) error {
 		"SIZE",
 		"MDTM",
 		"REST STREAM",
+		"MODE Z",
 		"EPRT",
 		"EPSV",
 	}
@@ -295,9 +296,14 @@ func (c *clientHandler) handleTYPE(param string) error {
 }
 
 func (c *clientHandler) handleMODE(param string) error {
-	if param == "S" {
+	switch param {
+	case "S":
+		c.transferMode = TransferModeStream
 		c.writeMessage(StatusOK, "Using stream mode")
-	} else {
+	case "Z":
+		c.transferMode = TransferModeDeflate
+		c.writeMessage(StatusOK, "Using deflate mode")
+	default:
 		c.writeMessage(StatusNotImplementedParam, "Unsupported mode")
 	}
 

@@ -55,12 +55,12 @@ func (driver *TestServerDriver) Init() {
 	}
 
 	{
-		dir, _ := os.MkdirTemp("", "example")
-		if err := os.MkdirAll(dir, 0o750); err != nil {
+		driver.serverDir, _ = os.MkdirTemp("", "example")
+		if err := os.MkdirAll(driver.serverDir, 0o750); err != nil {
 			panic(err)
 		}
 
-		driver.fs = afero.NewBasePathFs(afero.NewOsFs(), dir)
+		driver.fs = afero.NewBasePathFs(afero.NewOsFs(), driver.serverDir)
 	}
 }
 
@@ -124,6 +124,7 @@ type authUserProvider func(user, pass string) (ClientDriver, error)
 type TestServerDriver struct {
 	Clients              []ClientContext
 	errPassiveListener   error
+	serverDir            string
 	fs                   afero.Fs
 	clientMU             sync.Mutex
 	AuthProvider         authUserProvider

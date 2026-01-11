@@ -24,6 +24,9 @@ type transferHandler interface {
 	GetInfo() string
 }
 
+// activeTransferHandler implements the transferHandler interface
+var _ transferHandler = (*passiveTransferHandler)(nil)
+
 // Passive connection
 type passiveTransferHandler struct {
 	listener    net.Listener     // TCP or SSL Listener

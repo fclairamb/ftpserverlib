@@ -12,7 +12,6 @@ import (
 	"hash"
 	"hash/crc32"
 	"io"
-	"net"
 	"os"
 	"runtime"
 	"strconv"
@@ -118,10 +117,10 @@ func (c *clientHandler) transferFile(write bool, appendFile bool, param, info st
 	}
 
 	// closing the transfer we also send the response message to the FTP client
-	c.TransferClose(err)
+	c.TransferClose(fileTransferConn, err)
 }
 
-func (c *clientHandler) doFileTransfer(transferConn net.Conn, file io.ReadWriter, write bool) error {
+func (c *clientHandler) doFileTransfer(transferConn io.ReadWriter, file io.ReadWriter, write bool) error {
 	var err error
 	var reader io.Reader
 	var writer io.Writer
@@ -521,6 +520,12 @@ func (c *clientHandler) handleREST(param string) error {
 	if size, err := strconv.ParseInt(param, 10, 0); err == nil {
 		if c.currentTransferType == TransferTypeASCII {
 			c.writeMessage(StatusSyntaxErrorParameters, "Resuming transfers not allowed in ASCII mode")
+
+			return nil
+		}
+
+		if c.transferMode == TransferModeDeflate {
+			c.writeMessage(StatusSyntaxErrorParameters, "Resuming transfers not allowed in deflate mode")
 
 			return nil
 		}

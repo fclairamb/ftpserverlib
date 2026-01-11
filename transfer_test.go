@@ -11,6 +11,7 @@ import (
 	"math/rand"
 	"net"
 	"os"
+	"path"
 	"path/filepath"
 	"runtime"
 	"strconv"
@@ -114,11 +115,22 @@ func ftpDownloadAndHash(t *testing.T, ftp *goftp.Client, filename string) string
 	return hex.EncodeToString(hasher.Sum(nil))
 }
 
-func ftpDownloadAndHashWithRawConnection(t *testing.T, raw goftp.RawConn, fileName string) string {
+type ftpDownloadOptions struct {
+	deflateMode bool
+	otherWriter io.Writer
+}
+
+func ftpDownloadAndHashWithRawConnection(
+	t *testing.T, raw goftp.RawConn, fileName string, options *ftpDownloadOptions,
+) string {
 	t.Helper()
 
 	req := require.New(t)
 	hasher := sha256.New()
+
+	if options == nil {
+		options = &ftpDownloadOptions{}
+	}
 
 	dcGetter, err := raw.PrepareDataConn()
 	req.NoError(err)
@@ -130,7 +142,20 @@ func ftpDownloadAndHashWithRawConnection(t *testing.T, raw goftp.RawConn, fileNa
 	dataConn, err := dcGetter()
 	req.NoError(err)
 
-	_, err = io.Copy(hasher, dataConn)
+	var transfer io.ReadWriter = dataConn
+
+	if options.deflateMode {
+		transfer, err = newDeflateTransfer(transfer, 5)
+		req.NoError(err)
+	}
+
+	var writer io.Writer = hasher
+
+	if options.otherWriter != nil {
+		writer = io.MultiWriter(writer, options.otherWriter)
+	}
+
+	_, err = io.Copy(writer, transfer)
 	req.NoError(err)
 
 	err = dataConn.Close()
@@ -143,15 +168,26 @@ func ftpDownloadAndHashWithRawConnection(t *testing.T, raw goftp.RawConn, fileNa
 	return hex.EncodeToString(hasher.Sum(nil))
 }
 
-func ftpUploadWithRawConnection(t *testing.T, raw goftp.RawConn, file io.Reader, fileName string, appendFile bool) {
+type ftpUploadOptions struct {
+	appendFile  bool
+	deflateMode bool
+}
+
+func ftpUploadWithRawConnection(
+	t *testing.T, raw goftp.RawConn, file io.Reader, fileName string, options *ftpUploadOptions,
+) {
 	t.Helper()
 
 	req := require.New(t)
 	dcGetter, err := raw.PrepareDataConn()
 	req.NoError(err)
 
+	if options == nil {
+		options = &ftpUploadOptions{}
+	}
+
 	cmd := "STOR"
-	if appendFile {
+	if options.appendFile {
 		cmd = "APPE"
 	}
 
@@ -162,8 +198,23 @@ func ftpUploadWithRawConnection(t *testing.T, raw goftp.RawConn, file io.Reader,
 	dataConn, err := dcGetter()
 	req.NoError(err)
 
-	_, err = io.Copy(dataConn, file)
+	var transfer io.ReadWriter = dataConn
+
+	if options.deflateMode {
+		transfer, err = newDeflateTransfer(transfer, 5)
+		req.NoError(err)
+	}
+
+	_, err = io.Copy(transfer, file)
 	req.NoError(err)
+
+	// Finalize deflate transfer to write end-of-stream marker (BFINAL block)
+	if finalizer, ok := transfer.(TransferFinalizer); ok {
+		req.NoError(finalizer.FinalizeTransfer())
+	} else if transferFlusher, ok := transfer.(Flusher); ok {
+		// Only flush if not a TransferFinalizer (FinalizeTransfer already flushes for deflate)
+		req.NoError(transferFlusher.Flush())
+	}
 
 	err = dataConn.Close()
 	req.NoError(err)
@@ -536,7 +587,7 @@ func TestAPPEExistingFile(t *testing.T) {
 	_, err = file.Seek(1024, io.SeekStart)
 	require.NoError(t, err)
 
-	ftpUploadWithRawConnection(t, raw, file, fileName, true)
+	ftpUploadWithRawConnection(t, raw, file, fileName, &ftpUploadOptions{appendFile: true})
 
 	info, err := client.Stat(fileName)
 	require.NoError(t, err)
@@ -572,7 +623,7 @@ func TestAPPENewFile(t *testing.T) {
 
 	fileName := filepath.Base(file.Name())
 
-	ftpUploadWithRawConnection(t, raw, file, fileName, true)
+	ftpUploadWithRawConnection(t, raw, file, fileName, &ftpUploadOptions{appendFile: true})
 
 	localHash := hashFile(t, file)
 	remoteHash := ftpDownloadAndHash(t, client, fileName)
@@ -927,7 +978,7 @@ func TestASCIITransfers(t *testing.T) {
 	_, err = file.Seek(0, io.SeekStart)
 	require.NoError(t, err)
 
-	ftpUploadWithRawConnection(t, raw, file, "file.txt", false)
+	ftpUploadWithRawConnection(t, raw, file, "file.txt", nil)
 
 	files, err := client.ReadDir("/")
 	require.NoError(t, err)
@@ -939,7 +990,7 @@ func TestASCIITransfers(t *testing.T) {
 		require.Equal(t, int64(len(contents)), files[0].Size())
 	}
 
-	remoteHash := ftpDownloadAndHashWithRawConnection(t, raw, "file.txt")
+	remoteHash := ftpDownloadAndHashWithRawConnection(t, raw, "file.txt", nil)
 	localHash := hashFile(t, file)
 	require.Equal(t, localHash, remoteHash)
 }
@@ -979,9 +1030,9 @@ func TestASCIITransfersInvalidFiles(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, StatusOK, rc, response)
 
-	ftpUploadWithRawConnection(t, raw, file, "file.bin", false)
+	ftpUploadWithRawConnection(t, raw, file, "file.bin", nil)
 
-	remoteHash := ftpDownloadAndHashWithRawConnection(t, raw, "file.bin")
+	remoteHash := ftpDownloadAndHashWithRawConnection(t, raw, "file.bin", nil)
 	require.Equal(t, localHash, remoteHash)
 }
 
@@ -1359,6 +1410,101 @@ func getPortFromEPSVResponse(t *testing.T, resp string) int {
 	require.NoError(t, err)
 
 	return port
+}
+
+func TestTransferModeDeflate(t *testing.T) {
+	driver := &TestServerDriver{Debug: true}
+	server := NewTestServerWithTestDriver(t, driver)
+
+	conf := goftp.Config{User: authUser, Password: authPass}
+	client, err := goftp.DialConfig(conf, server.Addr())
+	require.NoError(t, err, "Couldn't connect")
+
+	defer func() { require.NoError(t, client.Close()) }()
+
+	raw, err := client.OpenRawConn()
+	require.NoError(t, err)
+
+	defer func() { require.NoError(t, raw.Close()) }()
+
+	// Create test file
+	contents := []byte("line1\r\n\r\nline3\r\n,line4")
+	file, localHash := createTestFileWithHash(t, contents)
+
+	defer func() { require.NoError(t, file.Close()) }()
+
+	// Enable deflate mode
+	rc, response, errMode := raw.SendCommand("MODE Z")
+	require.NoError(t, errMode)
+	require.Equal(t, StatusOK, rc, response)
+
+	t.Run("upload", func(t *testing.T) {
+		_, err = file.Seek(0, io.SeekStart)
+		require.NoError(t, err)
+
+		ftpUploadWithRawConnection(t, raw, file, "file.txt", &ftpUploadOptions{deflateMode: true})
+
+		files, err := client.ReadDir("/")
+		require.NoError(t, err)
+		require.Len(t, files, 1)
+
+		// Verify file on server
+		fp, err := os.Open(path.Join(driver.serverDir, "file.txt"))
+		require.NoError(t, err)
+
+		defer func() { require.NoError(t, fp.Close()) }()
+
+		readContents, err := io.ReadAll(fp)
+		require.NoError(t, err)
+		require.Equal(t, string(contents), string(readContents))
+	})
+
+	t.Run("mode-switching", func(t *testing.T) {
+		// Switch to stream mode
+		returnCode, response, errMode := raw.SendCommand("MODE S")
+		require.NoError(t, errMode)
+		require.Equal(t, StatusOK, returnCode, response)
+
+		// Download in stream mode
+		writer := bytes.NewBuffer(nil)
+		remoteHash := ftpDownloadAndHashWithRawConnection(t, raw, "file.txt", &ftpDownloadOptions{otherWriter: writer})
+		require.Equal(t, string(contents), writer.String())
+		require.Equal(t, localHash, remoteHash)
+
+		// Switch back to deflate mode
+		returnCode, response, errMode = raw.SendCommand("MODE Z")
+		require.NoError(t, errMode)
+		require.Equal(t, StatusOK, returnCode, response)
+	})
+
+	t.Run("download-deflate", func(t *testing.T) {
+		writer := bytes.NewBuffer(nil)
+		opts := &ftpDownloadOptions{deflateMode: true, otherWriter: writer}
+		remoteHash := ftpDownloadAndHashWithRawConnection(t, raw, "file.txt", opts)
+		require.Equal(t, string(contents), writer.String())
+		require.Equal(t, localHash, remoteHash)
+	})
+
+	t.Run("rest-not-allowed", func(t *testing.T) {
+		rc, response, errRest := raw.SendCommand("REST 10")
+		require.NoError(t, errRest)
+		require.Equal(t, StatusSyntaxErrorParameters, rc, response)
+		require.Contains(t, response, "deflate mode")
+	})
+}
+
+func createTestFileWithHash(t *testing.T, contents []byte) (*os.File, string) {
+	t.Helper()
+
+	file, err := os.CreateTemp("", "ftpserver")
+	require.NoError(t, err)
+
+	_, err = file.Write(contents)
+	require.NoError(t, err)
+
+	localHash := hashFile(t, file)
+
+	return file, localHash
 }
 
 // TestConnectionCloseDuringTransfer tests the behavior when the control connection is closed

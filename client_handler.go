@@ -2,6 +2,7 @@ package ftpserver
 
 import (
 	"bufio"
+	"compress/flate"
 	"errors"
 	"fmt"
 	"io"
@@ -31,6 +32,17 @@ type TransferType int8
 const (
 	TransferTypeASCII TransferType = iota
 	TransferTypeBinary
+)
+
+// TransferMode is the enumerable that represents the transfer mode (stream, block, compressed, deflate)
+type TransferMode int8
+
+// Transfer modes
+const (
+	// TransferModeStream is the standard uncompressed transfer mode
+	TransferModeStream TransferMode = iota
+	// TransferModeDeflate is the compressed transfer mode using deflate algorithm
+	TransferModeDeflate
 )
 
 // DataChannel is the enumerable that represents the data channel (active or passive)
@@ -103,6 +115,7 @@ type clientHandler struct {
 	debug               bool            // Show debugging info on the server side
 	transferTLS         bool            // Use TLS for transfer connection
 	controlTLS          bool            // Use TLS for control connection
+	transferMode        TransferMode    // Transfer mode (stream, deflate)
 	isTransferOpen      bool            // indicate if the transfer connection is opened
 	isTransferAborted   bool            // indicate if the transfer was aborted
 	connClosed          bool            // indicates if the connection has been commanded to close
@@ -660,7 +673,7 @@ func (c *clientHandler) GetTranferInfo() string {
 	return c.transfer.GetInfo()
 }
 
-func (c *clientHandler) TransferOpen(info string) (net.Conn, error) {
+func (c *clientHandler) TransferOpen(info string) (io.ReadWriter, error) {
 	c.transferMu.Lock()
 	defer c.transferMu.Unlock()
 
@@ -696,6 +709,17 @@ func (c *clientHandler) TransferOpen(info string) (net.Conn, error) {
 		return nil, err
 	}
 
+	var transferStream io.ReadWriter = conn
+
+	if c.transferMode == TransferModeDeflate {
+		transferStream, err = newDeflateTransfer(transferStream, c.server.settings.DeflateCompressionLevel)
+		if err != nil {
+			c.writeMessage(StatusActionNotTaken, fmt.Sprintf("Could not switch to deflate mode: %v", err))
+
+			return nil, fmt.Errorf("could not switch to deflate mode: %w", err)
+		}
+	}
+
 	c.isTransferOpen = true
 	c.transfer.SetInfo(info)
 
@@ -708,18 +732,56 @@ func (c *clientHandler) TransferOpen(info string) (net.Conn, error) {
 			"localAddr", conn.LocalAddr().String())
 	}
 
-	return conn, nil
+	return transferStream, nil
 }
 
-func (c *clientHandler) TransferClose(err error) {
+// Flusher is the interface that wraps the basic Flush method.
+type Flusher interface {
+	Flush() error
+}
+
+// TransferFinalizer is the interface for transfer streams that need explicit
+// finalization (e.g., deflate streams need to write end-of-stream markers).
+// This is distinct from closing the underlying connection.
+// We use FinalizeTransfer() instead of Close() to distinguish from io.Closer,
+// since net.Conn already implements io.Closer and we don't want to accidentally
+// close the underlying connection.
+type TransferFinalizer interface {
+	FinalizeTransfer() error
+}
+
+func (c *clientHandler) TransferClose(transfer io.ReadWriter, err error) {
 	c.transferMu.Lock()
 	defer c.transferMu.Unlock()
 
+	// Check if this is a transfer stream that needs explicit finalization (e.g., deflate).
+	// TransferFinalizer.FinalizeTransfer() for deflate writes the end-of-stream marker AND flushes,
+	// so we don't need to call Flush() separately.
+	if finalizer, ok := transfer.(TransferFinalizer); ok {
+		if errFinalize := finalizer.FinalizeTransfer(); errFinalize != nil {
+			c.logger.Warn(
+				"Error finalizing transfer stream",
+				"err", errFinalize,
+			)
+		}
+	} else if flush, ok := transfer.(Flusher); ok {
+		// Only flush if NOT a TransferCloser (deflate's Close already flushes)
+		if errFlush := flush.Flush(); errFlush != nil {
+			c.logger.Warn(
+				"Error flushing transfer connection",
+				"err", errFlush,
+			)
+		}
+	}
+
+	// Finally close the underlying connection.
+	// "Use of closed network connection" is normal in FTP - the client can close
+	// the connection when done, and we should treat this as success.
 	errClose := c.closeTransfer()
-	if errClose != nil {
+	if errClose != nil && !isClosedConnError(errClose) {
 		c.logger.Warn(
 			"Problem closing transfer connection",
-			"err", err,
+			"err", errClose,
 		)
 	}
 
@@ -730,6 +792,11 @@ func (c *clientHandler) TransferClose(err error) {
 		return
 	}
 
+	// Treat "connection already closed" as success - it means transfer completed
+	if isClosedConnError(errClose) {
+		errClose = nil
+	}
+
 	switch {
 	case err == nil && errClose == nil:
 		c.writeMessage(StatusClosingDataConn, "Closing transfer connection")
@@ -738,6 +805,19 @@ func (c *clientHandler) TransferClose(err error) {
 	case err != nil:
 		c.writeMessage(getErrorCode(err, StatusActionNotTaken), fmt.Sprintf("Issue during transfer: %v", err))
 	}
+}
+
+// isClosedConnError checks if the error indicates the connection is already closed.
+// This is normal FTP behavior - the client can close the connection when done.
+func isClosedConnError(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	errStr := err.Error()
+
+	return strings.Contains(errStr, "use of closed network connection") ||
+		strings.Contains(errStr, "connection reset by peer")
 }
 
 func (c *clientHandler) checkDataConnectionRequirement(dataConnIP net.IP, channelType DataChannel) error {
@@ -820,4 +900,58 @@ func getMessageLines(message string) []string {
 	}
 
 	return lines
+}
+
+// Compile-time checks that deflateReadWriter implements required interfaces
+var (
+	_ Flusher           = (*deflateReadWriter)(nil)
+	_ TransferFinalizer = (*deflateReadWriter)(nil)
+)
+
+type deflateReadWriter struct {
+	reader io.ReadCloser // flate.NewReader returns io.ReadCloser
+	writer *flate.Writer
+}
+
+func (d *deflateReadWriter) Read(p []byte) (int, error) {
+	return d.reader.Read(p)
+}
+
+func (d *deflateReadWriter) Write(p []byte) (int, error) {
+	return d.writer.Write(p)
+}
+
+// Flush flushes buffered data to the underlying writer.
+func (d *deflateReadWriter) Flush() error {
+	return d.writer.Flush()
+}
+
+// FinalizeTransfer finalizes the deflate stream by writing the BFINAL block (end-of-stream marker).
+// This does NOT close the underlying connection - it only finalizes the deflate stream.
+func (d *deflateReadWriter) FinalizeTransfer() error {
+	// Close the writer to write the BFINAL block
+	if err := d.writer.Close(); err != nil {
+		return fmt.Errorf("error closing deflate writer: %w", err)
+	}
+
+	// Close the reader to release resources
+	if err := d.reader.Close(); err != nil {
+		return fmt.Errorf("error closing deflate reader: %w", err)
+	}
+
+	return nil
+}
+
+func newDeflateTransfer(conn io.ReadWriter, level int) (*deflateReadWriter, error) {
+	writer, err := flate.NewWriter(conn, level)
+	if err != nil {
+		return nil, fmt.Errorf("could not create deflate writer: %w", err)
+	}
+
+	reader := flate.NewReader(conn)
+
+	return &deflateReadWriter{
+		reader: reader,
+		writer: writer,
+	}, nil
 }
