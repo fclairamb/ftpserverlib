@@ -451,6 +451,15 @@ func (c *clientHandler) readCommand() bool {
 	if c.server.settings.IdleTimeout > 0 {
 		if err := c.conn.SetDeadline(
 			time.Now().Add(time.Duration(time.Second.Nanoseconds() * int64(c.server.settings.IdleTimeout)))); err != nil {
+			// If the connection is already closed, return early instead of trying to read
+			if isClosedConnError(err) {
+				if c.debug {
+					c.logger.Debug("Client disconnected before first command")
+				}
+
+				return true
+			}
+
 			c.logger.Error("Network error", "err", err)
 		}
 	}
@@ -525,7 +534,25 @@ func (c *clientHandler) handleCommandsStreamError(err error) bool {
 			return true
 		}
 
+		// Check if this is a closed connection error - treat as normal disconnect
+		if isClosedConnError(err) {
+			if c.debug {
+				c.logger.Debug("Client disconnected", "clean", false)
+			}
+
+			return true
+		}
+
 		c.logger.Error("Network error", "err", err)
+
+		return true
+	}
+
+	// Check for closed connection errors before logging as error
+	if isClosedConnError(err) {
+		if c.debug {
+			c.logger.Debug("Client disconnected", "clean", false)
+		}
 
 		return true
 	}
