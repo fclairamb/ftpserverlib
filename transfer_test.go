@@ -1413,7 +1413,11 @@ func getPortFromEPSVResponse(t *testing.T, resp string) int {
 }
 
 func TestTransferModeDeflate(t *testing.T) {
-	driver := &TestServerDriver{Debug: true}
+	settings := &Settings{
+		DeflateCompressionLevel: 5,
+		DefaultTransferType:     TransferTypeBinary,
+	}
+	driver := &TestServerDriver{Debug: true, Settings: settings}
 	server := NewTestServerWithTestDriver(t, driver)
 
 	conf := goftp.Config{User: authUser, Password: authPass}
