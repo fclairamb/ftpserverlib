@@ -438,6 +438,10 @@ func TestMode(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, StatusOK, returnCode)
 
+	returnCode, _, err = raw.SendCommand("MODE Z") // Disabled by default
+	require.NoError(t, err)
+	require.Equal(t, StatusNotImplementedParam, returnCode)
+
 	returnCode, _, err = raw.SendCommand("MODE X")
 	require.NoError(t, err)
 	require.Equal(t, StatusNotImplementedParam, returnCode)

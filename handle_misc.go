@@ -222,9 +222,12 @@ func (c *clientHandler) handleFEAT(_ string) error {
 		"SIZE",
 		"MDTM",
 		"REST STREAM",
-		"MODE Z",
 		"EPRT",
 		"EPSV",
+	}
+
+	if c.server.settings.DeflateCompressionLevel > 0 {
+		features = append(features, "MODE Z")
 	}
 
 	if !c.server.settings.DisableMLSD {
@@ -301,8 +304,12 @@ func (c *clientHandler) handleMODE(param string) error {
 		c.transferMode = TransferModeStream
 		c.writeMessage(StatusOK, "Using stream mode")
 	case "Z":
-		c.transferMode = TransferModeDeflate
-		c.writeMessage(StatusOK, "Using deflate mode")
+		if c.server.settings.DeflateCompressionLevel > 0 {
+			c.transferMode = TransferModeDeflate
+			c.writeMessage(StatusOK, "Using deflate mode")
+		} else {
+			c.writeMessage(StatusNotImplementedParam, "Unimplemented MODE type")
+		}
 	default:
 		c.writeMessage(StatusNotImplementedParam, "Unsupported mode")
 	}
