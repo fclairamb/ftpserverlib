@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.30.0](https://github.com/fclairamb/ftpserverlib/compare/v0.29.0...v0.30.0) (2026-01-24)
+
+
+### Features
+
+* make MODE Z configurable, disabled by default ([#604](https://github.com/fclairamb/ftpserverlib/issues/604)) ([23fbe72](https://github.com/fclairamb/ftpserverlib/commit/23fbe72645ceb8b6343a67761f8242aa221d5b29))
+
+
+### Bug Fixes
+
+* handle closed connection errors gracefully ([#602](https://github.com/fclairamb/ftpserverlib/issues/602)) ([21f789a](https://github.com/fclairamb/ftpserverlib/commit/21f789ac54d5c8119ea9cabc22159fba6b94a19a))
+
 ## [0.29.0](https://github.com/fclairamb/ftpserverlib/compare/v0.28.0...v0.29.0) (2026-01-11)
 
 
