@@ -1,8 +1,12 @@
 package ftpserver
 
 import (
+	"bufio"
+	"bytes"
 	"errors"
 	"fmt"
+	"io"
+	"log/slog"
 	"net"
 	"slices"
 	"sync"
@@ -493,10 +497,12 @@ func TestExtraData(t *testing.T) {
 }
 
 var (
-	errClosedConn    = net.ErrClosed
-	errConnReset     = errors.New("connection reset by peer")
-	errOther         = errors.New("some other error")
-	errWrappedClosed = fmt.Errorf("failed: %w", errClosedConn)
+	errClosedConn     = net.ErrClosed
+	errConnReset      = errors.New("connection reset by peer")
+	errOther          = errors.New("some other error")
+	errWrappedClosed  = fmt.Errorf("failed: %w", errClosedConn)
+	errClosedConnText = errors.New("use of closed network connection")
+	errRandomError    = errors.New("some random error")
 )
 
 func TestIsClosedConnError(t *testing.T) {
@@ -519,6 +525,72 @@ func TestIsClosedConnError(t *testing.T) {
 			t.Parallel()
 			result := isClosedConnError(tc.err)
 			assert.Equal(t, tc.expected, result)
+		})
+	}
+}
+
+// mockNetError implements net.Error for testing
+type mockNetError struct {
+	msg       string
+	timeout   bool
+	temporary bool
+}
+
+func (e *mockNetError) Error() string   { return e.msg }
+func (e *mockNetError) Timeout() bool   { return e.timeout }
+func (e *mockNetError) Temporary() bool { return e.temporary }
+
+// testHandleCommandsStreamErrorCase represents a test case for handleCommandsStreamError.
+type testHandleCommandsStreamErrorCase struct {
+	name               string
+	err                error
+	debug              bool
+	expectedDisconnect bool
+}
+
+// getHandleCommandsStreamErrorTestCases returns all test cases for handleCommandsStreamError.
+func getHandleCommandsStreamErrorTestCases() []testHandleCommandsStreamErrorCase {
+	return []testHandleCommandsStreamErrorCase{
+		{name: "EOF with debug", err: io.EOF, debug: true, expectedDisconnect: true},
+		{name: "EOF without debug", err: io.EOF, debug: false, expectedDisconnect: true},
+		{name: "non-net.Error closed with debug", err: errClosedConnText, debug: true, expectedDisconnect: true},
+		{name: "non-net.Error closed without debug", err: errClosedConnText, debug: false, expectedDisconnect: true},
+		{name: "non-net.Error reset", err: errConnReset, debug: true, expectedDisconnect: true},
+		{name: "net.Error closed with debug", err: &mockNetError{msg: "use of closed network connection"},
+			debug: true, expectedDisconnect: true},
+		{name: "net.Error closed without debug", err: &mockNetError{msg: "use of closed network connection"},
+			debug: false, expectedDisconnect: true},
+		{name: "net.Error other", err: &mockNetError{msg: "other network error"}, debug: false, expectedDisconnect: true},
+		{name: "generic error", err: errRandomError, debug: false, expectedDisconnect: true},
+	}
+}
+
+// TestHandleCommandsStreamError tests the handleCommandsStreamError function
+// with various error types to ensure proper handling of closed connections.
+func TestHandleCommandsStreamError(t *testing.T) {
+	t.Parallel()
+
+	//nolint:sloglint // DiscardHandler requires Go 1.23+
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+
+	for _, testCase := range getHandleCommandsStreamErrorTestCases() {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			buf := bytes.Buffer{}
+			server := &FtpServer{
+				settings: &Settings{IdleTimeout: 0},
+				Logger:   logger,
+			}
+			handler := &clientHandler{
+				writer: bufio.NewWriter(&buf),
+				server: server,
+				logger: logger,
+				debug:  testCase.debug,
+			}
+
+			result := handler.handleCommandsStreamError(testCase.err)
+			assert.Equal(t, testCase.expectedDisconnect, result)
 		})
 	}
 }
@@ -574,4 +646,93 @@ func (m *mockReadWriter) Read(_ []byte) (int, error) {
 	m.readCount++
 
 	return 0, nil
+}
+
+// TestImmediateClientDisconnect tests that when a client connects and immediately
+// disconnects (before sending any FTP commands), the server handles it gracefully
+// without logging errors. This is common behavior for FTP clients that probe
+// connections or do quick connectivity checks.
+func TestImmediateClientDisconnect(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name  string
+		debug bool
+	}{
+		{name: "with debug", debug: true},
+		{name: "without debug", debug: false},
+	}
+
+	for _, testCase := range tests {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			server := NewTestServer(t, testCase.debug)
+			dialer := &net.Dialer{Timeout: 5 * time.Second}
+
+			// Connect and immediately close without sending any commands
+			conn, err := dialer.DialContext(t.Context(), "tcp", server.Addr())
+			require.NoError(t, err)
+
+			// Read the welcome message to ensure the server has started handling us
+			buf := make([]byte, 1024)
+			_, err = conn.Read(buf)
+			require.NoError(t, err)
+
+			// Close immediately without sending any commands
+			err = conn.Close()
+			require.NoError(t, err)
+
+			// Give the server time to process the disconnect
+			time.Sleep(100 * time.Millisecond)
+
+			// Verify server is still functional by connecting again
+			newConn, err := dialer.DialContext(t.Context(), "tcp", server.Addr())
+			require.NoError(t, err)
+
+			defer func() { _ = newConn.Close() }()
+
+			_, err = newConn.Read(buf)
+			require.NoError(t, err)
+			require.Contains(t, string(buf), "220")
+		})
+	}
+}
+
+// TestMultipleImmediateDisconnects tests that the server handles many rapid
+// connect/disconnect cycles gracefully (simulating probe traffic).
+func TestMultipleImmediateDisconnects(t *testing.T) {
+	t.Parallel()
+
+	server := NewTestServer(t, true)
+	dialer := &net.Dialer{Timeout: 5 * time.Second}
+
+	for range 10 {
+		conn, err := dialer.DialContext(t.Context(), "tcp", server.Addr())
+		require.NoError(t, err)
+
+		// Read welcome message
+		buf := make([]byte, 1024)
+		_, _ = conn.Read(buf)
+
+		// Immediate close
+		_ = conn.Close()
+	}
+
+	// Small delay to let server process all disconnects
+	time.Sleep(200 * time.Millisecond)
+
+	// Verify server still works
+	conf := goftp.Config{
+		User:     authUser,
+		Password: authPass,
+	}
+
+	client, err := goftp.DialConfig(conf, server.Addr())
+	require.NoError(t, err)
+
+	defer func() { _ = client.Close() }()
+
+	_, err = client.ReadDir("/")
+	require.NoError(t, err)
 }
