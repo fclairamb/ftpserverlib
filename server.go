@@ -164,10 +164,6 @@ func (server *FtpServer) loadSettings() error {
 		settings.Banner = "ftpserver - golang FTP server"
 	}
 
-	if settings.DeflateCompressionLevel == 0 {
-		settings.DeflateCompressionLevel = 5
-	}
-
 	server.settings = settings
 
 	return nil
