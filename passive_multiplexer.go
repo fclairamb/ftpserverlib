@@ -12,7 +12,7 @@ import (
 var errPassiveListenerReservedForIP = errors.New("passive listener already reserved for client ip")
 
 type passiveDeadlineSetter interface {
-	SetDeadline(time.Time) error
+	SetDeadline(deadline time.Time) error
 }
 
 type passivePortCandidate struct {
@@ -34,7 +34,10 @@ func newPassiveListenersManager(logger *slog.Logger) *passiveListenersManager {
 	}
 }
 
-func (m *passiveListenersManager) reserve(remoteIP net.IP, portRange PasvPortGetter) (int, net.Listener, passiveDeadlineSetter, error) {
+func (m *passiveListenersManager) reserve(
+	remoteIP net.IP,
+	portRange PasvPortGetter,
+) (int, net.Listener, passiveDeadlineSetter, error) {
 	for _, candidate := range getPassivePortCandidates(portRange) {
 		listener, err := m.getOrCreate(candidate.listenedPort)
 		if err != nil {
@@ -57,6 +60,7 @@ func (m *passiveListenersManager) close() error {
 	m.mu.Lock()
 	if m.closed {
 		m.mu.Unlock()
+
 		return nil
 	}
 
@@ -81,10 +85,12 @@ func (m *passiveListenersManager) getOrCreate(port int) (*sharedPassiveListener,
 	m.mu.Lock()
 	if m.closed {
 		m.mu.Unlock()
+
 		return nil, net.ErrClosed
 	}
 	if listener, ok := m.listeners[port]; ok {
 		m.mu.Unlock()
+
 		return listener, nil
 	}
 	m.mu.Unlock()
@@ -99,15 +105,18 @@ func (m *passiveListenersManager) getOrCreate(port int) (*sharedPassiveListener,
 
 	if m.closed {
 		_ = listener.close()
+
 		return nil, net.ErrClosed
 	}
 
 	if existing, ok := m.listeners[port]; ok {
 		_ = listener.close()
+
 		return existing, nil
 	}
 
 	m.listeners[port] = listener
+
 	return listener, nil
 }
 
@@ -153,6 +162,7 @@ func (l *sharedPassiveListener) serve() {
 			var netErr net.Error
 			if errors.As(err, &netErr) && netErr.Temporary() { //nolint:staticcheck
 				l.logger.Warn("Temporary passive accept error", "err", err)
+
 				continue
 			}
 

@@ -149,33 +149,7 @@ func (c *clientHandler) findListenerWithinPortRange(portMapping PasvPortGetter) 
 
 func (c *clientHandler) handlePASV(_ string) error {
 	command := c.GetLastCommand()
-	addr, _ := net.ResolveTCPAddr("tcp", ":0")
-	var err error
-	portMapping := c.server.settings.PassiveTransferPortRange
-	exposedPort := 0
-	var listener net.Listener
-	var deadlineSetter passiveDeadlineSetter
-
-	if c.server.settings.PassiveTransferPortMultiplexing && portMapping != nil {
-		controlConnIP, errIP := getIPFromRemoteAddr(c.RemoteAddr())
-		if errIP != nil {
-			c.writeMessage(StatusServiceNotAvailable, fmt.Sprintf("Could not listen for passive connection: %v", errIP))
-			return nil
-		}
-
-		exposedPort, listener, deadlineSetter, err = c.server.passiveListeners.reserve(controlConnIP, portMapping)
-	} else {
-		var tcpListener *net.TCPListener
-		if portMapping != nil {
-			exposedPort, tcpListener, err = c.findListenerWithinPortRange(portMapping)
-		} else {
-			tcpListener, err = net.ListenTCP("tcp", addr)
-		}
-		if err == nil {
-			listener = tcpListener
-			deadlineSetter = tcpListener
-		}
-	}
+	exposedPort, listener, deadlineSetter, err := c.getPassiveListener()
 
 	if err != nil {
 		c.logger.Error("Could not listen for passive connection", "err", err)
@@ -239,6 +213,36 @@ func (c *clientHandler) handlePASV(_ string) error {
 	return nil
 }
 
+func (c *clientHandler) getPassiveListener() (int, net.Listener, passiveDeadlineSetter, error) {
+	portMapping := c.server.settings.PassiveTransferPortRange
+	if c.server.settings.PassiveTransferPortMultiplexing && portMapping != nil {
+		controlConnIP, err := getIPFromRemoteAddr(c.RemoteAddr())
+		if err != nil {
+			return 0, nil, nil, err
+		}
+
+		return c.server.passiveListeners.reserve(controlConnIP, portMapping)
+	}
+
+	addr, _ := net.ResolveTCPAddr("tcp", ":0")
+	var (
+		exposedPort int
+		tcpListener *net.TCPListener
+		err         error
+	)
+
+	if portMapping != nil {
+		exposedPort, tcpListener, err = c.findListenerWithinPortRange(portMapping)
+	} else {
+		tcpListener, err = net.ListenTCP("tcp", addr)
+	}
+	if err != nil {
+		return 0, nil, nil, err
+	}
+
+	return exposedPort, tcpListener, tcpListener, nil
+}
+
 func (c *clientHandler) handlePassivePASV(transferHandler *passiveTransferHandler) bool {
 	portByte1 := transferHandler.Port / 256
 	portByte2 := transferHandler.Port - (portByte1 * 256)
@@ -263,33 +267,35 @@ func (c *clientHandler) handlePassivePASV(transferHandler *passiveTransferHandle
 }
 
 func (p *passiveTransferHandler) ConnectionWait(wait time.Duration) (net.Conn, error) {
-	if p.connection == nil {
-		var err error
-		if p.deadlineSetter != nil {
-			err = p.deadlineSetter.SetDeadline(time.Now().Add(wait))
-		}
-		if err != nil {
-			return nil, fmt.Errorf("failed to set deadline: %w", err)
-		}
+	if p.connection != nil {
+		return p.connection, nil
+	}
 
-		p.connection, err = p.listener.Accept()
-		if err != nil {
-			return nil, fmt.Errorf("failed to accept passive transfer connection: %w", err)
-		}
+	var err error
+	if p.deadlineSetter != nil {
+		err = p.deadlineSetter.SetDeadline(time.Now().Add(wait))
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to set deadline: %w", err)
+	}
 
-		ipAddress, err := getIPFromRemoteAddr(p.connection.RemoteAddr())
-		if err != nil {
-			p.logger.Warn("Could get remote passive IP address", "err", err)
+	p.connection, err = p.listener.Accept()
+	if err != nil {
+		return nil, fmt.Errorf("failed to accept passive transfer connection: %w", err)
+	}
 
-			return nil, err
-		}
+	ipAddress, err := getIPFromRemoteAddr(p.connection.RemoteAddr())
+	if err != nil {
+		p.logger.Warn("Could get remote passive IP address", "err", err)
 
-		if err := p.checkDataConn(ipAddress, DataChannelPassive); err != nil {
-			// we don't want to expose the full error to the client, we just log it
-			p.logger.Warn("Could not validate passive data connection requirement", "err", err)
+		return nil, err
+	}
 
-			return nil, &ipValidationError{error: "data connection security requirements not met"}
-		}
+	if err := p.checkDataConn(ipAddress, DataChannelPassive); err != nil {
+		// we don't want to expose the full error to the client, we just log it
+		p.logger.Warn("Could not validate passive data connection requirement", "err", err)
+
+		return nil, &ipValidationError{error: "data connection security requirements not met"}
 	}
 
 	return p.connection, nil
