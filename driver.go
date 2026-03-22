@@ -308,6 +308,7 @@ type Settings struct {
 	PublicHost               string           // Public IP to expose (only an IP address is accepted at this stage)
 	Banner                   string           // Banner to use in server status response
 	PassiveTransferPortRange PasvPortGetter   // (Optional) Port Mapping for data connections. Random if not specified
+	PassiveTransferPortMultiplexing bool      // Allow different client IPs to share passive listener ports
 	PublicIPResolver         PublicIPResolver // (Optional) To fetch a public IP lookup
 	IdleTimeout              int              // Maximum inactivity time before disconnecting (#58)
 	ConnectionTimeout        int              // Maximum time to establish passive or active transfer connections
