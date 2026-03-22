@@ -303,29 +303,29 @@ const (
 
 // Settings defines all the server settings
 type Settings struct {
-	Listener                 net.Listener     // (Optional) To provide an already initialized listener
-	ListenAddr               string           // Listening address
-	PublicHost               string           // Public IP to expose (only an IP address is accepted at this stage)
-	Banner                   string           // Banner to use in server status response
-	PassiveTransferPortRange PasvPortGetter   // (Optional) Port Mapping for data connections. Random if not specified
-	PassiveTransferPortMultiplexing bool      // Allow different client IPs to share passive listener ports
-	PublicIPResolver         PublicIPResolver // (Optional) To fetch a public IP lookup
-	IdleTimeout              int              // Maximum inactivity time before disconnecting (#58)
-	ConnectionTimeout        int              // Maximum time to establish passive or active transfer connections
-	ActiveTransferPortNon20  bool             // Do not impose the port 20 for active data transfer (#88, RFC 1579)
-	DisableMLSD              bool             // Disable MLSD support
-	DisableMLST              bool             // Disable MLST support
-	DisableMFMT              bool             // Disable MFMT support (modify file mtime)
-	TLSRequired              TLSRequirement   // defines the TLS mode
-	DisableLISTArgs          bool             // Disable ls like options (-a,-la etc.) for directory listing
-	DisableSite              bool             // Disable SITE command
-	DisableActiveMode        bool             // Disable Active FTP
-	EnableHASH               bool             // Enable support for calculating hash value of files
-	DisableSTAT              bool             // Disable Server STATUS, STAT on files and directories will still work
-	DisableSYST              bool             // Disable SYST
-	EnableCOMB               bool             // Enable COMB support
-	DeflateCompressionLevel  int              // Deflate compression level (0-9). 0 means disabled
-	DefaultTransferType      TransferType     // Transfer type to use if the client don't send the TYPE command
+	Listener                        net.Listener     // (Optional) To provide an already initialized listener
+	ListenAddr                      string           // Listening address
+	PublicHost                      string           // Public IP to expose (only an IP address is accepted at this stage)
+	Banner                          string           // Banner to use in server status response
+	PassiveTransferPortRange        PasvPortGetter   // (Optional) Port Mapping for data connections. Random if not specified
+	PassiveTransferPortMultiplexing bool             // Allow different client IPs to share passive listener ports
+	PublicIPResolver                PublicIPResolver // (Optional) To fetch a public IP lookup
+	IdleTimeout                     int              // Maximum inactivity time before disconnecting (#58)
+	ConnectionTimeout               int              // Maximum time to establish passive or active transfer connections
+	ActiveTransferPortNon20         bool             // Do not impose the port 20 for active data transfer (#88, RFC 1579)
+	DisableMLSD                     bool             // Disable MLSD support
+	DisableMLST                     bool             // Disable MLST support
+	DisableMFMT                     bool             // Disable MFMT support (modify file mtime)
+	TLSRequired                     TLSRequirement   // defines the TLS mode
+	DisableLISTArgs                 bool             // Disable ls like options (-a,-la etc.) for directory listing
+	DisableSite                     bool             // Disable SITE command
+	DisableActiveMode               bool             // Disable Active FTP
+	EnableHASH                      bool             // Enable support for calculating hash value of files
+	DisableSTAT                     bool             // Disable Server STATUS, STAT on files and directories will still work
+	DisableSYST                     bool             // Disable SYST
+	EnableCOMB                      bool             // Enable COMB support
+	DeflateCompressionLevel         int              // Deflate compression level (0-9). 0 means disabled
+	DefaultTransferType             TransferType     // Transfer type to use if the client don't send the TYPE command
 	// ActiveConnectionsCheck defines the security requirements for active connections
 	ActiveConnectionsCheck DataConnectionRequirement
 	// PasvConnectionsCheck defines the security requirements for passive connections
