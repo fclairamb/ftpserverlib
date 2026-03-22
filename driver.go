@@ -303,11 +303,12 @@ const (
 
 // Settings defines all the server settings
 type Settings struct {
-	Listener                        net.Listener     // (Optional) To provide an already initialized listener
-	ListenAddr                      string           // Listening address
-	PublicHost                      string           // Public IP to expose (only an IP address is accepted at this stage)
-	Banner                          string           // Banner to use in server status response
-	PassiveTransferPortRange        PasvPortGetter   // (Optional) Port Mapping for data connections. Random if not specified
+	Listener   net.Listener // (Optional) To provide an already initialized listener
+	ListenAddr string       // Listening address
+	PublicHost string       // Public IP to expose (only an IP address is accepted at this stage)
+	Banner     string       // Banner to use in server status response
+	// PassiveTransferPortRange is the optional port mapping for passive data connections.
+	PassiveTransferPortRange        PasvPortGetter
 	PassiveTransferPortMultiplexing bool             // Allow different client IPs to share passive listener ports
 	PublicIPResolver                PublicIPResolver // (Optional) To fetch a public IP lookup
 	IdleTimeout                     int              // Maximum inactivity time before disconnecting (#58)
@@ -321,11 +322,12 @@ type Settings struct {
 	DisableSite                     bool             // Disable SITE command
 	DisableActiveMode               bool             // Disable Active FTP
 	EnableHASH                      bool             // Enable support for calculating hash value of files
-	DisableSTAT                     bool             // Disable Server STATUS, STAT on files and directories will still work
-	DisableSYST                     bool             // Disable SYST
-	EnableCOMB                      bool             // Enable COMB support
-	DeflateCompressionLevel         int              // Deflate compression level (0-9). 0 means disabled
-	DefaultTransferType             TransferType     // Transfer type to use if the client don't send the TYPE command
+	// DisableSTAT disables Server STATUS. STAT on files and directories still works.
+	DisableSTAT             bool
+	DisableSYST             bool         // Disable SYST
+	EnableCOMB              bool         // Enable COMB support
+	DeflateCompressionLevel int          // Deflate compression level (0-9). 0 means disabled
+	DefaultTransferType     TransferType // Transfer type to use if the client don't send the TYPE command
 	// ActiveConnectionsCheck defines the security requirements for active connections
 	ActiveConnectionsCheck DataConnectionRequirement
 	// PasvConnectionsCheck defines the security requirements for passive connections

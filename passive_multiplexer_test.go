@@ -19,7 +19,10 @@ func getFreePassivePort(t *testing.T) int {
 		require.NoError(t, listener.Close())
 	}()
 
-	return listener.Addr().(*net.TCPAddr).Port
+	addr, ok := listener.Addr().(*net.TCPAddr)
+	require.True(t, ok)
+
+	return addr.Port
 }
 
 func TestPassiveListenersManagerMultiplexesByClientIP(t *testing.T) {
@@ -67,14 +70,19 @@ func TestPassiveListenersManagerRejectsSameIPForSamePort(t *testing.T) {
 	}()
 
 	portRange := &PortRange{Start: port, End: port}
-	ip := net.ParseIP("127.0.0.2")
+	clientIP := net.ParseIP("127.0.0.2")
 
-	exposedPort, _, _, err := manager.reserve(ip, portRange)
+	exposedPort, listener, deadlineSetter, err := manager.reserve(clientIP, portRange)
 	req.Equal(port, exposedPort)
 	req.NoError(err)
+	req.NotNil(listener)
+	req.NotNil(deadlineSetter)
 
-	_, _, _, err = manager.reserve(ip, portRange)
+	exposedPort, listener, deadlineSetter, err = manager.reserve(clientIP, portRange)
 	req.ErrorIs(err, ErrNoAvailableListeningPort)
+	req.Zero(exposedPort)
+	req.Nil(listener)
+	req.Nil(deadlineSetter)
 }
 
 func TestPassiveListenersManagerCloseReleasesReservation(t *testing.T) {
@@ -86,14 +94,19 @@ func TestPassiveListenersManagerCloseReleasesReservation(t *testing.T) {
 	}()
 
 	portRange := &PortRange{Start: port, End: port}
-	ip := net.ParseIP("127.0.0.2")
+	clientIP := net.ParseIP("127.0.0.2")
 
-	_, listener, _, err := manager.reserve(ip, portRange)
+	exposedPort, listener, deadlineSetter, err := manager.reserve(clientIP, portRange)
 	req.NoError(err)
+	req.Equal(port, exposedPort)
+	req.NotNil(deadlineSetter)
 	req.NoError(listener.Close())
 
-	_, _, _, err = manager.reserve(ip, portRange)
+	exposedPort, listener, deadlineSetter, err = manager.reserve(clientIP, portRange)
 	req.NoError(err)
+	req.Equal(port, exposedPort)
+	req.NotNil(listener)
+	req.NotNil(deadlineSetter)
 }
 
 func TestPassivePortMultiplexingSameClientExhaustion(t *testing.T) {
