@@ -29,13 +29,13 @@ var _ transferHandler = (*passiveTransferHandler)(nil)
 
 // Passive connection
 type passiveTransferHandler struct {
-	listener       net.Listener           // TCP or SSL Listener
-	deadlineSetter passiveDeadlineSetter  // Listener used to set accept deadlines
-	Port           int                    // TCP Port we are listening on
-	connection     net.Conn               // TCP Connection established
-	settings       *Settings              // Settings
-	info           string                 // transfer info
-	logger         *slog.Logger           // Logger
+	listener       net.Listener          // TCP or SSL Listener
+	deadlineSetter passiveDeadlineSetter // Listener used to set accept deadlines
+	Port           int                   // TCP Port we are listening on
+	connection     net.Conn              // TCP Connection established
+	settings       *Settings             // Settings
+	info           string                // transfer info
+	logger         *slog.Logger          // Logger
 	// data connection requirement checker
 	checkDataConn func(dataConnIP net.IP, channelType DataChannel) error
 }

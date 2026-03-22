@@ -126,12 +126,12 @@ var specialAttentionCommands = []string{"ABOR", "STAT", "QUIT"} //nolint:gocheck
 // FtpServer is where everything is stored
 // We want to keep it as simple as possible
 type FtpServer struct {
-	Logger        *slog.Logger // Structured logger (log/slog)
-	settings      *Settings    // General settings
-	listener      net.Listener // listener used to receive files
+	Logger           *slog.Logger // Structured logger (log/slog)
+	settings         *Settings    // General settings
+	listener         net.Listener // listener used to receive files
 	passiveListeners *passiveListenersManager
-	clientCounter uint32       // Clients counter
-	driver        MainDriver   // Driver to handle the client authentication and the file access driver selection
+	clientCounter    uint32     // Clients counter
+	driver           MainDriver // Driver to handle the client authentication and the file access driver selection
 }
 
 func (server *FtpServer) loadSettings() error {

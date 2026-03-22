@@ -247,15 +247,15 @@ func (l *sharedPassiveListener) close() error {
 }
 
 type passiveReservationListener struct {
-	parent      *sharedPassiveListener
-	remoteIP    string
-	connCh      chan net.Conn
-	closedCh    chan struct{}
-	closeOnce   sync.Once
-	stateMu     sync.Mutex
-	deadline    time.Time
-	released    bool
-	failureErr  error
+	parent     *sharedPassiveListener
+	remoteIP   string
+	connCh     chan net.Conn
+	closedCh   chan struct{}
+	closeOnce  sync.Once
+	stateMu    sync.Mutex
+	deadline   time.Time
+	released   bool
+	failureErr error
 }
 
 func (l *passiveReservationListener) Accept() (net.Conn, error) {
@@ -395,4 +395,3 @@ func isClosedListenerError(err error) bool {
 
 	return false
 }
-

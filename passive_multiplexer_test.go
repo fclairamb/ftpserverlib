@@ -101,10 +101,10 @@ func TestPassivePortMultiplexingSameClientExhaustion(t *testing.T) {
 	port := getFreePassivePort(t)
 	driver := &TestServerDriver{
 		Settings: &Settings{
-			ListenAddr:                        "127.0.0.1:0",
-			DefaultTransferType:              TransferTypeBinary,
-			PassiveTransferPortRange:         &PortRange{Start: port, End: port},
-			PassiveTransferPortMultiplexing:  true,
+			ListenAddr:                      "127.0.0.1:0",
+			DefaultTransferType:             TransferTypeBinary,
+			PassiveTransferPortRange:        &PortRange{Start: port, End: port},
+			PassiveTransferPortMultiplexing: true,
 		},
 	}
 	server := NewTestServerWithTestDriver(t, driver)
