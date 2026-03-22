@@ -129,6 +129,7 @@ type FtpServer struct {
 	Logger        *slog.Logger // Structured logger (log/slog)
 	settings      *Settings    // General settings
 	listener      net.Listener // listener used to receive files
+	passiveListeners *passiveListenersManager
 	clientCounter uint32       // Clients counter
 	driver        MainDriver   // Driver to handle the client authentication and the file access driver selection
 }
@@ -165,6 +166,7 @@ func (server *FtpServer) loadSettings() error {
 	}
 
 	server.settings = settings
+	server.passiveListeners = newPassiveListenersManager(server.Logger)
 
 	return nil
 }
@@ -349,6 +351,12 @@ func (server *FtpServer) Stop() error {
 		)
 
 		return newNetworkError("couln't close listener", err)
+	}
+
+	if server.passiveListeners != nil {
+		if err := server.passiveListeners.close(); err != nil && !errors.Is(err, net.ErrClosed) {
+			server.Logger.Warn("Could not close passive listeners", "err", err)
+		}
 	}
 
 	return nil

@@ -1117,11 +1117,11 @@ func TestPASVConnectionWait(t *testing.T) {
 				remoteAddr: &net.TCPAddr{IP: nil, Port: 21}, // invalid IP
 			},
 		},
-		tcpListener:   tcpListener,
-		Port:          tcpListener.Addr().(*net.TCPAddr).Port,
-		settings:      cltHandler.server.settings,
-		logger:        slog.New(slog.NewTextHandler(io.Discard, nil)), //nolint:sloglint // DiscardHandler requires Go 1.23+
-		checkDataConn: cltHandler.checkDataConnectionRequirement,
+		deadlineSetter: tcpListener,
+		Port:           tcpListener.Addr().(*net.TCPAddr).Port,
+		settings:       cltHandler.server.settings,
+		logger:         slog.New(slog.NewTextHandler(io.Discard, nil)), //nolint:sloglint // DiscardHandler requires Go 1.23+
+		checkDataConn:  cltHandler.checkDataConnectionRequirement,
 	}
 
 	defer func() {
