@@ -1,14 +1,27 @@
 package ftpserver
 
 import (
+	"errors"
 	"io"
 	"log/slog"
 	"net"
 	"testing"
+	"time"
 
 	"github.com/secsy/goftp"
 	"github.com/stretchr/testify/require"
 )
+
+type trackingTestConn struct {
+	testNetConn
+	closed bool
+}
+
+func (c *trackingTestConn) Close() error {
+	c.closed = true
+
+	return nil
+}
 
 func getFreePassivePort(t *testing.T) int {
 	t.Helper()
@@ -141,4 +154,103 @@ func TestPassivePortMultiplexingSameClientExhaustion(t *testing.T) {
 	req.NoError(err)
 	req.Equal(StatusServiceNotAvailable, returnCode, message)
 	req.Contains(message, ErrNoAvailableListeningPort.Error())
+}
+
+func TestPassiveReservationListenerTimeoutAndHelpers(t *testing.T) {
+	req := require.New(t)
+	port := getFreePassivePort(t)
+	listener, err := newSharedPassiveListener(port, slog.New(slog.NewTextHandler(io.Discard, nil))) //nolint:sloglint
+	req.NoError(err)
+	defer func() {
+		req.NoError(listener.close())
+	}()
+
+	reservation, err := listener.reserve(net.ParseIP("127.0.0.2"))
+	req.NoError(err)
+	req.Equal(listener.listener.Addr(), reservation.Addr())
+
+	req.NoError(reservation.SetDeadline(time.Now().Add(-time.Second)))
+
+	_, err = reservation.Accept()
+	req.Error(err)
+
+	var opErr *net.OpError
+	req.ErrorAs(err, &opErr)
+
+	netErr, ok := opErr.Err.(net.Error)
+	req.True(ok)
+	req.Equal("i/o timeout", netErr.Error())
+	req.True(netErr.Timeout())
+	req.True(netErr.Temporary())
+
+	req.True(isClosedListenerError(net.ErrClosed))
+	req.True(isClosedListenerError(&net.OpError{Err: errors.New("use of closed network connection")}))
+	req.False(isClosedListenerError(errors.New("different error")))
+}
+
+func TestPassiveReservationListenerCloseAndFailures(t *testing.T) {
+	req := require.New(t)
+	port := getFreePassivePort(t)
+	listener, err := newSharedPassiveListener(port, slog.New(slog.NewTextHandler(io.Discard, nil))) //nolint:sloglint
+	req.NoError(err)
+	defer func() {
+		req.NoError(listener.close())
+	}()
+
+	reservation, err := listener.reserve(net.ParseIP("127.0.0.2"))
+	req.NoError(err)
+
+	expectedErr := errors.New("boom")
+	reservation.stateMu.Lock()
+	reservation.failureErr = expectedErr
+	reservation.stateMu.Unlock()
+	reservation.connCh <- nil
+
+	_, err = reservation.Accept()
+	req.ErrorIs(err, expectedErr)
+
+	reservation2, err := listener.reserve(net.ParseIP("127.0.0.3"))
+	req.NoError(err)
+
+	conn := &trackingTestConn{}
+	reservation2.connCh <- conn
+	req.NoError(reservation2.Close())
+	req.True(conn.closed)
+	req.False(reservation2.deliver(&trackingTestConn{}))
+
+	_, err = reservation2.Accept()
+	req.ErrorIs(err, net.ErrClosed)
+}
+
+func TestSharedPassiveListenerDispatchRejectionsAndClosedManager(t *testing.T) {
+	req := require.New(t)
+	port := getFreePassivePort(t)
+	manager := newPassiveListenersManager(slog.New(slog.NewTextHandler(io.Discard, nil))) //nolint:sloglint
+	req.NoError(manager.close())
+	req.NoError(manager.close())
+
+	_, err := manager.getOrCreate(port)
+	req.ErrorIs(err, net.ErrClosed)
+
+	listener, err := newSharedPassiveListener(port, slog.New(slog.NewTextHandler(io.Discard, nil))) //nolint:sloglint
+	req.NoError(err)
+
+	unknownConn := &trackingTestConn{
+		testNetConn: testNetConn{remoteAddr: &net.TCPAddr{IP: net.ParseIP("127.0.0.9"), Port: 40003}},
+	}
+	listener.dispatch(unknownConn)
+	req.True(unknownConn.closed)
+
+	invalidConn := &trackingTestConn{
+		testNetConn: testNetConn{remoteAddr: &net.UnixAddr{Name: "sock", Net: "unix"}},
+	}
+	listener.dispatch(invalidConn)
+	req.True(invalidConn.closed)
+
+	req.NoError(listener.close())
+	_, err = listener.reserve(net.ParseIP("127.0.0.4"))
+	req.ErrorIs(err, net.ErrClosed)
+
+	_, err = newSharedPassiveListener(-1, slog.New(slog.NewTextHandler(io.Discard, nil))) //nolint:sloglint
+	req.Error(err)
 }
