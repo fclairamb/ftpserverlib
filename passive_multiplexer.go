@@ -331,6 +331,7 @@ func (l *passiveReservationListener) SetDeadline(deadline time.Time) error {
 	defer l.stateMu.Unlock()
 
 	l.deadline = deadline
+
 	return nil
 }
 
@@ -344,6 +345,7 @@ func (l *passiveReservationListener) deliver(conn net.Conn) bool {
 	select {
 	case l.connCh <- conn:
 		l.markReleased()
+
 		return true
 	case <-l.closedCh:
 		return false
