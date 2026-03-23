@@ -17,6 +17,12 @@ type trackingTestConn struct {
 	closed bool
 }
 
+var (
+	errTestClosedListener = errors.New("use of closed network connection")
+	errTestDifferent      = errors.New("different error")
+	errTestPassiveFailure = errors.New("boom")
+)
+
 func (c *trackingTestConn) Close() error {
 	c.closed = true
 
@@ -177,15 +183,14 @@ func TestPassiveReservationListenerTimeoutAndHelpers(t *testing.T) {
 	var opErr *net.OpError
 	req.ErrorAs(err, &opErr)
 
-	netErr, ok := opErr.Err.(net.Error)
-	req.True(ok)
-	req.Equal("i/o timeout", netErr.Error())
-	req.True(netErr.Timeout())
-	req.True(netErr.Temporary())
+	var timeoutErr passiveAcceptTimeoutError
+	req.ErrorAs(err, &timeoutErr)
+	req.Equal("i/o timeout", timeoutErr.Error())
+	req.True(timeoutErr.Timeout())
 
 	req.True(isClosedListenerError(net.ErrClosed))
-	req.True(isClosedListenerError(&net.OpError{Err: errors.New("use of closed network connection")}))
-	req.False(isClosedListenerError(errors.New("different error")))
+	req.True(isClosedListenerError(&net.OpError{Err: errTestClosedListener}))
+	req.False(isClosedListenerError(errTestDifferent))
 }
 
 func TestPassiveReservationListenerCloseAndFailures(t *testing.T) {
@@ -200,7 +205,7 @@ func TestPassiveReservationListenerCloseAndFailures(t *testing.T) {
 	reservation, err := listener.reserve(net.ParseIP("127.0.0.2"))
 	req.NoError(err)
 
-	expectedErr := errors.New("boom")
+	expectedErr := errTestPassiveFailure
 	reservation.stateMu.Lock()
 	reservation.failureErr = expectedErr
 	reservation.stateMu.Unlock()
