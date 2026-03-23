@@ -237,6 +237,7 @@ func (l *sharedPassiveListener) failAll(err error) {
 	l.mu.Lock()
 	if l.closed {
 		l.mu.Unlock()
+
 		return
 	}
 
@@ -256,6 +257,7 @@ func (l *sharedPassiveListener) failAll(err error) {
 func (l *sharedPassiveListener) close() error {
 	err := l.listener.Close()
 	l.failAll(net.ErrClosed)
+
 	return err
 }
 
@@ -292,6 +294,7 @@ func (l *passiveReservationListener) Accept() (net.Conn, error) {
 		if conn == nil {
 			return nil, l.getFailure()
 		}
+
 		return conn, nil
 	case <-l.closedCh:
 		return nil, l.getFailure()
