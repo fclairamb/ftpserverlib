@@ -156,6 +156,7 @@ func (l *sharedPassiveListener) serve() {
 		if err != nil {
 			if isClosedListenerError(err) {
 				l.failAll(net.ErrClosed)
+
 				return
 			}
 
@@ -167,6 +168,7 @@ func (l *sharedPassiveListener) serve() {
 			}
 
 			l.failAll(err)
+
 			return
 		}
 
@@ -203,6 +205,7 @@ func (l *sharedPassiveListener) dispatch(conn net.Conn) {
 	if err != nil {
 		l.logger.Warn("Could not parse passive data connection IP", "err", err)
 		_ = conn.Close()
+
 		return
 	}
 
