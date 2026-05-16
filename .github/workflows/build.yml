@@ -26,9 +26,9 @@ jobs:
 
     strategy:
       matrix:
-        go: ["1.25", "1.24"]
+        go: ["1.26", "1.25"]
         include:
-          - go: "1.25"
+          - go: "1.26"
             lint: true
 
     # Steps represent a sequence of tasks that will be executed as part of the job
