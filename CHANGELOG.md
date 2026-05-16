@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.31.0](https://github.com/fclairamb/ftpserverlib/compare/v0.30.0...v0.31.0) (2026-05-16)
+
+
+### Features
+
+* **transfer:** add passive port multiplexing by client IP ([#623](https://github.com/fclairamb/ftpserverlib/issues/623)) ([feb3821](https://github.com/fclairamb/ftpserverlib/commit/feb38214dec56b42977515dc32491bcc39a5238a))
+
+
+### Bug Fixes
+
+* **deps:** update module golang.org/x/sys to v0.41.0 ([#611](https://github.com/fclairamb/ftpserverlib/issues/611)) ([5388ad1](https://github.com/fclairamb/ftpserverlib/commit/5388ad151705160cca3750ab1b4153c0046517fb))
+* **deps:** update module golang.org/x/sys to v0.44.0 ([#620](https://github.com/fclairamb/ftpserverlib/issues/620)) ([c73a72e](https://github.com/fclairamb/ftpserverlib/commit/c73a72e78737007330a8a531d6a15d6a629802bd))
+
 ## [0.30.0](https://github.com/fclairamb/ftpserverlib/compare/v0.29.0...v0.30.0) (2026-01-24)
 
 
