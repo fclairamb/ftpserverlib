@@ -17,6 +17,8 @@ type trackingTestConn struct {
 	closed bool
 }
 
+const testServerListenAddr = "127.0.0.1:0"
+
 var (
 	errTestClosedListener = errors.New("use of closed network connection")
 	errTestDifferent      = errors.New("different error")
@@ -133,7 +135,7 @@ func TestPassivePortMultiplexingSameClientExhaustion(t *testing.T) {
 	port := getFreePassivePort(t)
 	driver := &TestServerDriver{
 		Settings: &Settings{
-			ListenAddr:                      "127.0.0.1:0",
+			ListenAddr:                      testServerListenAddr,
 			DefaultTransferType:             TransferTypeBinary,
 			PassiveTransferPortRange:        &PortRange{Start: port, End: port},
 			PassiveTransferPortMultiplexing: true,

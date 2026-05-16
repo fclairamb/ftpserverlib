@@ -9,6 +9,8 @@ import (
 	"time"
 )
 
+const errStrClosedNetworkConnection = "use of closed network connection"
+
 var errPassiveListenerReservedForIP = errors.New("passive listener already reserved for client ip")
 
 type passiveDeadlineSetter interface {
@@ -408,7 +410,7 @@ func isClosedListenerError(err error) bool {
 
 	errOp := &net.OpError{}
 	if errors.As(err, &errOp) && errOp.Err != nil {
-		return errOp.Err.Error() == "use of closed network connection"
+		return errOp.Err.Error() == errStrClosedNetworkConnection
 	}
 
 	return false
