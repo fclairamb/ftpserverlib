@@ -140,7 +140,7 @@ func (c *clientHandler) doFileTransfer(transferConn io.ReadWriter, file io.ReadW
 		writer = transferConn
 	}
 
-	if c.currentTransferType == TransferTypeASCII {
+	if c.currentTransferType == TransferTypeASCII && !c.server.settings.DisableASCIIConversion {
 		reader = newASCIIConverter(reader, conversionMode)
 	}
 
@@ -396,9 +396,12 @@ func (c *clientHandler) handleRNTO(param string) error {
 // the current TYPE is ASCII.
 // However, clients in general should not be resuming downloads
 // in ASCII mode. Resuming downloads in binary mode is the
-// recommended way as specified in RFC-3659
+// recommended way as specified in RFC-3659.
+// When Settings.DisableASCIIConversion is true, no conversion is
+// performed and the on-disk size matches the transfer size, so
+// SIZE is allowed in ASCII mode.
 func (c *clientHandler) handleSIZE(param string) error {
-	if c.currentTransferType == TransferTypeASCII {
+	if c.currentTransferType == TransferTypeASCII && !c.server.settings.DisableASCIIConversion {
 		c.writeMessage(StatusActionNotTaken, "SIZE not allowed in ASCII mode")
 
 		return nil

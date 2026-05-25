@@ -1198,6 +1198,62 @@ func TestASCIITransfersInvalidFiles(t *testing.T) {
 	require.Equal(t, localHash, remoteHash)
 }
 
+func TestASCIITransfersWithConversionDisabled(t *testing.T) {
+	driver := &TestServerDriver{
+		Settings: &Settings{DisableASCIIConversion: true},
+	}
+	s := NewTestServerWithTestDriver(t, driver)
+	conf := goftp.Config{
+		User:     authUser,
+		Password: authPass,
+	}
+	client, err := goftp.DialConfig(conf, s.Addr())
+	require.NoError(t, err, "Couldn't connect")
+
+	defer func() { require.NoError(t, client.Close()) }()
+
+	raw, err := client.OpenRawConn()
+	require.NoError(t, err)
+
+	defer func() { require.NoError(t, raw.Close()) }()
+
+	file, err := os.CreateTemp("", "ftpserver")
+	require.NoError(t, err)
+
+	defer func() { require.NoError(t, file.Close()) }()
+
+	// A mix of CRLF and lone LF that the converter would normally rewrite.
+	contents := []byte("line1\r\n\r\nline3\r\n,line4\nline5")
+	_, err = file.Write(contents)
+	require.NoError(t, err)
+
+	returnCode, response, err := raw.SendCommand("TYPE A")
+	require.NoError(t, err)
+	require.Equal(t, StatusOK, returnCode, response)
+
+	_, err = file.Seek(0, io.SeekStart)
+	require.NoError(t, err)
+
+	ftpUploadWithRawConnection(t, raw, file, "file.txt", nil)
+
+	// On disk size must match the input exactly: no \r stripping on upload.
+	files, err := client.ReadDir("/")
+	require.NoError(t, err)
+	require.Len(t, files, 1)
+	require.Equal(t, int64(len(contents)), files[0].Size())
+
+	// SIZE must be allowed in ASCII mode when conversion is disabled.
+	returnCode, response, err = raw.SendCommand("SIZE file.txt")
+	require.NoError(t, err)
+	require.Equal(t, StatusFileStatus, returnCode, response)
+	require.Equal(t, strconv.Itoa(len(contents)), response)
+
+	// Round-trip hash must match: no line-ending mangling on download either.
+	remoteHash := ftpDownloadAndHashWithRawConnection(t, raw, "file.txt", nil)
+	localHash := hashFile(t, file)
+	require.Equal(t, localHash, remoteHash)
+}
+
 func TestPASVWrappedListenerError(t *testing.T) {
 	server := NewTestServerWithTestDriver(t, &TestServerDriver{
 		Debug:              true,

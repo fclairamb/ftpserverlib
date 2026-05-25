@@ -364,6 +364,12 @@ type Settings struct {
 	EnableCOMB              bool         // Enable COMB support
 	DeflateCompressionLevel int          // Deflate compression level (0-9). 0 means disabled
 	DefaultTransferType     TransferType // Transfer type to use if the client don't send the TYPE command
+	// DisableASCIIConversion disables CRLF/LF line-ending conversion for TYPE A (ASCII) transfers.
+	// When true, files are transferred byte-for-byte even in ASCII mode, and SIZE is allowed in
+	// ASCII mode. This is not RFC 959-compliant but matches the behavior of vsftpd's
+	// ascii_download_enable/ascii_upload_enable=NO and is useful when clients do not want the
+	// server to modify their files.
+	DisableASCIIConversion bool
 	// ActiveConnectionsCheck defines the security requirements for active connections
 	ActiveConnectionsCheck DataConnectionRequirement
 	// PasvConnectionsCheck defines the security requirements for passive connections
