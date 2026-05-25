@@ -194,6 +194,45 @@ type ClientDriverExtensionHasher interface {
 }
 ```
 
+#### Detect transfer errors and interruptions
+
+FTP has no length header for `STOR` uploads, so the server can't always tell
+whether an upload that "ended" did so because the client sent every byte or
+because it gave up. To get notified when the server *does* detect an
+interruption (ABOR, dropped TCP connection, I/O error), implement the
+`FileTransferError` interface on the value you return from your `afero.Fs`
+`OpenFile`/`Create` (or from `ClientDriverExtentionFileTransfer.GetHandle`):
+
+```go
+type monitoredFile struct {
+    afero.File
+    transferErr error
+}
+
+// TransferError is called before Close whenever the transfer did not
+// complete normally (ABOR, broken connection, copy error, ...).
+func (f *monitoredFile) TransferError(err error) {
+    f.transferErr = err
+}
+
+func (f *monitoredFile) Close() error {
+    err := f.File.Close()
+    if f.transferErr != nil {
+        // upload was interrupted - run your "discard partial file" logic
+    } else {
+        // upload completed - run your "publish file" logic
+    }
+    return err
+}
+```
+
+`TransferError` is always invoked before `Close`. Both methods are called
+on the same `FileTransfer` instance, so a simple flag is enough to
+distinguish the two cases. A client that closes the data connection
+mid-upload without sending `ABOR` is indistinguishable from a clean
+completion - this is a limitation of the FTP protocol itself, not of this
+library.
+
 ## History of the project
 
 I wanted to make a system which would accept files through FTP and redirect them to something else. Go seemed like the obvious choice and it seemed there was a lot of libraries available but it turns out none of them were in a useable state.

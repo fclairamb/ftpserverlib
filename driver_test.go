@@ -134,16 +134,34 @@ type TestServerDriver struct {
 	Debug                bool // To display connection logs information
 	TLS                  bool
 	CloseOnConnect       bool // disconnect the client as soon as it connects
+	// transferFiles tracks the *testFile wrappers handed back from OpenFile,
+	// keyed by the path the FTP layer requested. Tests use it to inspect
+	// errTransfer after an interrupted transfer.
+	transferFiles sync.Map
+}
+
+// getTransferFile returns the *testFile previously registered under path, if any.
+func (driver *TestServerDriver) getTransferFile(path string) *testFile {
+	v, ok := driver.transferFiles.Load(path)
+	if !ok {
+		return nil
+	}
+
+	file, _ := v.(*testFile)
+
+	return file
 }
 
 // TestClientDriver defines a minimal serverftp client driver
 type TestClientDriver struct {
 	afero.Fs
+	server *TestServerDriver
 }
 
 type testFile struct {
 	afero.File
-	errTransfer error
+	errTransferMu sync.Mutex
+	errTransfer   error
 }
 
 var (
@@ -214,13 +232,26 @@ func (f *testFile) Readdir(count int) ([]os.FileInfo, error) {
 
 // TransferError implements the FileTransferError interface
 func (f *testFile) TransferError(err error) {
+	f.errTransferMu.Lock()
+	defer f.errTransferMu.Unlock()
 	f.errTransfer = err
+}
+
+// getErrTransfer returns the error recorded by TransferError, if any. It is
+// safe to call concurrently with the transfer goroutine (e.g. while polling
+// for a connection-drop interruption).
+func (f *testFile) getErrTransfer() error {
+	f.errTransferMu.Lock()
+	defer f.errTransferMu.Unlock()
+
+	return f.errTransfer
 }
 
 // NewTestClientDriver creates a client driver
 func NewTestClientDriver(server *TestServerDriver) *TestClientDriver {
 	return &TestClientDriver{
-		Fs: server.fs,
+		Fs:     server.fs,
+		server: server,
 	}
 }
 
@@ -417,7 +448,11 @@ func (driver *TestClientDriver) OpenFile(path string, flag int, perm os.FileMode
 	file, err := driver.Fs.OpenFile(path, flag, perm)
 
 	if err == nil {
-		file = &testFile{File: file}
+		wrapped := &testFile{File: file}
+		if driver.server != nil {
+			driver.server.transferFiles.Store(path, wrapped)
+		}
+		file = wrapped
 	}
 
 	return file, err
@@ -431,7 +466,11 @@ func (driver *TestClientDriver) Open(name string) (afero.File, error) {
 	file, err := driver.Fs.Open(name)
 
 	if err == nil {
-		file = &testFile{File: file}
+		wrapped := &testFile{File: file}
+		if driver.server != nil {
+			driver.server.transferFiles.Store(name, wrapped)
+		}
+		file = wrapped
 	}
 
 	return file, err

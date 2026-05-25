@@ -218,7 +218,43 @@ type FileTransfer interface {
 	io.Closer
 }
 
-// FileTransferError is a FileTransfer extension used to notify errors.
+// FileTransferError is a FileTransfer extension used to notify the driver
+// that a transfer did not complete normally.
+//
+// TransferError is called before the file's Close method whenever the data
+// transfer is interrupted by:
+//   - an ABOR command from the client,
+//   - the client dropping the data connection (TCP RST or otherwise),
+//   - an I/O error while copying bytes between the data connection and the file.
+//
+// It is NOT called when the transfer ends cleanly (the data connection is
+// closed gracefully by the client after sending all of its bytes). In that
+// case only Close is invoked.
+//
+// A common pattern is to set a flag in TransferError and inspect it in Close
+// to distinguish a completed upload from an interrupted one:
+//
+//	type monitoredFile struct {
+//	    afero.File
+//	    transferErr error
+//	}
+//
+//	func (f *monitoredFile) TransferError(err error) { f.transferErr = err }
+//
+//	func (f *monitoredFile) Close() error {
+//	    err := f.File.Close()
+//	    if f.transferErr != nil {
+//	        // upload was interrupted: f.transferErr describes why
+//	    } else {
+//	        // upload completed (as far as the server can tell)
+//	    }
+//	    return err
+//	}
+//
+// Keep in mind that FTP provides no length header for STOR transfers, so a
+// client that closes the data connection mid-upload without sending ABOR is
+// indistinguishable from a normal completion. Implementing this interface
+// catches every case the server can detect.
 type FileTransferError interface {
 	TransferError(err error)
 }

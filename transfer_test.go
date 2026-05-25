@@ -549,6 +549,168 @@ func TestFailingFileTransfer(t *testing.T) {
 	})
 }
 
+// TestFileTransferErrorNotification covers the contract documented on the
+// FileTransferError interface: TransferError is called before Close when the
+// transfer is interrupted, and is NOT called for a clean completion. This is
+// the recommended way for drivers to detect upload interruptions (issue #635).
+func TestFileTransferErrorNotification(t *testing.T) {
+	t.Parallel()
+
+	t.Run("clean upload does not trigger TransferError", testTransferErrorCleanUpload)
+	t.Run("write error triggers TransferError before Close", testTransferErrorOnWriteFailure)
+	t.Run("ABOR mid-upload triggers TransferError", testTransferErrorOnABOR)
+	t.Run("dropped connection mid-upload triggers TransferError", testTransferErrorOnDroppedConn)
+}
+
+// dialTransferErrorServer spins up a test server with a TestServerDriver that
+// tracks the files it hands out, so tests can inspect errTransfer afterwards.
+func dialTransferErrorServer(t *testing.T) (*TestServerDriver, *goftp.Client) {
+	t.Helper()
+
+	driver := &TestServerDriver{Debug: false}
+	server := NewTestServerWithTestDriver(t, driver)
+	client, err := goftp.DialConfig(goftp.Config{
+		User:     authUser,
+		Password: authPass,
+	}, server.Addr())
+	require.NoError(t, err)
+
+	return driver, client
+}
+
+func testTransferErrorCleanUpload(t *testing.T) {
+	t.Parallel()
+
+	driver, client := dialTransferErrorServer(t)
+
+	defer func() { require.NoError(t, client.Close()) }()
+
+	file := createTemporaryFile(t, 1*1024)
+	require.NoError(t, client.Store("ok.bin", file))
+
+	tf := driver.getTransferFile("/ok.bin")
+	require.NotNil(t, tf, "test driver should have tracked the upload file")
+	require.NoError(t, tf.getErrTransfer(), "TransferError must not fire on a clean upload")
+}
+
+func testTransferErrorOnWriteFailure(t *testing.T) {
+	t.Parallel()
+
+	driver, client := dialTransferErrorServer(t)
+
+	defer func() { require.NoError(t, client.Close()) }()
+
+	file := createTemporaryFile(t, 1*1024)
+	require.Error(t, client.Store("fail-to-write.bin", file))
+
+	tf := driver.getTransferFile("/fail-to-write.bin")
+	require.NotNil(t, tf, "test driver should have tracked the upload file")
+	require.Error(t, tf.getErrTransfer(), "TransferError must fire when the file write fails")
+}
+
+func testTransferErrorOnABOR(t *testing.T) {
+	t.Parallel()
+
+	driver, client := dialTransferErrorServer(t)
+
+	defer func() { require.NoError(t, client.Close()) }()
+
+	raw, err := client.OpenRawConn()
+	require.NoError(t, err)
+
+	defer func() { require.NoError(t, raw.Close()) }()
+
+	// "delay-io" makes each write sleep 500ms, giving us room to ABOR
+	// while the transfer is in flight.
+	fileName := "/delay-io-abort.bin"
+
+	dcGetter, err := raw.PrepareDataConn()
+	require.NoError(t, err)
+
+	require.NoError(t, raw.SendCommandNoWaitResponse("STOR %s", fileName))
+
+	returnCode, _, err := raw.ReadResponse()
+	require.NoError(t, err)
+	require.Equal(t, StatusFileStatusOK, returnCode)
+
+	dataConn, err := dcGetter()
+	require.NoError(t, err)
+
+	// Push a chunk so the server's io.Copy enters the slow Write path.
+	_, err = dataConn.Write(bytes.Repeat([]byte("x"), 1024))
+	require.NoError(t, err)
+
+	returnCode, _, err = raw.SendCommand(getABORCmd())
+	require.NoError(t, err)
+	require.Equal(t, StatusTransferAborted, returnCode)
+
+	returnCode, _, err = raw.ReadResponse()
+	require.NoError(t, err)
+	require.Equal(t, StatusClosingDataConn, returnCode)
+
+	require.NoError(t, dataConn.Close())
+
+	// NOOP is serialized behind the transfer goroutine (transferWg.Wait),
+	// so a successful NOOP response guarantees the STOR goroutine has
+	// finished and TransferError/Close have already run.
+	returnCode, _, err = raw.SendCommand("NOOP")
+	require.NoError(t, err)
+	require.Equal(t, StatusOK, returnCode)
+
+	tf := driver.getTransferFile(fileName)
+	require.NotNil(t, tf, "test driver should have tracked the upload file")
+	require.Error(t, tf.getErrTransfer(), "TransferError must fire on an ABOR-interrupted upload")
+}
+
+// testTransferErrorOnDroppedConn reproduces the scenario from issue #635: a
+// client (e.g. FileZilla) is in the middle of an upload and the whole
+// connection goes away - the process is killed, the network drops, etc. The
+// server detects the broken data connection and must report it through
+// TransferError so the driver can discard the partial file instead of treating
+// it as a finished upload.
+func testTransferErrorOnDroppedConn(t *testing.T) {
+	t.Parallel()
+
+	driver, client := dialTransferErrorServer(t)
+
+	raw, err := client.OpenRawConn()
+	require.NoError(t, err)
+
+	// "delay-io" makes each write sleep 500ms, so the server is still
+	// inside io.Copy when we tear the connection down.
+	fileName := "/delay-io-dropped.bin"
+
+	dcGetter, err := raw.PrepareDataConn()
+	require.NoError(t, err)
+
+	require.NoError(t, raw.SendCommandNoWaitResponse("STOR %s", fileName))
+
+	returnCode, _, err := raw.ReadResponse()
+	require.NoError(t, err)
+	require.Equal(t, StatusFileStatusOK, returnCode)
+
+	dataConn, err := dcGetter()
+	require.NoError(t, err)
+
+	_, err = dataConn.Write(bytes.Repeat([]byte("x"), 1024))
+	require.NoError(t, err)
+
+	// Tear everything down without an ABOR or a clean end-of-transfer:
+	// this mimics a client that simply vanishes mid-upload.
+	require.NoError(t, dataConn.Close())
+	require.NoError(t, raw.Close())
+	require.NoError(t, client.Close())
+
+	// The transfer runs in its own goroutine; once the server notices the
+	// broken connection it calls TransferError before closing the file.
+	tf := driver.getTransferFile(fileName)
+	require.NotNil(t, tf, "test driver should have tracked the upload file")
+	require.Eventually(t, func() bool {
+		return tf.getErrTransfer() != nil
+	}, 5*time.Second, 10*time.Millisecond,
+		"TransferError must fire when the connection drops mid-upload")
+}
+
 func TestAPPEExistingFile(t *testing.T) {
 	driver := &TestServerDriver{
 		Debug: false,
