@@ -640,7 +640,7 @@ func testTransferErrorOnABOR(t *testing.T) {
 	_, err = dataConn.Write(bytes.Repeat([]byte("x"), 1024))
 	require.NoError(t, err)
 
-	returnCode, _, err = raw.SendCommand(getABORCmd())
+	returnCode, _, err = raw.SendCommand("%s", getABORCmd())
 	require.NoError(t, err)
 	require.Equal(t, StatusTransferAborted, returnCode)
 
