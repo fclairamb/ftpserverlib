@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.32.0](https://github.com/fclairamb/ftpserverlib/compare/v0.31.0...v0.32.0) (2026-05-25)
+
+
+### Features
+
+* **settings:** add DisableASCIIConversion to skip CRLF/LF rewriting ([#636](https://github.com/fclairamb/ftpserverlib/issues/636)) ([5d53235](https://github.com/fclairamb/ftpserverlib/commit/5d5323575e1ebb478a3abb0cf8210f9a243b3d12)), closes [#615](https://github.com/fclairamb/ftpserverlib/issues/615)
+
+
+### Bug Fixes
+
+* **deps:** update module golang.org/x/sys to v0.45.0 ([#639](https://github.com/fclairamb/ftpserverlib/issues/639)) ([4b8e1bd](https://github.com/fclairamb/ftpserverlib/commit/4b8e1bdaade3b9f32cb77b6c8409c1eed4b113f9))
+
 ## [0.31.0](https://github.com/fclairamb/ftpserverlib/compare/v0.30.0...v0.31.0) (2026-05-16)
 
 
