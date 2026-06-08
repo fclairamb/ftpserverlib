@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.32.1](https://github.com/fclairamb/ftpserverlib/compare/v0.32.0...v0.32.1) (2026-06-08)
+
+
+### Bug Fixes
+
+* **deps:** update module golang.org/x/sys to v0.46.0 ([#646](https://github.com/fclairamb/ftpserverlib/issues/646)) ([707b5c3](https://github.com/fclairamb/ftpserverlib/commit/707b5c369f16e4a5c791d1b301d93509841d9f15))
+
 ## [0.32.0](https://github.com/fclairamb/ftpserverlib/compare/v0.31.0...v0.32.0) (2026-05-25)
 
 
