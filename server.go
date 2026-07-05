@@ -9,6 +9,7 @@ import (
 	"io"
 	"log/slog"
 	"net"
+	"sync"
 	"syscall"
 	"time"
 )
@@ -129,9 +130,24 @@ type FtpServer struct {
 	Logger           *slog.Logger // Structured logger (log/slog)
 	settings         *Settings    // General settings
 	listener         net.Listener // listener used to receive files
+	listenerMu       sync.RWMutex // guards listener (written by Listen, read by Serve/Addr/Stop)
 	passiveListeners *passiveListenersManager
 	clientCounter    uint32     // Clients counter
 	driver           MainDriver // Driver to handle the client authentication and the file access driver selection
+}
+
+func (server *FtpServer) getListener() net.Listener {
+	server.listenerMu.RLock()
+	defer server.listenerMu.RUnlock()
+
+	return server.listener
+}
+
+func (server *FtpServer) setListener(listener net.Listener) {
+	server.listenerMu.Lock()
+	defer server.listenerMu.Unlock()
+
+	server.listener = listener
 }
 
 func (server *FtpServer) loadSettings() error {
@@ -193,18 +209,21 @@ func (server *FtpServer) Listen() error {
 		return fmt.Errorf("could not load settings: %w", err)
 	}
 
+	var listener net.Listener
+
 	// The driver can provide its own listener implementation
 	if server.settings.Listener != nil {
-		server.listener = server.settings.Listener
+		listener = server.settings.Listener
 	} else {
 		// Otherwise, it's what we currently use
-		server.listener, err = server.createListener()
+		listener, err = server.createListener()
 		if err != nil {
 			return fmt.Errorf("could not create listener: %w", err)
 		}
 	}
 
-	server.Logger.Info("Listening...", "address", server.listener.Addr())
+	server.setListener(listener)
+	server.Logger.Info("Listening...", "address", listener.Addr())
 
 	return nil
 }
@@ -249,8 +268,10 @@ func temporaryError(err net.Error) bool {
 func (server *FtpServer) Serve() error {
 	var tempDelay time.Duration // how long to sleep on accept failure
 
+	listener := server.getListener()
+
 	for {
-		connection, err := server.listener.Accept()
+		connection, err := listener.Accept()
 		if err != nil {
 			if ok, finalErr := server.handleAcceptError(err, &tempDelay); ok {
 				return finalErr
@@ -272,7 +293,7 @@ func (server *FtpServer) handleAcceptError(err error, tempDelay *time.Duration) 
 	if errOp := (&net.OpError{}); errors.As(err, &errOp) {
 		// This means we just closed the connection and it's OK
 		if errOp.Err.Error() == "use of closed network connection" {
-			server.listener = nil
+			server.setListener(nil)
 
 			return true, nil
 		}
@@ -331,8 +352,8 @@ func NewFtpServer(driver MainDriver) *FtpServer {
 
 // Addr shows the listening address
 func (server *FtpServer) Addr() string {
-	if server.listener != nil {
-		return server.listener.Addr().String()
+	if listener := server.getListener(); listener != nil {
+		return listener.Addr().String()
 	}
 
 	return ""
@@ -340,11 +361,12 @@ func (server *FtpServer) Addr() string {
 
 // Stop closes the listener
 func (server *FtpServer) Stop() error {
-	if server.listener == nil {
+	listener := server.getListener()
+	if listener == nil {
 		return ErrNotListening
 	}
 
-	if err := server.listener.Close(); err != nil {
+	if err := listener.Close(); err != nil {
 		server.Logger.Warn(
 			"Could not close listener",
 			"err", err,
