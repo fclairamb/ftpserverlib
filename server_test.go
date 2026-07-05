@@ -256,3 +256,32 @@ func TestTemporaryError(t *testing.T) {
 
 	req.False(temporaryError(&net.OpError{Err: &os.SyscallError{Err: syscall.EAGAIN}}))
 }
+
+// TestListenerConcurrentAccess checks that reading the listen address while
+// ListenAndServe is still binding the listener doesn't race. Run with -race:
+// before the listener field was guarded, this reported a data race between
+// Addr() and Listen().
+func TestListenerConcurrentAccess(t *testing.T) {
+	driver := &TestServerDriver{}
+	driver.Init()
+
+	server := NewFtpServer(driver)
+	server.Logger = slog.New(slog.DiscardHandler)
+
+	served := make(chan error, 1)
+	go func() {
+		served <- server.ListenAndServe()
+	}()
+
+	// Poll Addr() from another goroutine while the listener is being set up.
+	var addr string
+	require.Eventually(t, func() bool {
+		addr = server.Addr()
+
+		return addr != ""
+	}, time.Second, 100*time.Microsecond)
+	require.NotEmpty(t, addr)
+
+	require.NoError(t, server.Stop())
+	require.NoError(t, <-served)
+}
