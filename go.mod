@@ -2,7 +2,7 @@ module github.com/fclairamb/ftpserverlib
 
 go 1.25.0
 
-toolchain go1.26.4
+toolchain go1.26.5
 
 require (
 	github.com/secsy/goftp v0.0.0-20200609142545-aa2de14babf4
