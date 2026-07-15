@@ -1,0 +1,1621 @@
+{
+  "schema_version": 1,
+  "source": "sourcey-godoc",
+  "module_path": "github.com/fclairamb/ftpserverlib",
+  "generated_at": "2026-07-13T07:35:52Z",
+  "packages": [
+    {
+      "importPath": "github.com/fclairamb/ftpserverlib",
+      "name": "ftpserver",
+      "synopsis": "Package ftpserver provides all the tools to build your own FTP server: The core library and the driver.",
+      "doc": "Package ftpserver provides all the tools to build your own FTP server: The core library and the driver.",
+      "dir": ".",
+      "files": [
+        "asciiconverter.go",
+        "client_handler.go",
+        "consts.go",
+        "control_windows.go",
+        "driver.go",
+        "errors.go",
+        "handle_auth.go",
+        "handle_dirs.go",
+        "handle_files.go",
+        "handle_misc.go",
+        "passive_multiplexer.go",
+        "server.go",
+        "transfer_active.go",
+        "transfer_pasv.go"
+      ],
+      "consts": [
+        {
+          "name": "StatusFileStatusOK",
+          "doc": "Status codes as documented by:\nhttps://tools.ietf.org/html/rfc959\nhttps://tools.ietf.org/html/rfc2428\nhttps://tools.ietf.org/html/rfc2228",
+          "declaration": "const (\n\t// 100 Series - The requested action is being initiated, expect another reply before\n\t// proceeding with a new command.\n\tStatusFileStatusOK = 150 // RFC 959, 4.2.1\n\n\t// 200 Series - The requested action has been successfully completed.\n\tStatusOK                 = 200 // RFC 959, 4.2.1\n\tStatusNotImplemented     = 202 // RFC 959, 4.2.1\n\tStatusSystemStatus       = 211 // RFC 959, 4.2.1\n\tStatusDirectoryStatus    = 212 // RFC 959, 4.2.1\n\tStatusFileStatus         = 213 // RFC 959, 4.2.1\n\tStatusHelpMessage        = 214 // RFC 959, 4.2.1\n\tStatusSystemType         = 215 // RFC 959, 4.2.1\n\tStatusServiceReady       = 220 // RFC 959, 4.2.1\n\tStatusClosingControlConn = 221 // RFC 959, 4.2.1\n\tStatusClosingDataConn    = 226 // RFC 959, 4.2.1\n\tStatusEnteringPASV       = 227 // RFC 959, 4.2.1\n\tStatusEnteringEPSV       = 229 // RFC 2428, 3\n\tStatusUserLoggedIn       = 230 // RFC 959, 4.2.1\n\tStatusAuthAccepted       = 234 // RFC 2228, 3\n\tStatusFileOK             = 250 // RFC 959, 4.2.1\n\tStatusPathCreated        = 257 // RFC 959, 4.2.1\n\n\t// 300 Series - The command has been accepted, but the requested action is on hold,\n\t// pending receipt of further information.\n\tStatusUserOK            = 331 // RFC 959, 4.2.1\n\tStatusFileActionPending = 350 // RFC 959, 4.2.1\n\n\t// 400 Series - The command was not accepted and the requested action did not take place,\n\t// but the error condition is temporary and the action may be requested again.\n\tStatusServiceNotAvailable      = 421 // RFC 959, 4.2.1\n\tStatusCannotOpenDataConnection = 425 // RFC 959, 4.2.1\n\tStatusTransferAborted          = 426 // RFC 959, 4.2.1\n\tStatusFileActionNotTaken       = 450 // RFC 959, 4.2.1\n\n\t// 500 Series - Syntax error, command unrecognized and the requested action did not take\n\t// place. This may include errors such as command line too long.\n\tStatusSyntaxErrorNotRecognised = 500 // RFC 959, 4.2.1\n\tStatusSyntaxErrorParameters    = 501 // RFC 959, 4.2.1\n\tStatusCommandNotImplemented    = 502 // RFC 959, 4.2.1\n\tStatusBadCommandSequence       = 503 // RFC 959, 4.2.1\n\tStatusNotImplementedParam      = 504 // RFC 959, 4.2.1\n\tStatusNotLoggedIn              = 530 // RFC 959, 4.2.1\n\tStatusActionNotTaken           = 550 // RFC 959, 4.2.1\n\tStatusActionAborted            = 552 // RFC 959, 4.2.1\n\tStatusActionNotTakenNoFile     = 553 // RFC 959, 4.2.1\n)",
+          "position": {
+            "file": "consts.go",
+            "line": 13
+          }
+        },
+        {
+          "name": "StatusOK",
+          "doc": "Status codes as documented by:\nhttps://tools.ietf.org/html/rfc959\nhttps://tools.ietf.org/html/rfc2428\nhttps://tools.ietf.org/html/rfc2228",
+          "declaration": "const (\n\t// 100 Series - The requested action is being initiated, expect another reply before\n\t// proceeding with a new command.\n\tStatusFileStatusOK = 150 // RFC 959, 4.2.1\n\n\t// 200 Series - The requested action has been successfully completed.\n\tStatusOK                 = 200 // RFC 959, 4.2.1\n\tStatusNotImplemented     = 202 // RFC 959, 4.2.1\n\tStatusSystemStatus       = 211 // RFC 959, 4.2.1\n\tStatusDirectoryStatus    = 212 // RFC 959, 4.2.1\n\tStatusFileStatus         = 213 // RFC 959, 4.2.1\n\tStatusHelpMessage        = 214 // RFC 959, 4.2.1\n\tStatusSystemType         = 215 // RFC 959, 4.2.1\n\tStatusServiceReady       = 220 // RFC 959, 4.2.1\n\tStatusClosingControlConn = 221 // RFC 959, 4.2.1\n\tStatusClosingDataConn    = 226 // RFC 959, 4.2.1\n\tStatusEnteringPASV       = 227 // RFC 959, 4.2.1\n\tStatusEnteringEPSV       = 229 // RFC 2428, 3\n\tStatusUserLoggedIn       = 230 // RFC 959, 4.2.1\n\tStatusAuthAccepted       = 234 // RFC 2228, 3\n\tStatusFileOK             = 250 // RFC 959, 4.2.1\n\tStatusPathCreated        = 257 // RFC 959, 4.2.1\n\n\t// 300 Series - The command has been accepted, but the requested action is on hold,\n\t// pending receipt of further information.\n\tStatusUserOK            = 331 // RFC 959, 4.2.1\n\tStatusFileActionPending = 350 // RFC 959, 4.2.1\n\n\t// 400 Series - The command was not accepted and the requested action did not take place,\n\t// but the error condition is temporary and the action may be requested again.\n\tStatusServiceNotAvailable      = 421 // RFC 959, 4.2.1\n\tStatusCannotOpenDataConnection = 425 // RFC 959, 4.2.1\n\tStatusTransferAborted          = 426 // RFC 959, 4.2.1\n\tStatusFileActionNotTaken       = 450 // RFC 959, 4.2.1\n\n\t// 500 Series - Syntax error, command unrecognized and the requested action did not take\n\t// place. This may include errors such as command line too long.\n\tStatusSyntaxErrorNotRecognised = 500 // RFC 959, 4.2.1\n\tStatusSyntaxErrorParameters    = 501 // RFC 959, 4.2.1\n\tStatusCommandNotImplemented    = 502 // RFC 959, 4.2.1\n\tStatusBadCommandSequence       = 503 // RFC 959, 4.2.1\n\tStatusNotImplementedParam      = 504 // RFC 959, 4.2.1\n\tStatusNotLoggedIn              = 530 // RFC 959, 4.2.1\n\tStatusActionNotTaken           = 550 // RFC 959, 4.2.1\n\tStatusActionAborted            = 552 // RFC 959, 4.2.1\n\tStatusActionNotTakenNoFile     = 553 // RFC 959, 4.2.1\n)",
+          "position": {
+            "file": "consts.go",
+            "line": 16
+          }
+        },
+        {
+          "name": "StatusNotImplemented",
+          "doc": "Status codes as documented by:\nhttps://tools.ietf.org/html/rfc959\nhttps://tools.ietf.org/html/rfc2428\nhttps://tools.ietf.org/html/rfc2228",
+          "declaration": "const (\n\t// 100 Series - The requested action is being initiated, expect another reply before\n\t// proceeding with a new command.\n\tStatusFileStatusOK = 150 // RFC 959, 4.2.1\n\n\t// 200 Series - The requested action has been successfully completed.\n\tStatusOK                 = 200 // RFC 959, 4.2.1\n\tStatusNotImplemented     = 202 // RFC 959, 4.2.1\n\tStatusSystemStatus       = 211 // RFC 959, 4.2.1\n\tStatusDirectoryStatus    = 212 // RFC 959, 4.2.1\n\tStatusFileStatus         = 213 // RFC 959, 4.2.1\n\tStatusHelpMessage        = 214 // RFC 959, 4.2.1\n\tStatusSystemType         = 215 // RFC 959, 4.2.1\n\tStatusServiceReady       = 220 // RFC 959, 4.2.1\n\tStatusClosingControlConn = 221 // RFC 959, 4.2.1\n\tStatusClosingDataConn    = 226 // RFC 959, 4.2.1\n\tStatusEnteringPASV       = 227 // RFC 959, 4.2.1\n\tStatusEnteringEPSV       = 229 // RFC 2428, 3\n\tStatusUserLoggedIn       = 230 // RFC 959, 4.2.1\n\tStatusAuthAccepted       = 234 // RFC 2228, 3\n\tStatusFileOK             = 250 // RFC 959, 4.2.1\n\tStatusPathCreated        = 257 // RFC 959, 4.2.1\n\n\t// 300 Series - The command has been accepted, but the requested action is on hold,\n\t// pending receipt of further information.\n\tStatusUserOK            = 331 // RFC 959, 4.2.1\n\tStatusFileActionPending = 350 // RFC 959, 4.2.1\n\n\t// 400 Series - The command was not accepted and the requested action did not take place,\n\t// but the error condition is temporary and the action may be requested again.\n\tStatusServiceNotAvailable      = 421 // RFC 959, 4.2.1\n\tStatusCannotOpenDataConnection = 425 // RFC 959, 4.2.1\n\tStatusTransferAborted          = 426 // RFC 959, 4.2.1\n\tStatusFileActionNotTaken       = 450 // RFC 959, 4.2.1\n\n\t// 500 Series - Syntax error, command unrecognized and the requested action did not take\n\t// place. This may include errors such as command line too long.\n\tStatusSyntaxErrorNotRecognised = 500 // RFC 959, 4.2.1\n\tStatusSyntaxErrorParameters    = 501 // RFC 959, 4.2.1\n\tStatusCommandNotImplemented    = 502 // RFC 959, 4.2.1\n\tStatusBadCommandSequence       = 503 // RFC 959, 4.2.1\n\tStatusNotImplementedParam      = 504 // RFC 959, 4.2.1\n\tStatusNotLoggedIn              = 530 // RFC 959, 4.2.1\n\tStatusActionNotTaken           = 550 // RFC 959, 4.2.1\n\tStatusActionAborted            = 552 // RFC 959, 4.2.1\n\tStatusActionNotTakenNoFile     = 553 // RFC 959, 4.2.1\n)",
+          "position": {
+            "file": "consts.go",
+            "line": 17
+          }
+        },
+        {
+          "name": "StatusSystemStatus",
+          "doc": "Status codes as documented by:\nhttps://tools.ietf.org/html/rfc959\nhttps://tools.ietf.org/html/rfc2428\nhttps://tools.ietf.org/html/rfc2228",
+          "declaration": "const (\n\t// 100 Series - The requested action is being initiated, expect another reply before\n\t// proceeding with a new command.\n\tStatusFileStatusOK = 150 // RFC 959, 4.2.1\n\n\t// 200 Series - The requested action has been successfully completed.\n\tStatusOK                 = 200 // RFC 959, 4.2.1\n\tStatusNotImplemented     = 202 // RFC 959, 4.2.1\n\tStatusSystemStatus       = 211 // RFC 959, 4.2.1\n\tStatusDirectoryStatus    = 212 // RFC 959, 4.2.1\n\tStatusFileStatus         = 213 // RFC 959, 4.2.1\n\tStatusHelpMessage        = 214 // RFC 959, 4.2.1\n\tStatusSystemType         = 215 // RFC 959, 4.2.1\n\tStatusServiceReady       = 220 // RFC 959, 4.2.1\n\tStatusClosingControlConn = 221 // RFC 959, 4.2.1\n\tStatusClosingDataConn    = 226 // RFC 959, 4.2.1\n\tStatusEnteringPASV       = 227 // RFC 959, 4.2.1\n\tStatusEnteringEPSV       = 229 // RFC 2428, 3\n\tStatusUserLoggedIn       = 230 // RFC 959, 4.2.1\n\tStatusAuthAccepted       = 234 // RFC 2228, 3\n\tStatusFileOK             = 250 // RFC 959, 4.2.1\n\tStatusPathCreated        = 257 // RFC 959, 4.2.1\n\n\t// 300 Series - The command has been accepted, but the requested action is on hold,\n\t// pending receipt of further information.\n\tStatusUserOK            = 331 // RFC 959, 4.2.1\n\tStatusFileActionPending = 350 // RFC 959, 4.2.1\n\n\t// 400 Series - The command was not accepted and the requested action did not take place,\n\t// but the error condition is temporary and the action may be requested again.\n\tStatusServiceNotAvailable      = 421 // RFC 959, 4.2.1\n\tStatusCannotOpenDataConnection = 425 // RFC 959, 4.2.1\n\tStatusTransferAborted          = 426 // RFC 959, 4.2.1\n\tStatusFileActionNotTaken       = 450 // RFC 959, 4.2.1\n\n\t// 500 Series - Syntax error, command unrecognized and the requested action did not take\n\t// place. This may include errors such as command line too long.\n\tStatusSyntaxErrorNotRecognised = 500 // RFC 959, 4.2.1\n\tStatusSyntaxErrorParameters    = 501 // RFC 959, 4.2.1\n\tStatusCommandNotImplemented    = 502 // RFC 959, 4.2.1\n\tStatusBadCommandSequence       = 503 // RFC 959, 4.2.1\n\tStatusNotImplementedParam      = 504 // RFC 959, 4.2.1\n\tStatusNotLoggedIn              = 530 // RFC 959, 4.2.1\n\tStatusActionNotTaken           = 550 // RFC 959, 4.2.1\n\tStatusActionAborted            = 552 // RFC 959, 4.2.1\n\tStatusActionNotTakenNoFile     = 553 // RFC 959, 4.2.1\n)",
+          "position": {
+            "file": "consts.go",
+            "line": 18
+          }
+        },
+        {
+          "name": "StatusDirectoryStatus",
+          "doc": "Status codes as documented by:\nhttps://tools.ietf.org/html/rfc959\nhttps://tools.ietf.org/html/rfc2428\nhttps://tools.ietf.org/html/rfc2228",
+          "declaration": "const (\n\t// 100 Series - The requested action is being initiated, expect another reply before\n\t// proceeding with a new command.\n\tStatusFileStatusOK = 150 // RFC 959, 4.2.1\n\n\t// 200 Series - The requested action has been successfully completed.\n\tStatusOK                 = 200 // RFC 959, 4.2.1\n\tStatusNotImplemented     = 202 // RFC 959, 4.2.1\n\tStatusSystemStatus       = 211 // RFC 959, 4.2.1\n\tStatusDirectoryStatus    = 212 // RFC 959, 4.2.1\n\tStatusFileStatus         = 213 // RFC 959, 4.2.1\n\tStatusHelpMessage        = 214 // RFC 959, 4.2.1\n\tStatusSystemType         = 215 // RFC 959, 4.2.1\n\tStatusServiceReady       = 220 // RFC 959, 4.2.1\n\tStatusClosingControlConn = 221 // RFC 959, 4.2.1\n\tStatusClosingDataConn    = 226 // RFC 959, 4.2.1\n\tStatusEnteringPASV       = 227 // RFC 959, 4.2.1\n\tStatusEnteringEPSV       = 229 // RFC 2428, 3\n\tStatusUserLoggedIn       = 230 // RFC 959, 4.2.1\n\tStatusAuthAccepted       = 234 // RFC 2228, 3\n\tStatusFileOK             = 250 // RFC 959, 4.2.1\n\tStatusPathCreated        = 257 // RFC 959, 4.2.1\n\n\t// 300 Series - The command has been accepted, but the requested action is on hold,\n\t// pending receipt of further information.\n\tStatusUserOK            = 331 // RFC 959, 4.2.1\n\tStatusFileActionPending = 350 // RFC 959, 4.2.1\n\n\t// 400 Series - The command was not accepted and the requested action did not take place,\n\t// but the error condition is temporary and the action may be requested again.\n\tStatusServiceNotAvailable      = 421 // RFC 959, 4.2.1\n\tStatusCannotOpenDataConnection = 425 // RFC 959, 4.2.1\n\tStatusTransferAborted          = 426 // RFC 959, 4.2.1\n\tStatusFileActionNotTaken       = 450 // RFC 959, 4.2.1\n\n\t// 500 Series - Syntax error, command unrecognized and the requested action did not take\n\t// place. This may include errors such as command line too long.\n\tStatusSyntaxErrorNotRecognised = 500 // RFC 959, 4.2.1\n\tStatusSyntaxErrorParameters    = 501 // RFC 959, 4.2.1\n\tStatusCommandNotImplemented    = 502 // RFC 959, 4.2.1\n\tStatusBadCommandSequence       = 503 // RFC 959, 4.2.1\n\tStatusNotImplementedParam      = 504 // RFC 959, 4.2.1\n\tStatusNotLoggedIn              = 530 // RFC 959, 4.2.1\n\tStatusActionNotTaken           = 550 // RFC 959, 4.2.1\n\tStatusActionAborted            = 552 // RFC 959, 4.2.1\n\tStatusActionNotTakenNoFile     = 553 // RFC 959, 4.2.1\n)",
+          "position": {
+            "file": "consts.go",
+            "line": 19
+          }
+        },
+        {
+          "name": "StatusFileStatus",
+          "doc": "Status codes as documented by:\nhttps://tools.ietf.org/html/rfc959\nhttps://tools.ietf.org/html/rfc2428\nhttps://tools.ietf.org/html/rfc2228",
+          "declaration": "const (\n\t// 100 Series - The requested action is being initiated, expect another reply before\n\t// proceeding with a new command.\n\tStatusFileStatusOK = 150 // RFC 959, 4.2.1\n\n\t// 200 Series - The requested action has been successfully completed.\n\tStatusOK                 = 200 // RFC 959, 4.2.1\n\tStatusNotImplemented     = 202 // RFC 959, 4.2.1\n\tStatusSystemStatus       = 211 // RFC 959, 4.2.1\n\tStatusDirectoryStatus    = 212 // RFC 959, 4.2.1\n\tStatusFileStatus         = 213 // RFC 959, 4.2.1\n\tStatusHelpMessage        = 214 // RFC 959, 4.2.1\n\tStatusSystemType         = 215 // RFC 959, 4.2.1\n\tStatusServiceReady       = 220 // RFC 959, 4.2.1\n\tStatusClosingControlConn = 221 // RFC 959, 4.2.1\n\tStatusClosingDataConn    = 226 // RFC 959, 4.2.1\n\tStatusEnteringPASV       = 227 // RFC 959, 4.2.1\n\tStatusEnteringEPSV       = 229 // RFC 2428, 3\n\tStatusUserLoggedIn       = 230 // RFC 959, 4.2.1\n\tStatusAuthAccepted       = 234 // RFC 2228, 3\n\tStatusFileOK             = 250 // RFC 959, 4.2.1\n\tStatusPathCreated        = 257 // RFC 959, 4.2.1\n\n\t// 300 Series - The command has been accepted, but the requested action is on hold,\n\t// pending receipt of further information.\n\tStatusUserOK            = 331 // RFC 959, 4.2.1\n\tStatusFileActionPending = 350 // RFC 959, 4.2.1\n\n\t// 400 Series - The command was not accepted and the requested action did not take place,\n\t// but the error condition is temporary and the action may be requested again.\n\tStatusServiceNotAvailable      = 421 // RFC 959, 4.2.1\n\tStatusCannotOpenDataConnection = 425 // RFC 959, 4.2.1\n\tStatusTransferAborted          = 426 // RFC 959, 4.2.1\n\tStatusFileActionNotTaken       = 450 // RFC 959, 4.2.1\n\n\t// 500 Series - Syntax error, command unrecognized and the requested action did not take\n\t// place. This may include errors such as command line too long.\n\tStatusSyntaxErrorNotRecognised = 500 // RFC 959, 4.2.1\n\tStatusSyntaxErrorParameters    = 501 // RFC 959, 4.2.1\n\tStatusCommandNotImplemented    = 502 // RFC 959, 4.2.1\n\tStatusBadCommandSequence       = 503 // RFC 959, 4.2.1\n\tStatusNotImplementedParam      = 504 // RFC 959, 4.2.1\n\tStatusNotLoggedIn              = 530 // RFC 959, 4.2.1\n\tStatusActionNotTaken           = 550 // RFC 959, 4.2.1\n\tStatusActionAborted            = 552 // RFC 959, 4.2.1\n\tStatusActionNotTakenNoFile     = 553 // RFC 959, 4.2.1\n)",
+          "position": {
+            "file": "consts.go",
+            "line": 20
+          }
+        },
+        {
+          "name": "StatusHelpMessage",
+          "doc": "Status codes as documented by:\nhttps://tools.ietf.org/html/rfc959\nhttps://tools.ietf.org/html/rfc2428\nhttps://tools.ietf.org/html/rfc2228",
+          "declaration": "const (\n\t// 100 Series - The requested action is being initiated, expect another reply before\n\t// proceeding with a new command.\n\tStatusFileStatusOK = 150 // RFC 959, 4.2.1\n\n\t// 200 Series - The requested action has been successfully completed.\n\tStatusOK                 = 200 // RFC 959, 4.2.1\n\tStatusNotImplemented     = 202 // RFC 959, 4.2.1\n\tStatusSystemStatus       = 211 // RFC 959, 4.2.1\n\tStatusDirectoryStatus    = 212 // RFC 959, 4.2.1\n\tStatusFileStatus         = 213 // RFC 959, 4.2.1\n\tStatusHelpMessage        = 214 // RFC 959, 4.2.1\n\tStatusSystemType         = 215 // RFC 959, 4.2.1\n\tStatusServiceReady       = 220 // RFC 959, 4.2.1\n\tStatusClosingControlConn = 221 // RFC 959, 4.2.1\n\tStatusClosingDataConn    = 226 // RFC 959, 4.2.1\n\tStatusEnteringPASV       = 227 // RFC 959, 4.2.1\n\tStatusEnteringEPSV       = 229 // RFC 2428, 3\n\tStatusUserLoggedIn       = 230 // RFC 959, 4.2.1\n\tStatusAuthAccepted       = 234 // RFC 2228, 3\n\tStatusFileOK             = 250 // RFC 959, 4.2.1\n\tStatusPathCreated        = 257 // RFC 959, 4.2.1\n\n\t// 300 Series - The command has been accepted, but the requested action is on hold,\n\t// pending receipt of further information.\n\tStatusUserOK            = 331 // RFC 959, 4.2.1\n\tStatusFileActionPending = 350 // RFC 959, 4.2.1\n\n\t// 400 Series - The command was not accepted and the requested action did not take place,\n\t// but the error condition is temporary and the action may be requested again.\n\tStatusServiceNotAvailable      = 421 // RFC 959, 4.2.1\n\tStatusCannotOpenDataConnection = 425 // RFC 959, 4.2.1\n\tStatusTransferAborted          = 426 // RFC 959, 4.2.1\n\tStatusFileActionNotTaken       = 450 // RFC 959, 4.2.1\n\n\t// 500 Series - Syntax error, command unrecognized and the requested action did not take\n\t// place. This may include errors such as command line too long.\n\tStatusSyntaxErrorNotRecognised = 500 // RFC 959, 4.2.1\n\tStatusSyntaxErrorParameters    = 501 // RFC 959, 4.2.1\n\tStatusCommandNotImplemented    = 502 // RFC 959, 4.2.1\n\tStatusBadCommandSequence       = 503 // RFC 959, 4.2.1\n\tStatusNotImplementedParam      = 504 // RFC 959, 4.2.1\n\tStatusNotLoggedIn              = 530 // RFC 959, 4.2.1\n\tStatusActionNotTaken           = 550 // RFC 959, 4.2.1\n\tStatusActionAborted            = 552 // RFC 959, 4.2.1\n\tStatusActionNotTakenNoFile     = 553 // RFC 959, 4.2.1\n)",
+          "position": {
+            "file": "consts.go",
+            "line": 21
+          }
+        },
+        {
+          "name": "StatusSystemType",
+          "doc": "Status codes as documented by:\nhttps://tools.ietf.org/html/rfc959\nhttps://tools.ietf.org/html/rfc2428\nhttps://tools.ietf.org/html/rfc2228",
+          "declaration": "const (\n\t// 100 Series - The requested action is being initiated, expect another reply before\n\t// proceeding with a new command.\n\tStatusFileStatusOK = 150 // RFC 959, 4.2.1\n\n\t// 200 Series - The requested action has been successfully completed.\n\tStatusOK                 = 200 // RFC 959, 4.2.1\n\tStatusNotImplemented     = 202 // RFC 959, 4.2.1\n\tStatusSystemStatus       = 211 // RFC 959, 4.2.1\n\tStatusDirectoryStatus    = 212 // RFC 959, 4.2.1\n\tStatusFileStatus         = 213 // RFC 959, 4.2.1\n\tStatusHelpMessage        = 214 // RFC 959, 4.2.1\n\tStatusSystemType         = 215 // RFC 959, 4.2.1\n\tStatusServiceReady       = 220 // RFC 959, 4.2.1\n\tStatusClosingControlConn = 221 // RFC 959, 4.2.1\n\tStatusClosingDataConn    = 226 // RFC 959, 4.2.1\n\tStatusEnteringPASV       = 227 // RFC 959, 4.2.1\n\tStatusEnteringEPSV       = 229 // RFC 2428, 3\n\tStatusUserLoggedIn       = 230 // RFC 959, 4.2.1\n\tStatusAuthAccepted       = 234 // RFC 2228, 3\n\tStatusFileOK             = 250 // RFC 959, 4.2.1\n\tStatusPathCreated        = 257 // RFC 959, 4.2.1\n\n\t// 300 Series - The command has been accepted, but the requested action is on hold,\n\t// pending receipt of further information.\n\tStatusUserOK            = 331 // RFC 959, 4.2.1\n\tStatusFileActionPending = 350 // RFC 959, 4.2.1\n\n\t// 400 Series - The command was not accepted and the requested action did not take place,\n\t// but the error condition is temporary and the action may be requested again.\n\tStatusServiceNotAvailable      = 421 // RFC 959, 4.2.1\n\tStatusCannotOpenDataConnection = 425 // RFC 959, 4.2.1\n\tStatusTransferAborted          = 426 // RFC 959, 4.2.1\n\tStatusFileActionNotTaken       = 450 // RFC 959, 4.2.1\n\n\t// 500 Series - Syntax error, command unrecognized and the requested action did not take\n\t// place. This may include errors such as command line too long.\n\tStatusSyntaxErrorNotRecognised = 500 // RFC 959, 4.2.1\n\tStatusSyntaxErrorParameters    = 501 // RFC 959, 4.2.1\n\tStatusCommandNotImplemented    = 502 // RFC 959, 4.2.1\n\tStatusBadCommandSequence       = 503 // RFC 959, 4.2.1\n\tStatusNotImplementedParam      = 504 // RFC 959, 4.2.1\n\tStatusNotLoggedIn              = 530 // RFC 959, 4.2.1\n\tStatusActionNotTaken           = 550 // RFC 959, 4.2.1\n\tStatusActionAborted            = 552 // RFC 959, 4.2.1\n\tStatusActionNotTakenNoFile     = 553 // RFC 959, 4.2.1\n)",
+          "position": {
+            "file": "consts.go",
+            "line": 22
+          }
+        },
+        {
+          "name": "StatusServiceReady",
+          "doc": "Status codes as documented by:\nhttps://tools.ietf.org/html/rfc959\nhttps://tools.ietf.org/html/rfc2428\nhttps://tools.ietf.org/html/rfc2228",
+          "declaration": "const (\n\t// 100 Series - The requested action is being initiated, expect another reply before\n\t// proceeding with a new command.\n\tStatusFileStatusOK = 150 // RFC 959, 4.2.1\n\n\t// 200 Series - The requested action has been successfully completed.\n\tStatusOK                 = 200 // RFC 959, 4.2.1\n\tStatusNotImplemented     = 202 // RFC 959, 4.2.1\n\tStatusSystemStatus       = 211 // RFC 959, 4.2.1\n\tStatusDirectoryStatus    = 212 // RFC 959, 4.2.1\n\tStatusFileStatus         = 213 // RFC 959, 4.2.1\n\tStatusHelpMessage        = 214 // RFC 959, 4.2.1\n\tStatusSystemType         = 215 // RFC 959, 4.2.1\n\tStatusServiceReady       = 220 // RFC 959, 4.2.1\n\tStatusClosingControlConn = 221 // RFC 959, 4.2.1\n\tStatusClosingDataConn    = 226 // RFC 959, 4.2.1\n\tStatusEnteringPASV       = 227 // RFC 959, 4.2.1\n\tStatusEnteringEPSV       = 229 // RFC 2428, 3\n\tStatusUserLoggedIn       = 230 // RFC 959, 4.2.1\n\tStatusAuthAccepted       = 234 // RFC 2228, 3\n\tStatusFileOK             = 250 // RFC 959, 4.2.1\n\tStatusPathCreated        = 257 // RFC 959, 4.2.1\n\n\t// 300 Series - The command has been accepted, but the requested action is on hold,\n\t// pending receipt of further information.\n\tStatusUserOK            = 331 // RFC 959, 4.2.1\n\tStatusFileActionPending = 350 // RFC 959, 4.2.1\n\n\t// 400 Series - The command was not accepted and the requested action did not take place,\n\t// but the error condition is temporary and the action may be requested again.\n\tStatusServiceNotAvailable      = 421 // RFC 959, 4.2.1\n\tStatusCannotOpenDataConnection = 425 // RFC 959, 4.2.1\n\tStatusTransferAborted          = 426 // RFC 959, 4.2.1\n\tStatusFileActionNotTaken       = 450 // RFC 959, 4.2.1\n\n\t// 500 Series - Syntax error, command unrecognized and the requested action did not take\n\t// place. This may include errors such as command line too long.\n\tStatusSyntaxErrorNotRecognised = 500 // RFC 959, 4.2.1\n\tStatusSyntaxErrorParameters    = 501 // RFC 959, 4.2.1\n\tStatusCommandNotImplemented    = 502 // RFC 959, 4.2.1\n\tStatusBadCommandSequence       = 503 // RFC 959, 4.2.1\n\tStatusNotImplementedParam      = 504 // RFC 959, 4.2.1\n\tStatusNotLoggedIn              = 530 // RFC 959, 4.2.1\n\tStatusActionNotTaken           = 550 // RFC 959, 4.2.1\n\tStatusActionAborted            = 552 // RFC 959, 4.2.1\n\tStatusActionNotTakenNoFile     = 553 // RFC 959, 4.2.1\n)",
+          "position": {
+            "file": "consts.go",
+            "line": 23
+          }
+        },
+        {
+          "name": "StatusClosingControlConn",
+          "doc": "Status codes as documented by:\nhttps://tools.ietf.org/html/rfc959\nhttps://tools.ietf.org/html/rfc2428\nhttps://tools.ietf.org/html/rfc2228",
+          "declaration": "const (\n\t// 100 Series - The requested action is being initiated, expect another reply before\n\t// proceeding with a new command.\n\tStatusFileStatusOK = 150 // RFC 959, 4.2.1\n\n\t// 200 Series - The requested action has been successfully completed.\n\tStatusOK                 = 200 // RFC 959, 4.2.1\n\tStatusNotImplemented     = 202 // RFC 959, 4.2.1\n\tStatusSystemStatus       = 211 // RFC 959, 4.2.1\n\tStatusDirectoryStatus    = 212 // RFC 959, 4.2.1\n\tStatusFileStatus         = 213 // RFC 959, 4.2.1\n\tStatusHelpMessage        = 214 // RFC 959, 4.2.1\n\tStatusSystemType         = 215 // RFC 959, 4.2.1\n\tStatusServiceReady       = 220 // RFC 959, 4.2.1\n\tStatusClosingControlConn = 221 // RFC 959, 4.2.1\n\tStatusClosingDataConn    = 226 // RFC 959, 4.2.1\n\tStatusEnteringPASV       = 227 // RFC 959, 4.2.1\n\tStatusEnteringEPSV       = 229 // RFC 2428, 3\n\tStatusUserLoggedIn       = 230 // RFC 959, 4.2.1\n\tStatusAuthAccepted       = 234 // RFC 2228, 3\n\tStatusFileOK             = 250 // RFC 959, 4.2.1\n\tStatusPathCreated        = 257 // RFC 959, 4.2.1\n\n\t// 300 Series - The command has been accepted, but the requested action is on hold,\n\t// pending receipt of further information.\n\tStatusUserOK            = 331 // RFC 959, 4.2.1\n\tStatusFileActionPending = 350 // RFC 959, 4.2.1\n\n\t// 400 Series - The command was not accepted and the requested action did not take place,\n\t// but the error condition is temporary and the action may be requested again.\n\tStatusServiceNotAvailable      = 421 // RFC 959, 4.2.1\n\tStatusCannotOpenDataConnection = 425 // RFC 959, 4.2.1\n\tStatusTransferAborted          = 426 // RFC 959, 4.2.1\n\tStatusFileActionNotTaken       = 450 // RFC 959, 4.2.1\n\n\t// 500 Series - Syntax error, command unrecognized and the requested action did not take\n\t// place. This may include errors such as command line too long.\n\tStatusSyntaxErrorNotRecognised = 500 // RFC 959, 4.2.1\n\tStatusSyntaxErrorParameters    = 501 // RFC 959, 4.2.1\n\tStatusCommandNotImplemented    = 502 // RFC 959, 4.2.1\n\tStatusBadCommandSequence       = 503 // RFC 959, 4.2.1\n\tStatusNotImplementedParam      = 504 // RFC 959, 4.2.1\n\tStatusNotLoggedIn              = 530 // RFC 959, 4.2.1\n\tStatusActionNotTaken           = 550 // RFC 959, 4.2.1\n\tStatusActionAborted            = 552 // RFC 959, 4.2.1\n\tStatusActionNotTakenNoFile     = 553 // RFC 959, 4.2.1\n)",
+          "position": {
+            "file": "consts.go",
+            "line": 24
+          }
+        },
+        {
+          "name": "StatusClosingDataConn",
+          "doc": "Status codes as documented by:\nhttps://tools.ietf.org/html/rfc959\nhttps://tools.ietf.org/html/rfc2428\nhttps://tools.ietf.org/html/rfc2228",
+          "declaration": "const (\n\t// 100 Series - The requested action is being initiated, expect another reply before\n\t// proceeding with a new command.\n\tStatusFileStatusOK = 150 // RFC 959, 4.2.1\n\n\t// 200 Series - The requested action has been successfully completed.\n\tStatusOK                 = 200 // RFC 959, 4.2.1\n\tStatusNotImplemented     = 202 // RFC 959, 4.2.1\n\tStatusSystemStatus       = 211 // RFC 959, 4.2.1\n\tStatusDirectoryStatus    = 212 // RFC 959, 4.2.1\n\tStatusFileStatus         = 213 // RFC 959, 4.2.1\n\tStatusHelpMessage        = 214 // RFC 959, 4.2.1\n\tStatusSystemType         = 215 // RFC 959, 4.2.1\n\tStatusServiceReady       = 220 // RFC 959, 4.2.1\n\tStatusClosingControlConn = 221 // RFC 959, 4.2.1\n\tStatusClosingDataConn    = 226 // RFC 959, 4.2.1\n\tStatusEnteringPASV       = 227 // RFC 959, 4.2.1\n\tStatusEnteringEPSV       = 229 // RFC 2428, 3\n\tStatusUserLoggedIn       = 230 // RFC 959, 4.2.1\n\tStatusAuthAccepted       = 234 // RFC 2228, 3\n\tStatusFileOK             = 250 // RFC 959, 4.2.1\n\tStatusPathCreated        = 257 // RFC 959, 4.2.1\n\n\t// 300 Series - The command has been accepted, but the requested action is on hold,\n\t// pending receipt of further information.\n\tStatusUserOK            = 331 // RFC 959, 4.2.1\n\tStatusFileActionPending = 350 // RFC 959, 4.2.1\n\n\t// 400 Series - The command was not accepted and the requested action did not take place,\n\t// but the error condition is temporary and the action may be requested again.\n\tStatusServiceNotAvailable      = 421 // RFC 959, 4.2.1\n\tStatusCannotOpenDataConnection = 425 // RFC 959, 4.2.1\n\tStatusTransferAborted          = 426 // RFC 959, 4.2.1\n\tStatusFileActionNotTaken       = 450 // RFC 959, 4.2.1\n\n\t// 500 Series - Syntax error, command unrecognized and the requested action did not take\n\t// place. This may include errors such as command line too long.\n\tStatusSyntaxErrorNotRecognised = 500 // RFC 959, 4.2.1\n\tStatusSyntaxErrorParameters    = 501 // RFC 959, 4.2.1\n\tStatusCommandNotImplemented    = 502 // RFC 959, 4.2.1\n\tStatusBadCommandSequence       = 503 // RFC 959, 4.2.1\n\tStatusNotImplementedParam      = 504 // RFC 959, 4.2.1\n\tStatusNotLoggedIn              = 530 // RFC 959, 4.2.1\n\tStatusActionNotTaken           = 550 // RFC 959, 4.2.1\n\tStatusActionAborted            = 552 // RFC 959, 4.2.1\n\tStatusActionNotTakenNoFile     = 553 // RFC 959, 4.2.1\n)",
+          "position": {
+            "file": "consts.go",
+            "line": 25
+          }
+        },
+        {
+          "name": "StatusEnteringPASV",
+          "doc": "Status codes as documented by:\nhttps://tools.ietf.org/html/rfc959\nhttps://tools.ietf.org/html/rfc2428\nhttps://tools.ietf.org/html/rfc2228",
+          "declaration": "const (\n\t// 100 Series - The requested action is being initiated, expect another reply before\n\t// proceeding with a new command.\n\tStatusFileStatusOK = 150 // RFC 959, 4.2.1\n\n\t// 200 Series - The requested action has been successfully completed.\n\tStatusOK                 = 200 // RFC 959, 4.2.1\n\tStatusNotImplemented     = 202 // RFC 959, 4.2.1\n\tStatusSystemStatus       = 211 // RFC 959, 4.2.1\n\tStatusDirectoryStatus    = 212 // RFC 959, 4.2.1\n\tStatusFileStatus         = 213 // RFC 959, 4.2.1\n\tStatusHelpMessage        = 214 // RFC 959, 4.2.1\n\tStatusSystemType         = 215 // RFC 959, 4.2.1\n\tStatusServiceReady       = 220 // RFC 959, 4.2.1\n\tStatusClosingControlConn = 221 // RFC 959, 4.2.1\n\tStatusClosingDataConn    = 226 // RFC 959, 4.2.1\n\tStatusEnteringPASV       = 227 // RFC 959, 4.2.1\n\tStatusEnteringEPSV       = 229 // RFC 2428, 3\n\tStatusUserLoggedIn       = 230 // RFC 959, 4.2.1\n\tStatusAuthAccepted       = 234 // RFC 2228, 3\n\tStatusFileOK             = 250 // RFC 959, 4.2.1\n\tStatusPathCreated        = 257 // RFC 959, 4.2.1\n\n\t// 300 Series - The command has been accepted, but the requested action is on hold,\n\t// pending receipt of further information.\n\tStatusUserOK            = 331 // RFC 959, 4.2.1\n\tStatusFileActionPending = 350 // RFC 959, 4.2.1\n\n\t// 400 Series - The command was not accepted and the requested action did not take place,\n\t// but the error condition is temporary and the action may be requested again.\n\tStatusServiceNotAvailable      = 421 // RFC 959, 4.2.1\n\tStatusCannotOpenDataConnection = 425 // RFC 959, 4.2.1\n\tStatusTransferAborted          = 426 // RFC 959, 4.2.1\n\tStatusFileActionNotTaken       = 450 // RFC 959, 4.2.1\n\n\t// 500 Series - Syntax error, command unrecognized and the requested action did not take\n\t// place. This may include errors such as command line too long.\n\tStatusSyntaxErrorNotRecognised = 500 // RFC 959, 4.2.1\n\tStatusSyntaxErrorParameters    = 501 // RFC 959, 4.2.1\n\tStatusCommandNotImplemented    = 502 // RFC 959, 4.2.1\n\tStatusBadCommandSequence       = 503 // RFC 959, 4.2.1\n\tStatusNotImplementedParam      = 504 // RFC 959, 4.2.1\n\tStatusNotLoggedIn              = 530 // RFC 959, 4.2.1\n\tStatusActionNotTaken           = 550 // RFC 959, 4.2.1\n\tStatusActionAborted            = 552 // RFC 959, 4.2.1\n\tStatusActionNotTakenNoFile     = 553 // RFC 959, 4.2.1\n)",
+          "position": {
+            "file": "consts.go",
+            "line": 26
+          }
+        },
+        {
+          "name": "StatusEnteringEPSV",
+          "doc": "Status codes as documented by:\nhttps://tools.ietf.org/html/rfc959\nhttps://tools.ietf.org/html/rfc2428\nhttps://tools.ietf.org/html/rfc2228",
+          "declaration": "const (\n\t// 100 Series - The requested action is being initiated, expect another reply before\n\t// proceeding with a new command.\n\tStatusFileStatusOK = 150 // RFC 959, 4.2.1\n\n\t// 200 Series - The requested action has been successfully completed.\n\tStatusOK                 = 200 // RFC 959, 4.2.1\n\tStatusNotImplemented     = 202 // RFC 959, 4.2.1\n\tStatusSystemStatus       = 211 // RFC 959, 4.2.1\n\tStatusDirectoryStatus    = 212 // RFC 959, 4.2.1\n\tStatusFileStatus         = 213 // RFC 959, 4.2.1\n\tStatusHelpMessage        = 214 // RFC 959, 4.2.1\n\tStatusSystemType         = 215 // RFC 959, 4.2.1\n\tStatusServiceReady       = 220 // RFC 959, 4.2.1\n\tStatusClosingControlConn = 221 // RFC 959, 4.2.1\n\tStatusClosingDataConn    = 226 // RFC 959, 4.2.1\n\tStatusEnteringPASV       = 227 // RFC 959, 4.2.1\n\tStatusEnteringEPSV       = 229 // RFC 2428, 3\n\tStatusUserLoggedIn       = 230 // RFC 959, 4.2.1\n\tStatusAuthAccepted       = 234 // RFC 2228, 3\n\tStatusFileOK             = 250 // RFC 959, 4.2.1\n\tStatusPathCreated        = 257 // RFC 959, 4.2.1\n\n\t// 300 Series - The command has been accepted, but the requested action is on hold,\n\t// pending receipt of further information.\n\tStatusUserOK            = 331 // RFC 959, 4.2.1\n\tStatusFileActionPending = 350 // RFC 959, 4.2.1\n\n\t// 400 Series - The command was not accepted and the requested action did not take place,\n\t// but the error condition is temporary and the action may be requested again.\n\tStatusServiceNotAvailable      = 421 // RFC 959, 4.2.1\n\tStatusCannotOpenDataConnection = 425 // RFC 959, 4.2.1\n\tStatusTransferAborted          = 426 // RFC 959, 4.2.1\n\tStatusFileActionNotTaken       = 450 // RFC 959, 4.2.1\n\n\t// 500 Series - Syntax error, command unrecognized and the requested action did not take\n\t// place. This may include errors such as command line too long.\n\tStatusSyntaxErrorNotRecognised = 500 // RFC 959, 4.2.1\n\tStatusSyntaxErrorParameters    = 501 // RFC 959, 4.2.1\n\tStatusCommandNotImplemented    = 502 // RFC 959, 4.2.1\n\tStatusBadCommandSequence       = 503 // RFC 959, 4.2.1\n\tStatusNotImplementedParam      = 504 // RFC 959, 4.2.1\n\tStatusNotLoggedIn              = 530 // RFC 959, 4.2.1\n\tStatusActionNotTaken           = 550 // RFC 959, 4.2.1\n\tStatusActionAborted            = 552 // RFC 959, 4.2.1\n\tStatusActionNotTakenNoFile     = 553 // RFC 959, 4.2.1\n)",
+          "position": {
+            "file": "consts.go",
+            "line": 27
+          }
+        },
+        {
+          "name": "StatusUserLoggedIn",
+          "doc": "Status codes as documented by:\nhttps://tools.ietf.org/html/rfc959\nhttps://tools.ietf.org/html/rfc2428\nhttps://tools.ietf.org/html/rfc2228",
+          "declaration": "const (\n\t// 100 Series - The requested action is being initiated, expect another reply before\n\t// proceeding with a new command.\n\tStatusFileStatusOK = 150 // RFC 959, 4.2.1\n\n\t// 200 Series - The requested action has been successfully completed.\n\tStatusOK                 = 200 // RFC 959, 4.2.1\n\tStatusNotImplemented     = 202 // RFC 959, 4.2.1\n\tStatusSystemStatus       = 211 // RFC 959, 4.2.1\n\tStatusDirectoryStatus    = 212 // RFC 959, 4.2.1\n\tStatusFileStatus         = 213 // RFC 959, 4.2.1\n\tStatusHelpMessage        = 214 // RFC 959, 4.2.1\n\tStatusSystemType         = 215 // RFC 959, 4.2.1\n\tStatusServiceReady       = 220 // RFC 959, 4.2.1\n\tStatusClosingControlConn = 221 // RFC 959, 4.2.1\n\tStatusClosingDataConn    = 226 // RFC 959, 4.2.1\n\tStatusEnteringPASV       = 227 // RFC 959, 4.2.1\n\tStatusEnteringEPSV       = 229 // RFC 2428, 3\n\tStatusUserLoggedIn       = 230 // RFC 959, 4.2.1\n\tStatusAuthAccepted       = 234 // RFC 2228, 3\n\tStatusFileOK             = 250 // RFC 959, 4.2.1\n\tStatusPathCreated        = 257 // RFC 959, 4.2.1\n\n\t// 300 Series - The command has been accepted, but the requested action is on hold,\n\t// pending receipt of further information.\n\tStatusUserOK            = 331 // RFC 959, 4.2.1\n\tStatusFileActionPending = 350 // RFC 959, 4.2.1\n\n\t// 400 Series - The command was not accepted and the requested action did not take place,\n\t// but the error condition is temporary and the action may be requested again.\n\tStatusServiceNotAvailable      = 421 // RFC 959, 4.2.1\n\tStatusCannotOpenDataConnection = 425 // RFC 959, 4.2.1\n\tStatusTransferAborted          = 426 // RFC 959, 4.2.1\n\tStatusFileActionNotTaken       = 450 // RFC 959, 4.2.1\n\n\t// 500 Series - Syntax error, command unrecognized and the requested action did not take\n\t// place. This may include errors such as command line too long.\n\tStatusSyntaxErrorNotRecognised = 500 // RFC 959, 4.2.1\n\tStatusSyntaxErrorParameters    = 501 // RFC 959, 4.2.1\n\tStatusCommandNotImplemented    = 502 // RFC 959, 4.2.1\n\tStatusBadCommandSequence       = 503 // RFC 959, 4.2.1\n\tStatusNotImplementedParam      = 504 // RFC 959, 4.2.1\n\tStatusNotLoggedIn              = 530 // RFC 959, 4.2.1\n\tStatusActionNotTaken           = 550 // RFC 959, 4.2.1\n\tStatusActionAborted            = 552 // RFC 959, 4.2.1\n\tStatusActionNotTakenNoFile     = 553 // RFC 959, 4.2.1\n)",
+          "position": {
+            "file": "consts.go",
+            "line": 28
+          }
+        },
+        {
+          "name": "StatusAuthAccepted",
+          "doc": "Status codes as documented by:\nhttps://tools.ietf.org/html/rfc959\nhttps://tools.ietf.org/html/rfc2428\nhttps://tools.ietf.org/html/rfc2228",
+          "declaration": "const (\n\t// 100 Series - The requested action is being initiated, expect another reply before\n\t// proceeding with a new command.\n\tStatusFileStatusOK = 150 // RFC 959, 4.2.1\n\n\t// 200 Series - The requested action has been successfully completed.\n\tStatusOK                 = 200 // RFC 959, 4.2.1\n\tStatusNotImplemented     = 202 // RFC 959, 4.2.1\n\tStatusSystemStatus       = 211 // RFC 959, 4.2.1\n\tStatusDirectoryStatus    = 212 // RFC 959, 4.2.1\n\tStatusFileStatus         = 213 // RFC 959, 4.2.1\n\tStatusHelpMessage        = 214 // RFC 959, 4.2.1\n\tStatusSystemType         = 215 // RFC 959, 4.2.1\n\tStatusServiceReady       = 220 // RFC 959, 4.2.1\n\tStatusClosingControlConn = 221 // RFC 959, 4.2.1\n\tStatusClosingDataConn    = 226 // RFC 959, 4.2.1\n\tStatusEnteringPASV       = 227 // RFC 959, 4.2.1\n\tStatusEnteringEPSV       = 229 // RFC 2428, 3\n\tStatusUserLoggedIn       = 230 // RFC 959, 4.2.1\n\tStatusAuthAccepted       = 234 // RFC 2228, 3\n\tStatusFileOK             = 250 // RFC 959, 4.2.1\n\tStatusPathCreated        = 257 // RFC 959, 4.2.1\n\n\t// 300 Series - The command has been accepted, but the requested action is on hold,\n\t// pending receipt of further information.\n\tStatusUserOK            = 331 // RFC 959, 4.2.1\n\tStatusFileActionPending = 350 // RFC 959, 4.2.1\n\n\t// 400 Series - The command was not accepted and the requested action did not take place,\n\t// but the error condition is temporary and the action may be requested again.\n\tStatusServiceNotAvailable      = 421 // RFC 959, 4.2.1\n\tStatusCannotOpenDataConnection = 425 // RFC 959, 4.2.1\n\tStatusTransferAborted          = 426 // RFC 959, 4.2.1\n\tStatusFileActionNotTaken       = 450 // RFC 959, 4.2.1\n\n\t// 500 Series - Syntax error, command unrecognized and the requested action did not take\n\t// place. This may include errors such as command line too long.\n\tStatusSyntaxErrorNotRecognised = 500 // RFC 959, 4.2.1\n\tStatusSyntaxErrorParameters    = 501 // RFC 959, 4.2.1\n\tStatusCommandNotImplemented    = 502 // RFC 959, 4.2.1\n\tStatusBadCommandSequence       = 503 // RFC 959, 4.2.1\n\tStatusNotImplementedParam      = 504 // RFC 959, 4.2.1\n\tStatusNotLoggedIn              = 530 // RFC 959, 4.2.1\n\tStatusActionNotTaken           = 550 // RFC 959, 4.2.1\n\tStatusActionAborted            = 552 // RFC 959, 4.2.1\n\tStatusActionNotTakenNoFile     = 553 // RFC 959, 4.2.1\n)",
+          "position": {
+            "file": "consts.go",
+            "line": 29
+          }
+        },
+        {
+          "name": "StatusFileOK",
+          "doc": "Status codes as documented by:\nhttps://tools.ietf.org/html/rfc959\nhttps://tools.ietf.org/html/rfc2428\nhttps://tools.ietf.org/html/rfc2228",
+          "declaration": "const (\n\t// 100 Series - The requested action is being initiated, expect another reply before\n\t// proceeding with a new command.\n\tStatusFileStatusOK = 150 // RFC 959, 4.2.1\n\n\t// 200 Series - The requested action has been successfully completed.\n\tStatusOK                 = 200 // RFC 959, 4.2.1\n\tStatusNotImplemented     = 202 // RFC 959, 4.2.1\n\tStatusSystemStatus       = 211 // RFC 959, 4.2.1\n\tStatusDirectoryStatus    = 212 // RFC 959, 4.2.1\n\tStatusFileStatus         = 213 // RFC 959, 4.2.1\n\tStatusHelpMessage        = 214 // RFC 959, 4.2.1\n\tStatusSystemType         = 215 // RFC 959, 4.2.1\n\tStatusServiceReady       = 220 // RFC 959, 4.2.1\n\tStatusClosingControlConn = 221 // RFC 959, 4.2.1\n\tStatusClosingDataConn    = 226 // RFC 959, 4.2.1\n\tStatusEnteringPASV       = 227 // RFC 959, 4.2.1\n\tStatusEnteringEPSV       = 229 // RFC 2428, 3\n\tStatusUserLoggedIn       = 230 // RFC 959, 4.2.1\n\tStatusAuthAccepted       = 234 // RFC 2228, 3\n\tStatusFileOK             = 250 // RFC 959, 4.2.1\n\tStatusPathCreated        = 257 // RFC 959, 4.2.1\n\n\t// 300 Series - The command has been accepted, but the requested action is on hold,\n\t// pending receipt of further information.\n\tStatusUserOK            = 331 // RFC 959, 4.2.1\n\tStatusFileActionPending = 350 // RFC 959, 4.2.1\n\n\t// 400 Series - The command was not accepted and the requested action did not take place,\n\t// but the error condition is temporary and the action may be requested again.\n\tStatusServiceNotAvailable      = 421 // RFC 959, 4.2.1\n\tStatusCannotOpenDataConnection = 425 // RFC 959, 4.2.1\n\tStatusTransferAborted          = 426 // RFC 959, 4.2.1\n\tStatusFileActionNotTaken       = 450 // RFC 959, 4.2.1\n\n\t// 500 Series - Syntax error, command unrecognized and the requested action did not take\n\t// place. This may include errors such as command line too long.\n\tStatusSyntaxErrorNotRecognised = 500 // RFC 959, 4.2.1\n\tStatusSyntaxErrorParameters    = 501 // RFC 959, 4.2.1\n\tStatusCommandNotImplemented    = 502 // RFC 959, 4.2.1\n\tStatusBadCommandSequence       = 503 // RFC 959, 4.2.1\n\tStatusNotImplementedParam      = 504 // RFC 959, 4.2.1\n\tStatusNotLoggedIn              = 530 // RFC 959, 4.2.1\n\tStatusActionNotTaken           = 550 // RFC 959, 4.2.1\n\tStatusActionAborted            = 552 // RFC 959, 4.2.1\n\tStatusActionNotTakenNoFile     = 553 // RFC 959, 4.2.1\n)",
+          "position": {
+            "file": "consts.go",
+            "line": 30
+          }
+        },
+        {
+          "name": "StatusPathCreated",
+          "doc": "Status codes as documented by:\nhttps://tools.ietf.org/html/rfc959\nhttps://tools.ietf.org/html/rfc2428\nhttps://tools.ietf.org/html/rfc2228",
+          "declaration": "const (\n\t// 100 Series - The requested action is being initiated, expect another reply before\n\t// proceeding with a new command.\n\tStatusFileStatusOK = 150 // RFC 959, 4.2.1\n\n\t// 200 Series - The requested action has been successfully completed.\n\tStatusOK                 = 200 // RFC 959, 4.2.1\n\tStatusNotImplemented     = 202 // RFC 959, 4.2.1\n\tStatusSystemStatus       = 211 // RFC 959, 4.2.1\n\tStatusDirectoryStatus    = 212 // RFC 959, 4.2.1\n\tStatusFileStatus         = 213 // RFC 959, 4.2.1\n\tStatusHelpMessage        = 214 // RFC 959, 4.2.1\n\tStatusSystemType         = 215 // RFC 959, 4.2.1\n\tStatusServiceReady       = 220 // RFC 959, 4.2.1\n\tStatusClosingControlConn = 221 // RFC 959, 4.2.1\n\tStatusClosingDataConn    = 226 // RFC 959, 4.2.1\n\tStatusEnteringPASV       = 227 // RFC 959, 4.2.1\n\tStatusEnteringEPSV       = 229 // RFC 2428, 3\n\tStatusUserLoggedIn       = 230 // RFC 959, 4.2.1\n\tStatusAuthAccepted       = 234 // RFC 2228, 3\n\tStatusFileOK             = 250 // RFC 959, 4.2.1\n\tStatusPathCreated        = 257 // RFC 959, 4.2.1\n\n\t// 300 Series - The command has been accepted, but the requested action is on hold,\n\t// pending receipt of further information.\n\tStatusUserOK            = 331 // RFC 959, 4.2.1\n\tStatusFileActionPending = 350 // RFC 959, 4.2.1\n\n\t// 400 Series - The command was not accepted and the requested action did not take place,\n\t// but the error condition is temporary and the action may be requested again.\n\tStatusServiceNotAvailable      = 421 // RFC 959, 4.2.1\n\tStatusCannotOpenDataConnection = 425 // RFC 959, 4.2.1\n\tStatusTransferAborted          = 426 // RFC 959, 4.2.1\n\tStatusFileActionNotTaken       = 450 // RFC 959, 4.2.1\n\n\t// 500 Series - Syntax error, command unrecognized and the requested action did not take\n\t// place. This may include errors such as command line too long.\n\tStatusSyntaxErrorNotRecognised = 500 // RFC 959, 4.2.1\n\tStatusSyntaxErrorParameters    = 501 // RFC 959, 4.2.1\n\tStatusCommandNotImplemented    = 502 // RFC 959, 4.2.1\n\tStatusBadCommandSequence       = 503 // RFC 959, 4.2.1\n\tStatusNotImplementedParam      = 504 // RFC 959, 4.2.1\n\tStatusNotLoggedIn              = 530 // RFC 959, 4.2.1\n\tStatusActionNotTaken           = 550 // RFC 959, 4.2.1\n\tStatusActionAborted            = 552 // RFC 959, 4.2.1\n\tStatusActionNotTakenNoFile     = 553 // RFC 959, 4.2.1\n)",
+          "position": {
+            "file": "consts.go",
+            "line": 31
+          }
+        },
+        {
+          "name": "StatusUserOK",
+          "doc": "Status codes as documented by:\nhttps://tools.ietf.org/html/rfc959\nhttps://tools.ietf.org/html/rfc2428\nhttps://tools.ietf.org/html/rfc2228",
+          "declaration": "const (\n\t// 100 Series - The requested action is being initiated, expect another reply before\n\t// proceeding with a new command.\n\tStatusFileStatusOK = 150 // RFC 959, 4.2.1\n\n\t// 200 Series - The requested action has been successfully completed.\n\tStatusOK                 = 200 // RFC 959, 4.2.1\n\tStatusNotImplemented     = 202 // RFC 959, 4.2.1\n\tStatusSystemStatus       = 211 // RFC 959, 4.2.1\n\tStatusDirectoryStatus    = 212 // RFC 959, 4.2.1\n\tStatusFileStatus         = 213 // RFC 959, 4.2.1\n\tStatusHelpMessage        = 214 // RFC 959, 4.2.1\n\tStatusSystemType         = 215 // RFC 959, 4.2.1\n\tStatusServiceReady       = 220 // RFC 959, 4.2.1\n\tStatusClosingControlConn = 221 // RFC 959, 4.2.1\n\tStatusClosingDataConn    = 226 // RFC 959, 4.2.1\n\tStatusEnteringPASV       = 227 // RFC 959, 4.2.1\n\tStatusEnteringEPSV       = 229 // RFC 2428, 3\n\tStatusUserLoggedIn       = 230 // RFC 959, 4.2.1\n\tStatusAuthAccepted       = 234 // RFC 2228, 3\n\tStatusFileOK             = 250 // RFC 959, 4.2.1\n\tStatusPathCreated        = 257 // RFC 959, 4.2.1\n\n\t// 300 Series - The command has been accepted, but the requested action is on hold,\n\t// pending receipt of further information.\n\tStatusUserOK            = 331 // RFC 959, 4.2.1\n\tStatusFileActionPending = 350 // RFC 959, 4.2.1\n\n\t// 400 Series - The command was not accepted and the requested action did not take place,\n\t// but the error condition is temporary and the action may be requested again.\n\tStatusServiceNotAvailable      = 421 // RFC 959, 4.2.1\n\tStatusCannotOpenDataConnection = 425 // RFC 959, 4.2.1\n\tStatusTransferAborted          = 426 // RFC 959, 4.2.1\n\tStatusFileActionNotTaken       = 450 // RFC 959, 4.2.1\n\n\t// 500 Series - Syntax error, command unrecognized and the requested action did not take\n\t// place. This may include errors such as command line too long.\n\tStatusSyntaxErrorNotRecognised = 500 // RFC 959, 4.2.1\n\tStatusSyntaxErrorParameters    = 501 // RFC 959, 4.2.1\n\tStatusCommandNotImplemented    = 502 // RFC 959, 4.2.1\n\tStatusBadCommandSequence       = 503 // RFC 959, 4.2.1\n\tStatusNotImplementedParam      = 504 // RFC 959, 4.2.1\n\tStatusNotLoggedIn              = 530 // RFC 959, 4.2.1\n\tStatusActionNotTaken           = 550 // RFC 959, 4.2.1\n\tStatusActionAborted            = 552 // RFC 959, 4.2.1\n\tStatusActionNotTakenNoFile     = 553 // RFC 959, 4.2.1\n)",
+          "position": {
+            "file": "consts.go",
+            "line": 35
+          }
+        },
+        {
+          "name": "StatusFileActionPending",
+          "doc": "Status codes as documented by:\nhttps://tools.ietf.org/html/rfc959\nhttps://tools.ietf.org/html/rfc2428\nhttps://tools.ietf.org/html/rfc2228",
+          "declaration": "const (\n\t// 100 Series - The requested action is being initiated, expect another reply before\n\t// proceeding with a new command.\n\tStatusFileStatusOK = 150 // RFC 959, 4.2.1\n\n\t// 200 Series - The requested action has been successfully completed.\n\tStatusOK                 = 200 // RFC 959, 4.2.1\n\tStatusNotImplemented     = 202 // RFC 959, 4.2.1\n\tStatusSystemStatus       = 211 // RFC 959, 4.2.1\n\tStatusDirectoryStatus    = 212 // RFC 959, 4.2.1\n\tStatusFileStatus         = 213 // RFC 959, 4.2.1\n\tStatusHelpMessage        = 214 // RFC 959, 4.2.1\n\tStatusSystemType         = 215 // RFC 959, 4.2.1\n\tStatusServiceReady       = 220 // RFC 959, 4.2.1\n\tStatusClosingControlConn = 221 // RFC 959, 4.2.1\n\tStatusClosingDataConn    = 226 // RFC 959, 4.2.1\n\tStatusEnteringPASV       = 227 // RFC 959, 4.2.1\n\tStatusEnteringEPSV       = 229 // RFC 2428, 3\n\tStatusUserLoggedIn       = 230 // RFC 959, 4.2.1\n\tStatusAuthAccepted       = 234 // RFC 2228, 3\n\tStatusFileOK             = 250 // RFC 959, 4.2.1\n\tStatusPathCreated        = 257 // RFC 959, 4.2.1\n\n\t// 300 Series - The command has been accepted, but the requested action is on hold,\n\t// pending receipt of further information.\n\tStatusUserOK            = 331 // RFC 959, 4.2.1\n\tStatusFileActionPending = 350 // RFC 959, 4.2.1\n\n\t// 400 Series - The command was not accepted and the requested action did not take place,\n\t// but the error condition is temporary and the action may be requested again.\n\tStatusServiceNotAvailable      = 421 // RFC 959, 4.2.1\n\tStatusCannotOpenDataConnection = 425 // RFC 959, 4.2.1\n\tStatusTransferAborted          = 426 // RFC 959, 4.2.1\n\tStatusFileActionNotTaken       = 450 // RFC 959, 4.2.1\n\n\t// 500 Series - Syntax error, command unrecognized and the requested action did not take\n\t// place. This may include errors such as command line too long.\n\tStatusSyntaxErrorNotRecognised = 500 // RFC 959, 4.2.1\n\tStatusSyntaxErrorParameters    = 501 // RFC 959, 4.2.1\n\tStatusCommandNotImplemented    = 502 // RFC 959, 4.2.1\n\tStatusBadCommandSequence       = 503 // RFC 959, 4.2.1\n\tStatusNotImplementedParam      = 504 // RFC 959, 4.2.1\n\tStatusNotLoggedIn              = 530 // RFC 959, 4.2.1\n\tStatusActionNotTaken           = 550 // RFC 959, 4.2.1\n\tStatusActionAborted            = 552 // RFC 959, 4.2.1\n\tStatusActionNotTakenNoFile     = 553 // RFC 959, 4.2.1\n)",
+          "position": {
+            "file": "consts.go",
+            "line": 36
+          }
+        },
+        {
+          "name": "StatusServiceNotAvailable",
+          "doc": "Status codes as documented by:\nhttps://tools.ietf.org/html/rfc959\nhttps://tools.ietf.org/html/rfc2428\nhttps://tools.ietf.org/html/rfc2228",
+          "declaration": "const (\n\t// 100 Series - The requested action is being initiated, expect another reply before\n\t// proceeding with a new command.\n\tStatusFileStatusOK = 150 // RFC 959, 4.2.1\n\n\t// 200 Series - The requested action has been successfully completed.\n\tStatusOK                 = 200 // RFC 959, 4.2.1\n\tStatusNotImplemented     = 202 // RFC 959, 4.2.1\n\tStatusSystemStatus       = 211 // RFC 959, 4.2.1\n\tStatusDirectoryStatus    = 212 // RFC 959, 4.2.1\n\tStatusFileStatus         = 213 // RFC 959, 4.2.1\n\tStatusHelpMessage        = 214 // RFC 959, 4.2.1\n\tStatusSystemType         = 215 // RFC 959, 4.2.1\n\tStatusServiceReady       = 220 // RFC 959, 4.2.1\n\tStatusClosingControlConn = 221 // RFC 959, 4.2.1\n\tStatusClosingDataConn    = 226 // RFC 959, 4.2.1\n\tStatusEnteringPASV       = 227 // RFC 959, 4.2.1\n\tStatusEnteringEPSV       = 229 // RFC 2428, 3\n\tStatusUserLoggedIn       = 230 // RFC 959, 4.2.1\n\tStatusAuthAccepted       = 234 // RFC 2228, 3\n\tStatusFileOK             = 250 // RFC 959, 4.2.1\n\tStatusPathCreated        = 257 // RFC 959, 4.2.1\n\n\t// 300 Series - The command has been accepted, but the requested action is on hold,\n\t// pending receipt of further information.\n\tStatusUserOK            = 331 // RFC 959, 4.2.1\n\tStatusFileActionPending = 350 // RFC 959, 4.2.1\n\n\t// 400 Series - The command was not accepted and the requested action did not take place,\n\t// but the error condition is temporary and the action may be requested again.\n\tStatusServiceNotAvailable      = 421 // RFC 959, 4.2.1\n\tStatusCannotOpenDataConnection = 425 // RFC 959, 4.2.1\n\tStatusTransferAborted          = 426 // RFC 959, 4.2.1\n\tStatusFileActionNotTaken       = 450 // RFC 959, 4.2.1\n\n\t// 500 Series - Syntax error, command unrecognized and the requested action did not take\n\t// place. This may include errors such as command line too long.\n\tStatusSyntaxErrorNotRecognised = 500 // RFC 959, 4.2.1\n\tStatusSyntaxErrorParameters    = 501 // RFC 959, 4.2.1\n\tStatusCommandNotImplemented    = 502 // RFC 959, 4.2.1\n\tStatusBadCommandSequence       = 503 // RFC 959, 4.2.1\n\tStatusNotImplementedParam      = 504 // RFC 959, 4.2.1\n\tStatusNotLoggedIn              = 530 // RFC 959, 4.2.1\n\tStatusActionNotTaken           = 550 // RFC 959, 4.2.1\n\tStatusActionAborted            = 552 // RFC 959, 4.2.1\n\tStatusActionNotTakenNoFile     = 553 // RFC 959, 4.2.1\n)",
+          "position": {
+            "file": "consts.go",
+            "line": 40
+          }
+        },
+        {
+          "name": "StatusCannotOpenDataConnection",
+          "doc": "Status codes as documented by:\nhttps://tools.ietf.org/html/rfc959\nhttps://tools.ietf.org/html/rfc2428\nhttps://tools.ietf.org/html/rfc2228",
+          "declaration": "const (\n\t// 100 Series - The requested action is being initiated, expect another reply before\n\t// proceeding with a new command.\n\tStatusFileStatusOK = 150 // RFC 959, 4.2.1\n\n\t// 200 Series - The requested action has been successfully completed.\n\tStatusOK                 = 200 // RFC 959, 4.2.1\n\tStatusNotImplemented     = 202 // RFC 959, 4.2.1\n\tStatusSystemStatus       = 211 // RFC 959, 4.2.1\n\tStatusDirectoryStatus    = 212 // RFC 959, 4.2.1\n\tStatusFileStatus         = 213 // RFC 959, 4.2.1\n\tStatusHelpMessage        = 214 // RFC 959, 4.2.1\n\tStatusSystemType         = 215 // RFC 959, 4.2.1\n\tStatusServiceReady       = 220 // RFC 959, 4.2.1\n\tStatusClosingControlConn = 221 // RFC 959, 4.2.1\n\tStatusClosingDataConn    = 226 // RFC 959, 4.2.1\n\tStatusEnteringPASV       = 227 // RFC 959, 4.2.1\n\tStatusEnteringEPSV       = 229 // RFC 2428, 3\n\tStatusUserLoggedIn       = 230 // RFC 959, 4.2.1\n\tStatusAuthAccepted       = 234 // RFC 2228, 3\n\tStatusFileOK             = 250 // RFC 959, 4.2.1\n\tStatusPathCreated        = 257 // RFC 959, 4.2.1\n\n\t// 300 Series - The command has been accepted, but the requested action is on hold,\n\t// pending receipt of further information.\n\tStatusUserOK            = 331 // RFC 959, 4.2.1\n\tStatusFileActionPending = 350 // RFC 959, 4.2.1\n\n\t// 400 Series - The command was not accepted and the requested action did not take place,\n\t// but the error condition is temporary and the action may be requested again.\n\tStatusServiceNotAvailable      = 421 // RFC 959, 4.2.1\n\tStatusCannotOpenDataConnection = 425 // RFC 959, 4.2.1\n\tStatusTransferAborted          = 426 // RFC 959, 4.2.1\n\tStatusFileActionNotTaken       = 450 // RFC 959, 4.2.1\n\n\t// 500 Series - Syntax error, command unrecognized and the requested action did not take\n\t// place. This may include errors such as command line too long.\n\tStatusSyntaxErrorNotRecognised = 500 // RFC 959, 4.2.1\n\tStatusSyntaxErrorParameters    = 501 // RFC 959, 4.2.1\n\tStatusCommandNotImplemented    = 502 // RFC 959, 4.2.1\n\tStatusBadCommandSequence       = 503 // RFC 959, 4.2.1\n\tStatusNotImplementedParam      = 504 // RFC 959, 4.2.1\n\tStatusNotLoggedIn              = 530 // RFC 959, 4.2.1\n\tStatusActionNotTaken           = 550 // RFC 959, 4.2.1\n\tStatusActionAborted            = 552 // RFC 959, 4.2.1\n\tStatusActionNotTakenNoFile     = 553 // RFC 959, 4.2.1\n)",
+          "position": {
+            "file": "consts.go",
+            "line": 41
+          }
+        },
+        {
+          "name": "StatusTransferAborted",
+          "doc": "Status codes as documented by:\nhttps://tools.ietf.org/html/rfc959\nhttps://tools.ietf.org/html/rfc2428\nhttps://tools.ietf.org/html/rfc2228",
+          "declaration": "const (\n\t// 100 Series - The requested action is being initiated, expect another reply before\n\t// proceeding with a new command.\n\tStatusFileStatusOK = 150 // RFC 959, 4.2.1\n\n\t// 200 Series - The requested action has been successfully completed.\n\tStatusOK                 = 200 // RFC 959, 4.2.1\n\tStatusNotImplemented     = 202 // RFC 959, 4.2.1\n\tStatusSystemStatus       = 211 // RFC 959, 4.2.1\n\tStatusDirectoryStatus    = 212 // RFC 959, 4.2.1\n\tStatusFileStatus         = 213 // RFC 959, 4.2.1\n\tStatusHelpMessage        = 214 // RFC 959, 4.2.1\n\tStatusSystemType         = 215 // RFC 959, 4.2.1\n\tStatusServiceReady       = 220 // RFC 959, 4.2.1\n\tStatusClosingControlConn = 221 // RFC 959, 4.2.1\n\tStatusClosingDataConn    = 226 // RFC 959, 4.2.1\n\tStatusEnteringPASV       = 227 // RFC 959, 4.2.1\n\tStatusEnteringEPSV       = 229 // RFC 2428, 3\n\tStatusUserLoggedIn       = 230 // RFC 959, 4.2.1\n\tStatusAuthAccepted       = 234 // RFC 2228, 3\n\tStatusFileOK             = 250 // RFC 959, 4.2.1\n\tStatusPathCreated        = 257 // RFC 959, 4.2.1\n\n\t// 300 Series - The command has been accepted, but the requested action is on hold,\n\t// pending receipt of further information.\n\tStatusUserOK            = 331 // RFC 959, 4.2.1\n\tStatusFileActionPending = 350 // RFC 959, 4.2.1\n\n\t// 400 Series - The command was not accepted and the requested action did not take place,\n\t// but the error condition is temporary and the action may be requested again.\n\tStatusServiceNotAvailable      = 421 // RFC 959, 4.2.1\n\tStatusCannotOpenDataConnection = 425 // RFC 959, 4.2.1\n\tStatusTransferAborted          = 426 // RFC 959, 4.2.1\n\tStatusFileActionNotTaken       = 450 // RFC 959, 4.2.1\n\n\t// 500 Series - Syntax error, command unrecognized and the requested action did not take\n\t// place. This may include errors such as command line too long.\n\tStatusSyntaxErrorNotRecognised = 500 // RFC 959, 4.2.1\n\tStatusSyntaxErrorParameters    = 501 // RFC 959, 4.2.1\n\tStatusCommandNotImplemented    = 502 // RFC 959, 4.2.1\n\tStatusBadCommandSequence       = 503 // RFC 959, 4.2.1\n\tStatusNotImplementedParam      = 504 // RFC 959, 4.2.1\n\tStatusNotLoggedIn              = 530 // RFC 959, 4.2.1\n\tStatusActionNotTaken           = 550 // RFC 959, 4.2.1\n\tStatusActionAborted            = 552 // RFC 959, 4.2.1\n\tStatusActionNotTakenNoFile     = 553 // RFC 959, 4.2.1\n)",
+          "position": {
+            "file": "consts.go",
+            "line": 42
+          }
+        },
+        {
+          "name": "StatusFileActionNotTaken",
+          "doc": "Status codes as documented by:\nhttps://tools.ietf.org/html/rfc959\nhttps://tools.ietf.org/html/rfc2428\nhttps://tools.ietf.org/html/rfc2228",
+          "declaration": "const (\n\t// 100 Series - The requested action is being initiated, expect another reply before\n\t// proceeding with a new command.\n\tStatusFileStatusOK = 150 // RFC 959, 4.2.1\n\n\t// 200 Series - The requested action has been successfully completed.\n\tStatusOK                 = 200 // RFC 959, 4.2.1\n\tStatusNotImplemented     = 202 // RFC 959, 4.2.1\n\tStatusSystemStatus       = 211 // RFC 959, 4.2.1\n\tStatusDirectoryStatus    = 212 // RFC 959, 4.2.1\n\tStatusFileStatus         = 213 // RFC 959, 4.2.1\n\tStatusHelpMessage        = 214 // RFC 959, 4.2.1\n\tStatusSystemType         = 215 // RFC 959, 4.2.1\n\tStatusServiceReady       = 220 // RFC 959, 4.2.1\n\tStatusClosingControlConn = 221 // RFC 959, 4.2.1\n\tStatusClosingDataConn    = 226 // RFC 959, 4.2.1\n\tStatusEnteringPASV       = 227 // RFC 959, 4.2.1\n\tStatusEnteringEPSV       = 229 // RFC 2428, 3\n\tStatusUserLoggedIn       = 230 // RFC 959, 4.2.1\n\tStatusAuthAccepted       = 234 // RFC 2228, 3\n\tStatusFileOK             = 250 // RFC 959, 4.2.1\n\tStatusPathCreated        = 257 // RFC 959, 4.2.1\n\n\t// 300 Series - The command has been accepted, but the requested action is on hold,\n\t// pending receipt of further information.\n\tStatusUserOK            = 331 // RFC 959, 4.2.1\n\tStatusFileActionPending = 350 // RFC 959, 4.2.1\n\n\t// 400 Series - The command was not accepted and the requested action did not take place,\n\t// but the error condition is temporary and the action may be requested again.\n\tStatusServiceNotAvailable      = 421 // RFC 959, 4.2.1\n\tStatusCannotOpenDataConnection = 425 // RFC 959, 4.2.1\n\tStatusTransferAborted          = 426 // RFC 959, 4.2.1\n\tStatusFileActionNotTaken       = 450 // RFC 959, 4.2.1\n\n\t// 500 Series - Syntax error, command unrecognized and the requested action did not take\n\t// place. This may include errors such as command line too long.\n\tStatusSyntaxErrorNotRecognised = 500 // RFC 959, 4.2.1\n\tStatusSyntaxErrorParameters    = 501 // RFC 959, 4.2.1\n\tStatusCommandNotImplemented    = 502 // RFC 959, 4.2.1\n\tStatusBadCommandSequence       = 503 // RFC 959, 4.2.1\n\tStatusNotImplementedParam      = 504 // RFC 959, 4.2.1\n\tStatusNotLoggedIn              = 530 // RFC 959, 4.2.1\n\tStatusActionNotTaken           = 550 // RFC 959, 4.2.1\n\tStatusActionAborted            = 552 // RFC 959, 4.2.1\n\tStatusActionNotTakenNoFile     = 553 // RFC 959, 4.2.1\n)",
+          "position": {
+            "file": "consts.go",
+            "line": 43
+          }
+        },
+        {
+          "name": "StatusSyntaxErrorNotRecognised",
+          "doc": "Status codes as documented by:\nhttps://tools.ietf.org/html/rfc959\nhttps://tools.ietf.org/html/rfc2428\nhttps://tools.ietf.org/html/rfc2228",
+          "declaration": "const (\n\t// 100 Series - The requested action is being initiated, expect another reply before\n\t// proceeding with a new command.\n\tStatusFileStatusOK = 150 // RFC 959, 4.2.1\n\n\t// 200 Series - The requested action has been successfully completed.\n\tStatusOK                 = 200 // RFC 959, 4.2.1\n\tStatusNotImplemented     = 202 // RFC 959, 4.2.1\n\tStatusSystemStatus       = 211 // RFC 959, 4.2.1\n\tStatusDirectoryStatus    = 212 // RFC 959, 4.2.1\n\tStatusFileStatus         = 213 // RFC 959, 4.2.1\n\tStatusHelpMessage        = 214 // RFC 959, 4.2.1\n\tStatusSystemType         = 215 // RFC 959, 4.2.1\n\tStatusServiceReady       = 220 // RFC 959, 4.2.1\n\tStatusClosingControlConn = 221 // RFC 959, 4.2.1\n\tStatusClosingDataConn    = 226 // RFC 959, 4.2.1\n\tStatusEnteringPASV       = 227 // RFC 959, 4.2.1\n\tStatusEnteringEPSV       = 229 // RFC 2428, 3\n\tStatusUserLoggedIn       = 230 // RFC 959, 4.2.1\n\tStatusAuthAccepted       = 234 // RFC 2228, 3\n\tStatusFileOK             = 250 // RFC 959, 4.2.1\n\tStatusPathCreated        = 257 // RFC 959, 4.2.1\n\n\t// 300 Series - The command has been accepted, but the requested action is on hold,\n\t// pending receipt of further information.\n\tStatusUserOK            = 331 // RFC 959, 4.2.1\n\tStatusFileActionPending = 350 // RFC 959, 4.2.1\n\n\t// 400 Series - The command was not accepted and the requested action did not take place,\n\t// but the error condition is temporary and the action may be requested again.\n\tStatusServiceNotAvailable      = 421 // RFC 959, 4.2.1\n\tStatusCannotOpenDataConnection = 425 // RFC 959, 4.2.1\n\tStatusTransferAborted          = 426 // RFC 959, 4.2.1\n\tStatusFileActionNotTaken       = 450 // RFC 959, 4.2.1\n\n\t// 500 Series - Syntax error, command unrecognized and the requested action did not take\n\t// place. This may include errors such as command line too long.\n\tStatusSyntaxErrorNotRecognised = 500 // RFC 959, 4.2.1\n\tStatusSyntaxErrorParameters    = 501 // RFC 959, 4.2.1\n\tStatusCommandNotImplemented    = 502 // RFC 959, 4.2.1\n\tStatusBadCommandSequence       = 503 // RFC 959, 4.2.1\n\tStatusNotImplementedParam      = 504 // RFC 959, 4.2.1\n\tStatusNotLoggedIn              = 530 // RFC 959, 4.2.1\n\tStatusActionNotTaken           = 550 // RFC 959, 4.2.1\n\tStatusActionAborted            = 552 // RFC 959, 4.2.1\n\tStatusActionNotTakenNoFile     = 553 // RFC 959, 4.2.1\n)",
+          "position": {
+            "file": "consts.go",
+            "line": 47
+          }
+        },
+        {
+          "name": "StatusSyntaxErrorParameters",
+          "doc": "Status codes as documented by:\nhttps://tools.ietf.org/html/rfc959\nhttps://tools.ietf.org/html/rfc2428\nhttps://tools.ietf.org/html/rfc2228",
+          "declaration": "const (\n\t// 100 Series - The requested action is being initiated, expect another reply before\n\t// proceeding with a new command.\n\tStatusFileStatusOK = 150 // RFC 959, 4.2.1\n\n\t// 200 Series - The requested action has been successfully completed.\n\tStatusOK                 = 200 // RFC 959, 4.2.1\n\tStatusNotImplemented     = 202 // RFC 959, 4.2.1\n\tStatusSystemStatus       = 211 // RFC 959, 4.2.1\n\tStatusDirectoryStatus    = 212 // RFC 959, 4.2.1\n\tStatusFileStatus         = 213 // RFC 959, 4.2.1\n\tStatusHelpMessage        = 214 // RFC 959, 4.2.1\n\tStatusSystemType         = 215 // RFC 959, 4.2.1\n\tStatusServiceReady       = 220 // RFC 959, 4.2.1\n\tStatusClosingControlConn = 221 // RFC 959, 4.2.1\n\tStatusClosingDataConn    = 226 // RFC 959, 4.2.1\n\tStatusEnteringPASV       = 227 // RFC 959, 4.2.1\n\tStatusEnteringEPSV       = 229 // RFC 2428, 3\n\tStatusUserLoggedIn       = 230 // RFC 959, 4.2.1\n\tStatusAuthAccepted       = 234 // RFC 2228, 3\n\tStatusFileOK             = 250 // RFC 959, 4.2.1\n\tStatusPathCreated        = 257 // RFC 959, 4.2.1\n\n\t// 300 Series - The command has been accepted, but the requested action is on hold,\n\t// pending receipt of further information.\n\tStatusUserOK            = 331 // RFC 959, 4.2.1\n\tStatusFileActionPending = 350 // RFC 959, 4.2.1\n\n\t// 400 Series - The command was not accepted and the requested action did not take place,\n\t// but the error condition is temporary and the action may be requested again.\n\tStatusServiceNotAvailable      = 421 // RFC 959, 4.2.1\n\tStatusCannotOpenDataConnection = 425 // RFC 959, 4.2.1\n\tStatusTransferAborted          = 426 // RFC 959, 4.2.1\n\tStatusFileActionNotTaken       = 450 // RFC 959, 4.2.1\n\n\t// 500 Series - Syntax error, command unrecognized and the requested action did not take\n\t// place. This may include errors such as command line too long.\n\tStatusSyntaxErrorNotRecognised = 500 // RFC 959, 4.2.1\n\tStatusSyntaxErrorParameters    = 501 // RFC 959, 4.2.1\n\tStatusCommandNotImplemented    = 502 // RFC 959, 4.2.1\n\tStatusBadCommandSequence       = 503 // RFC 959, 4.2.1\n\tStatusNotImplementedParam      = 504 // RFC 959, 4.2.1\n\tStatusNotLoggedIn              = 530 // RFC 959, 4.2.1\n\tStatusActionNotTaken           = 550 // RFC 959, 4.2.1\n\tStatusActionAborted            = 552 // RFC 959, 4.2.1\n\tStatusActionNotTakenNoFile     = 553 // RFC 959, 4.2.1\n)",
+          "position": {
+            "file": "consts.go",
+            "line": 48
+          }
+        },
+        {
+          "name": "StatusCommandNotImplemented",
+          "doc": "Status codes as documented by:\nhttps://tools.ietf.org/html/rfc959\nhttps://tools.ietf.org/html/rfc2428\nhttps://tools.ietf.org/html/rfc2228",
+          "declaration": "const (\n\t// 100 Series - The requested action is being initiated, expect another reply before\n\t// proceeding with a new command.\n\tStatusFileStatusOK = 150 // RFC 959, 4.2.1\n\n\t// 200 Series - The requested action has been successfully completed.\n\tStatusOK                 = 200 // RFC 959, 4.2.1\n\tStatusNotImplemented     = 202 // RFC 959, 4.2.1\n\tStatusSystemStatus       = 211 // RFC 959, 4.2.1\n\tStatusDirectoryStatus    = 212 // RFC 959, 4.2.1\n\tStatusFileStatus         = 213 // RFC 959, 4.2.1\n\tStatusHelpMessage        = 214 // RFC 959, 4.2.1\n\tStatusSystemType         = 215 // RFC 959, 4.2.1\n\tStatusServiceReady       = 220 // RFC 959, 4.2.1\n\tStatusClosingControlConn = 221 // RFC 959, 4.2.1\n\tStatusClosingDataConn    = 226 // RFC 959, 4.2.1\n\tStatusEnteringPASV       = 227 // RFC 959, 4.2.1\n\tStatusEnteringEPSV       = 229 // RFC 2428, 3\n\tStatusUserLoggedIn       = 230 // RFC 959, 4.2.1\n\tStatusAuthAccepted       = 234 // RFC 2228, 3\n\tStatusFileOK             = 250 // RFC 959, 4.2.1\n\tStatusPathCreated        = 257 // RFC 959, 4.2.1\n\n\t// 300 Series - The command has been accepted, but the requested action is on hold,\n\t// pending receipt of further information.\n\tStatusUserOK            = 331 // RFC 959, 4.2.1\n\tStatusFileActionPending = 350 // RFC 959, 4.2.1\n\n\t// 400 Series - The command was not accepted and the requested action did not take place,\n\t// but the error condition is temporary and the action may be requested again.\n\tStatusServiceNotAvailable      = 421 // RFC 959, 4.2.1\n\tStatusCannotOpenDataConnection = 425 // RFC 959, 4.2.1\n\tStatusTransferAborted          = 426 // RFC 959, 4.2.1\n\tStatusFileActionNotTaken       = 450 // RFC 959, 4.2.1\n\n\t// 500 Series - Syntax error, command unrecognized and the requested action did not take\n\t// place. This may include errors such as command line too long.\n\tStatusSyntaxErrorNotRecognised = 500 // RFC 959, 4.2.1\n\tStatusSyntaxErrorParameters    = 501 // RFC 959, 4.2.1\n\tStatusCommandNotImplemented    = 502 // RFC 959, 4.2.1\n\tStatusBadCommandSequence       = 503 // RFC 959, 4.2.1\n\tStatusNotImplementedParam      = 504 // RFC 959, 4.2.1\n\tStatusNotLoggedIn              = 530 // RFC 959, 4.2.1\n\tStatusActionNotTaken           = 550 // RFC 959, 4.2.1\n\tStatusActionAborted            = 552 // RFC 959, 4.2.1\n\tStatusActionNotTakenNoFile     = 553 // RFC 959, 4.2.1\n)",
+          "position": {
+            "file": "consts.go",
+            "line": 49
+          }
+        },
+        {
+          "name": "StatusBadCommandSequence",
+          "doc": "Status codes as documented by:\nhttps://tools.ietf.org/html/rfc959\nhttps://tools.ietf.org/html/rfc2428\nhttps://tools.ietf.org/html/rfc2228",
+          "declaration": "const (\n\t// 100 Series - The requested action is being initiated, expect another reply before\n\t// proceeding with a new command.\n\tStatusFileStatusOK = 150 // RFC 959, 4.2.1\n\n\t// 200 Series - The requested action has been successfully completed.\n\tStatusOK                 = 200 // RFC 959, 4.2.1\n\tStatusNotImplemented     = 202 // RFC 959, 4.2.1\n\tStatusSystemStatus       = 211 // RFC 959, 4.2.1\n\tStatusDirectoryStatus    = 212 // RFC 959, 4.2.1\n\tStatusFileStatus         = 213 // RFC 959, 4.2.1\n\tStatusHelpMessage        = 214 // RFC 959, 4.2.1\n\tStatusSystemType         = 215 // RFC 959, 4.2.1\n\tStatusServiceReady       = 220 // RFC 959, 4.2.1\n\tStatusClosingControlConn = 221 // RFC 959, 4.2.1\n\tStatusClosingDataConn    = 226 // RFC 959, 4.2.1\n\tStatusEnteringPASV       = 227 // RFC 959, 4.2.1\n\tStatusEnteringEPSV       = 229 // RFC 2428, 3\n\tStatusUserLoggedIn       = 230 // RFC 959, 4.2.1\n\tStatusAuthAccepted       = 234 // RFC 2228, 3\n\tStatusFileOK             = 250 // RFC 959, 4.2.1\n\tStatusPathCreated        = 257 // RFC 959, 4.2.1\n\n\t// 300 Series - The command has been accepted, but the requested action is on hold,\n\t// pending receipt of further information.\n\tStatusUserOK            = 331 // RFC 959, 4.2.1\n\tStatusFileActionPending = 350 // RFC 959, 4.2.1\n\n\t// 400 Series - The command was not accepted and the requested action did not take place,\n\t// but the error condition is temporary and the action may be requested again.\n\tStatusServiceNotAvailable      = 421 // RFC 959, 4.2.1\n\tStatusCannotOpenDataConnection = 425 // RFC 959, 4.2.1\n\tStatusTransferAborted          = 426 // RFC 959, 4.2.1\n\tStatusFileActionNotTaken       = 450 // RFC 959, 4.2.1\n\n\t// 500 Series - Syntax error, command unrecognized and the requested action did not take\n\t// place. This may include errors such as command line too long.\n\tStatusSyntaxErrorNotRecognised = 500 // RFC 959, 4.2.1\n\tStatusSyntaxErrorParameters    = 501 // RFC 959, 4.2.1\n\tStatusCommandNotImplemented    = 502 // RFC 959, 4.2.1\n\tStatusBadCommandSequence       = 503 // RFC 959, 4.2.1\n\tStatusNotImplementedParam      = 504 // RFC 959, 4.2.1\n\tStatusNotLoggedIn              = 530 // RFC 959, 4.2.1\n\tStatusActionNotTaken           = 550 // RFC 959, 4.2.1\n\tStatusActionAborted            = 552 // RFC 959, 4.2.1\n\tStatusActionNotTakenNoFile     = 553 // RFC 959, 4.2.1\n)",
+          "position": {
+            "file": "consts.go",
+            "line": 50
+          }
+        },
+        {
+          "name": "StatusNotImplementedParam",
+          "doc": "Status codes as documented by:\nhttps://tools.ietf.org/html/rfc959\nhttps://tools.ietf.org/html/rfc2428\nhttps://tools.ietf.org/html/rfc2228",
+          "declaration": "const (\n\t// 100 Series - The requested action is being initiated, expect another reply before\n\t// proceeding with a new command.\n\tStatusFileStatusOK = 150 // RFC 959, 4.2.1\n\n\t// 200 Series - The requested action has been successfully completed.\n\tStatusOK                 = 200 // RFC 959, 4.2.1\n\tStatusNotImplemented     = 202 // RFC 959, 4.2.1\n\tStatusSystemStatus       = 211 // RFC 959, 4.2.1\n\tStatusDirectoryStatus    = 212 // RFC 959, 4.2.1\n\tStatusFileStatus         = 213 // RFC 959, 4.2.1\n\tStatusHelpMessage        = 214 // RFC 959, 4.2.1\n\tStatusSystemType         = 215 // RFC 959, 4.2.1\n\tStatusServiceReady       = 220 // RFC 959, 4.2.1\n\tStatusClosingControlConn = 221 // RFC 959, 4.2.1\n\tStatusClosingDataConn    = 226 // RFC 959, 4.2.1\n\tStatusEnteringPASV       = 227 // RFC 959, 4.2.1\n\tStatusEnteringEPSV       = 229 // RFC 2428, 3\n\tStatusUserLoggedIn       = 230 // RFC 959, 4.2.1\n\tStatusAuthAccepted       = 234 // RFC 2228, 3\n\tStatusFileOK             = 250 // RFC 959, 4.2.1\n\tStatusPathCreated        = 257 // RFC 959, 4.2.1\n\n\t// 300 Series - The command has been accepted, but the requested action is on hold,\n\t// pending receipt of further information.\n\tStatusUserOK            = 331 // RFC 959, 4.2.1\n\tStatusFileActionPending = 350 // RFC 959, 4.2.1\n\n\t// 400 Series - The command was not accepted and the requested action did not take place,\n\t// but the error condition is temporary and the action may be requested again.\n\tStatusServiceNotAvailable      = 421 // RFC 959, 4.2.1\n\tStatusCannotOpenDataConnection = 425 // RFC 959, 4.2.1\n\tStatusTransferAborted          = 426 // RFC 959, 4.2.1\n\tStatusFileActionNotTaken       = 450 // RFC 959, 4.2.1\n\n\t// 500 Series - Syntax error, command unrecognized and the requested action did not take\n\t// place. This may include errors such as command line too long.\n\tStatusSyntaxErrorNotRecognised = 500 // RFC 959, 4.2.1\n\tStatusSyntaxErrorParameters    = 501 // RFC 959, 4.2.1\n\tStatusCommandNotImplemented    = 502 // RFC 959, 4.2.1\n\tStatusBadCommandSequence       = 503 // RFC 959, 4.2.1\n\tStatusNotImplementedParam      = 504 // RFC 959, 4.2.1\n\tStatusNotLoggedIn              = 530 // RFC 959, 4.2.1\n\tStatusActionNotTaken           = 550 // RFC 959, 4.2.1\n\tStatusActionAborted            = 552 // RFC 959, 4.2.1\n\tStatusActionNotTakenNoFile     = 553 // RFC 959, 4.2.1\n)",
+          "position": {
+            "file": "consts.go",
+            "line": 51
+          }
+        },
+        {
+          "name": "StatusNotLoggedIn",
+          "doc": "Status codes as documented by:\nhttps://tools.ietf.org/html/rfc959\nhttps://tools.ietf.org/html/rfc2428\nhttps://tools.ietf.org/html/rfc2228",
+          "declaration": "const (\n\t// 100 Series - The requested action is being initiated, expect another reply before\n\t// proceeding with a new command.\n\tStatusFileStatusOK = 150 // RFC 959, 4.2.1\n\n\t// 200 Series - The requested action has been successfully completed.\n\tStatusOK                 = 200 // RFC 959, 4.2.1\n\tStatusNotImplemented     = 202 // RFC 959, 4.2.1\n\tStatusSystemStatus       = 211 // RFC 959, 4.2.1\n\tStatusDirectoryStatus    = 212 // RFC 959, 4.2.1\n\tStatusFileStatus         = 213 // RFC 959, 4.2.1\n\tStatusHelpMessage        = 214 // RFC 959, 4.2.1\n\tStatusSystemType         = 215 // RFC 959, 4.2.1\n\tStatusServiceReady       = 220 // RFC 959, 4.2.1\n\tStatusClosingControlConn = 221 // RFC 959, 4.2.1\n\tStatusClosingDataConn    = 226 // RFC 959, 4.2.1\n\tStatusEnteringPASV       = 227 // RFC 959, 4.2.1\n\tStatusEnteringEPSV       = 229 // RFC 2428, 3\n\tStatusUserLoggedIn       = 230 // RFC 959, 4.2.1\n\tStatusAuthAccepted       = 234 // RFC 2228, 3\n\tStatusFileOK             = 250 // RFC 959, 4.2.1\n\tStatusPathCreated        = 257 // RFC 959, 4.2.1\n\n\t// 300 Series - The command has been accepted, but the requested action is on hold,\n\t// pending receipt of further information.\n\tStatusUserOK            = 331 // RFC 959, 4.2.1\n\tStatusFileActionPending = 350 // RFC 959, 4.2.1\n\n\t// 400 Series - The command was not accepted and the requested action did not take place,\n\t// but the error condition is temporary and the action may be requested again.\n\tStatusServiceNotAvailable      = 421 // RFC 959, 4.2.1\n\tStatusCannotOpenDataConnection = 425 // RFC 959, 4.2.1\n\tStatusTransferAborted          = 426 // RFC 959, 4.2.1\n\tStatusFileActionNotTaken       = 450 // RFC 959, 4.2.1\n\n\t// 500 Series - Syntax error, command unrecognized and the requested action did not take\n\t// place. This may include errors such as command line too long.\n\tStatusSyntaxErrorNotRecognised = 500 // RFC 959, 4.2.1\n\tStatusSyntaxErrorParameters    = 501 // RFC 959, 4.2.1\n\tStatusCommandNotImplemented    = 502 // RFC 959, 4.2.1\n\tStatusBadCommandSequence       = 503 // RFC 959, 4.2.1\n\tStatusNotImplementedParam      = 504 // RFC 959, 4.2.1\n\tStatusNotLoggedIn              = 530 // RFC 959, 4.2.1\n\tStatusActionNotTaken           = 550 // RFC 959, 4.2.1\n\tStatusActionAborted            = 552 // RFC 959, 4.2.1\n\tStatusActionNotTakenNoFile     = 553 // RFC 959, 4.2.1\n)",
+          "position": {
+            "file": "consts.go",
+            "line": 52
+          }
+        },
+        {
+          "name": "StatusActionNotTaken",
+          "doc": "Status codes as documented by:\nhttps://tools.ietf.org/html/rfc959\nhttps://tools.ietf.org/html/rfc2428\nhttps://tools.ietf.org/html/rfc2228",
+          "declaration": "const (\n\t// 100 Series - The requested action is being initiated, expect another reply before\n\t// proceeding with a new command.\n\tStatusFileStatusOK = 150 // RFC 959, 4.2.1\n\n\t// 200 Series - The requested action has been successfully completed.\n\tStatusOK                 = 200 // RFC 959, 4.2.1\n\tStatusNotImplemented     = 202 // RFC 959, 4.2.1\n\tStatusSystemStatus       = 211 // RFC 959, 4.2.1\n\tStatusDirectoryStatus    = 212 // RFC 959, 4.2.1\n\tStatusFileStatus         = 213 // RFC 959, 4.2.1\n\tStatusHelpMessage        = 214 // RFC 959, 4.2.1\n\tStatusSystemType         = 215 // RFC 959, 4.2.1\n\tStatusServiceReady       = 220 // RFC 959, 4.2.1\n\tStatusClosingControlConn = 221 // RFC 959, 4.2.1\n\tStatusClosingDataConn    = 226 // RFC 959, 4.2.1\n\tStatusEnteringPASV       = 227 // RFC 959, 4.2.1\n\tStatusEnteringEPSV       = 229 // RFC 2428, 3\n\tStatusUserLoggedIn       = 230 // RFC 959, 4.2.1\n\tStatusAuthAccepted       = 234 // RFC 2228, 3\n\tStatusFileOK             = 250 // RFC 959, 4.2.1\n\tStatusPathCreated        = 257 // RFC 959, 4.2.1\n\n\t// 300 Series - The command has been accepted, but the requested action is on hold,\n\t// pending receipt of further information.\n\tStatusUserOK            = 331 // RFC 959, 4.2.1\n\tStatusFileActionPending = 350 // RFC 959, 4.2.1\n\n\t// 400 Series - The command was not accepted and the requested action did not take place,\n\t// but the error condition is temporary and the action may be requested again.\n\tStatusServiceNotAvailable      = 421 // RFC 959, 4.2.1\n\tStatusCannotOpenDataConnection = 425 // RFC 959, 4.2.1\n\tStatusTransferAborted          = 426 // RFC 959, 4.2.1\n\tStatusFileActionNotTaken       = 450 // RFC 959, 4.2.1\n\n\t// 500 Series - Syntax error, command unrecognized and the requested action did not take\n\t// place. This may include errors such as command line too long.\n\tStatusSyntaxErrorNotRecognised = 500 // RFC 959, 4.2.1\n\tStatusSyntaxErrorParameters    = 501 // RFC 959, 4.2.1\n\tStatusCommandNotImplemented    = 502 // RFC 959, 4.2.1\n\tStatusBadCommandSequence       = 503 // RFC 959, 4.2.1\n\tStatusNotImplementedParam      = 504 // RFC 959, 4.2.1\n\tStatusNotLoggedIn              = 530 // RFC 959, 4.2.1\n\tStatusActionNotTaken           = 550 // RFC 959, 4.2.1\n\tStatusActionAborted            = 552 // RFC 959, 4.2.1\n\tStatusActionNotTakenNoFile     = 553 // RFC 959, 4.2.1\n)",
+          "position": {
+            "file": "consts.go",
+            "line": 53
+          }
+        },
+        {
+          "name": "StatusActionAborted",
+          "doc": "Status codes as documented by:\nhttps://tools.ietf.org/html/rfc959\nhttps://tools.ietf.org/html/rfc2428\nhttps://tools.ietf.org/html/rfc2228",
+          "declaration": "const (\n\t// 100 Series - The requested action is being initiated, expect another reply before\n\t// proceeding with a new command.\n\tStatusFileStatusOK = 150 // RFC 959, 4.2.1\n\n\t// 200 Series - The requested action has been successfully completed.\n\tStatusOK                 = 200 // RFC 959, 4.2.1\n\tStatusNotImplemented     = 202 // RFC 959, 4.2.1\n\tStatusSystemStatus       = 211 // RFC 959, 4.2.1\n\tStatusDirectoryStatus    = 212 // RFC 959, 4.2.1\n\tStatusFileStatus         = 213 // RFC 959, 4.2.1\n\tStatusHelpMessage        = 214 // RFC 959, 4.2.1\n\tStatusSystemType         = 215 // RFC 959, 4.2.1\n\tStatusServiceReady       = 220 // RFC 959, 4.2.1\n\tStatusClosingControlConn = 221 // RFC 959, 4.2.1\n\tStatusClosingDataConn    = 226 // RFC 959, 4.2.1\n\tStatusEnteringPASV       = 227 // RFC 959, 4.2.1\n\tStatusEnteringEPSV       = 229 // RFC 2428, 3\n\tStatusUserLoggedIn       = 230 // RFC 959, 4.2.1\n\tStatusAuthAccepted       = 234 // RFC 2228, 3\n\tStatusFileOK             = 250 // RFC 959, 4.2.1\n\tStatusPathCreated        = 257 // RFC 959, 4.2.1\n\n\t// 300 Series - The command has been accepted, but the requested action is on hold,\n\t// pending receipt of further information.\n\tStatusUserOK            = 331 // RFC 959, 4.2.1\n\tStatusFileActionPending = 350 // RFC 959, 4.2.1\n\n\t// 400 Series - The command was not accepted and the requested action did not take place,\n\t// but the error condition is temporary and the action may be requested again.\n\tStatusServiceNotAvailable      = 421 // RFC 959, 4.2.1\n\tStatusCannotOpenDataConnection = 425 // RFC 959, 4.2.1\n\tStatusTransferAborted          = 426 // RFC 959, 4.2.1\n\tStatusFileActionNotTaken       = 450 // RFC 959, 4.2.1\n\n\t// 500 Series - Syntax error, command unrecognized and the requested action did not take\n\t// place. This may include errors such as command line too long.\n\tStatusSyntaxErrorNotRecognised = 500 // RFC 959, 4.2.1\n\tStatusSyntaxErrorParameters    = 501 // RFC 959, 4.2.1\n\tStatusCommandNotImplemented    = 502 // RFC 959, 4.2.1\n\tStatusBadCommandSequence       = 503 // RFC 959, 4.2.1\n\tStatusNotImplementedParam      = 504 // RFC 959, 4.2.1\n\tStatusNotLoggedIn              = 530 // RFC 959, 4.2.1\n\tStatusActionNotTaken           = 550 // RFC 959, 4.2.1\n\tStatusActionAborted            = 552 // RFC 959, 4.2.1\n\tStatusActionNotTakenNoFile     = 553 // RFC 959, 4.2.1\n)",
+          "position": {
+            "file": "consts.go",
+            "line": 54
+          }
+        },
+        {
+          "name": "StatusActionNotTakenNoFile",
+          "doc": "Status codes as documented by:\nhttps://tools.ietf.org/html/rfc959\nhttps://tools.ietf.org/html/rfc2428\nhttps://tools.ietf.org/html/rfc2228",
+          "declaration": "const (\n\t// 100 Series - The requested action is being initiated, expect another reply before\n\t// proceeding with a new command.\n\tStatusFileStatusOK = 150 // RFC 959, 4.2.1\n\n\t// 200 Series - The requested action has been successfully completed.\n\tStatusOK                 = 200 // RFC 959, 4.2.1\n\tStatusNotImplemented     = 202 // RFC 959, 4.2.1\n\tStatusSystemStatus       = 211 // RFC 959, 4.2.1\n\tStatusDirectoryStatus    = 212 // RFC 959, 4.2.1\n\tStatusFileStatus         = 213 // RFC 959, 4.2.1\n\tStatusHelpMessage        = 214 // RFC 959, 4.2.1\n\tStatusSystemType         = 215 // RFC 959, 4.2.1\n\tStatusServiceReady       = 220 // RFC 959, 4.2.1\n\tStatusClosingControlConn = 221 // RFC 959, 4.2.1\n\tStatusClosingDataConn    = 226 // RFC 959, 4.2.1\n\tStatusEnteringPASV       = 227 // RFC 959, 4.2.1\n\tStatusEnteringEPSV       = 229 // RFC 2428, 3\n\tStatusUserLoggedIn       = 230 // RFC 959, 4.2.1\n\tStatusAuthAccepted       = 234 // RFC 2228, 3\n\tStatusFileOK             = 250 // RFC 959, 4.2.1\n\tStatusPathCreated        = 257 // RFC 959, 4.2.1\n\n\t// 300 Series - The command has been accepted, but the requested action is on hold,\n\t// pending receipt of further information.\n\tStatusUserOK            = 331 // RFC 959, 4.2.1\n\tStatusFileActionPending = 350 // RFC 959, 4.2.1\n\n\t// 400 Series - The command was not accepted and the requested action did not take place,\n\t// but the error condition is temporary and the action may be requested again.\n\tStatusServiceNotAvailable      = 421 // RFC 959, 4.2.1\n\tStatusCannotOpenDataConnection = 425 // RFC 959, 4.2.1\n\tStatusTransferAborted          = 426 // RFC 959, 4.2.1\n\tStatusFileActionNotTaken       = 450 // RFC 959, 4.2.1\n\n\t// 500 Series - Syntax error, command unrecognized and the requested action did not take\n\t// place. This may include errors such as command line too long.\n\tStatusSyntaxErrorNotRecognised = 500 // RFC 959, 4.2.1\n\tStatusSyntaxErrorParameters    = 501 // RFC 959, 4.2.1\n\tStatusCommandNotImplemented    = 502 // RFC 959, 4.2.1\n\tStatusBadCommandSequence       = 503 // RFC 959, 4.2.1\n\tStatusNotImplementedParam      = 504 // RFC 959, 4.2.1\n\tStatusNotLoggedIn              = 530 // RFC 959, 4.2.1\n\tStatusActionNotTaken           = 550 // RFC 959, 4.2.1\n\tStatusActionAborted            = 552 // RFC 959, 4.2.1\n\tStatusActionNotTakenNoFile     = 553 // RFC 959, 4.2.1\n)",
+          "position": {
+            "file": "consts.go",
+            "line": 55
+          }
+        },
+        {
+          "name": "DataChannelPassive",
+          "doc": "Supported data channel types",
+          "declaration": "const (\n\tDataChannelPassive DataChannel = iota + 1\n\tDataChannelActive\n)",
+          "position": {
+            "file": "client_handler.go",
+            "line": 53
+          }
+        },
+        {
+          "name": "DataChannelActive",
+          "doc": "Supported data channel types",
+          "declaration": "const (\n\tDataChannelPassive DataChannel = iota + 1\n\tDataChannelActive\n)",
+          "position": {
+            "file": "client_handler.go",
+            "line": 54
+          }
+        },
+        {
+          "name": "IPMatchRequired",
+          "doc": "Supported data connection requirements",
+          "declaration": "const (\n\t// IPMatchRequired requires matching peer IP addresses of control and data connection\n\tIPMatchRequired DataConnectionRequirement = iota\n\t// IPMatchDisabled disables checking peer IP addresses of control and data connection\n\tIPMatchDisabled\n)",
+          "position": {
+            "file": "driver.go",
+            "line": 335
+          }
+        },
+        {
+          "name": "IPMatchDisabled",
+          "doc": "Supported data connection requirements",
+          "declaration": "const (\n\t// IPMatchRequired requires matching peer IP addresses of control and data connection\n\tIPMatchRequired DataConnectionRequirement = iota\n\t// IPMatchDisabled disables checking peer IP addresses of control and data connection\n\tIPMatchDisabled\n)",
+          "position": {
+            "file": "driver.go",
+            "line": 337
+          }
+        },
+        {
+          "name": "HASHAlgoCRC32",
+          "doc": "Supported hash algorithms",
+          "declaration": "const (\n\tHASHAlgoCRC32 HASHAlgo = iota\n\tHASHAlgoMD5\n\tHASHAlgoSHA1\n\tHASHAlgoSHA256\n\tHASHAlgoSHA512\n)",
+          "position": {
+            "file": "client_handler.go",
+            "line": 21
+          }
+        },
+        {
+          "name": "HASHAlgoMD5",
+          "doc": "Supported hash algorithms",
+          "declaration": "const (\n\tHASHAlgoCRC32 HASHAlgo = iota\n\tHASHAlgoMD5\n\tHASHAlgoSHA1\n\tHASHAlgoSHA256\n\tHASHAlgoSHA512\n)",
+          "position": {
+            "file": "client_handler.go",
+            "line": 22
+          }
+        },
+        {
+          "name": "HASHAlgoSHA1",
+          "doc": "Supported hash algorithms",
+          "declaration": "const (\n\tHASHAlgoCRC32 HASHAlgo = iota\n\tHASHAlgoMD5\n\tHASHAlgoSHA1\n\tHASHAlgoSHA256\n\tHASHAlgoSHA512\n)",
+          "position": {
+            "file": "client_handler.go",
+            "line": 23
+          }
+        },
+        {
+          "name": "HASHAlgoSHA256",
+          "doc": "Supported hash algorithms",
+          "declaration": "const (\n\tHASHAlgoCRC32 HASHAlgo = iota\n\tHASHAlgoMD5\n\tHASHAlgoSHA1\n\tHASHAlgoSHA256\n\tHASHAlgoSHA512\n)",
+          "position": {
+            "file": "client_handler.go",
+            "line": 24
+          }
+        },
+        {
+          "name": "HASHAlgoSHA512",
+          "doc": "Supported hash algorithms",
+          "declaration": "const (\n\tHASHAlgoCRC32 HASHAlgo = iota\n\tHASHAlgoMD5\n\tHASHAlgoSHA1\n\tHASHAlgoSHA256\n\tHASHAlgoSHA512\n)",
+          "position": {
+            "file": "client_handler.go",
+            "line": 25
+          }
+        },
+        {
+          "name": "ClearOrEncrypted",
+          "doc": "TLS modes",
+          "declaration": "const (\n\tClearOrEncrypted TLSRequirement = iota\n\tMandatoryEncryption\n\tImplicitEncryption\n)",
+          "position": {
+            "file": "driver.go",
+            "line": 323
+          }
+        },
+        {
+          "name": "MandatoryEncryption",
+          "doc": "TLS modes",
+          "declaration": "const (\n\tClearOrEncrypted TLSRequirement = iota\n\tMandatoryEncryption\n\tImplicitEncryption\n)",
+          "position": {
+            "file": "driver.go",
+            "line": 324
+          }
+        },
+        {
+          "name": "ImplicitEncryption",
+          "doc": "TLS modes",
+          "declaration": "const (\n\tClearOrEncrypted TLSRequirement = iota\n\tMandatoryEncryption\n\tImplicitEncryption\n)",
+          "position": {
+            "file": "driver.go",
+            "line": 325
+          }
+        },
+        {
+          "name": "TransferModeStream",
+          "doc": "Transfer modes",
+          "declaration": "const (\n\t// TransferModeStream is the standard uncompressed transfer mode\n\tTransferModeStream TransferMode = iota\n\t// TransferModeDeflate is the compressed transfer mode using deflate algorithm\n\tTransferModeDeflate\n)",
+          "position": {
+            "file": "client_handler.go",
+            "line": 43
+          }
+        },
+        {
+          "name": "TransferModeDeflate",
+          "doc": "Transfer modes",
+          "declaration": "const (\n\t// TransferModeStream is the standard uncompressed transfer mode\n\tTransferModeStream TransferMode = iota\n\t// TransferModeDeflate is the compressed transfer mode using deflate algorithm\n\tTransferModeDeflate\n)",
+          "position": {
+            "file": "client_handler.go",
+            "line": 45
+          }
+        },
+        {
+          "name": "TransferTypeASCII",
+          "doc": "Supported transfer type",
+          "declaration": "const (\n\tTransferTypeASCII TransferType = iota\n\tTransferTypeBinary\n)",
+          "position": {
+            "file": "client_handler.go",
+            "line": 33
+          }
+        },
+        {
+          "name": "TransferTypeBinary",
+          "doc": "Supported transfer type",
+          "declaration": "const (\n\tTransferTypeASCII TransferType = iota\n\tTransferTypeBinary\n)",
+          "position": {
+            "file": "client_handler.go",
+            "line": 34
+          }
+        }
+      ],
+      "vars": [
+        {
+          "name": "ErrStorageExceeded",
+          "doc": "",
+          "declaration": "var (\n\t// ErrStorageExceeded defines the error mapped to the FTP 552 reply code.\n\t// As for RFC 959 this error is checked for STOR, APPE\n\tErrStorageExceeded = errors.New(\"storage limit exceeded\")\n\t// ErrFileNameNotAllowed defines the error mapped to the FTP 553 reply code.\n\t// As for RFC 959 this error is checked for STOR, APPE, RNTO\n\tErrFileNameNotAllowed = errors.New(\"filename not allowed\")\n)",
+          "position": {
+            "file": "errors.go",
+            "line": 11
+          }
+        },
+        {
+          "name": "ErrFileNameNotAllowed",
+          "doc": "",
+          "declaration": "var (\n\t// ErrStorageExceeded defines the error mapped to the FTP 552 reply code.\n\t// As for RFC 959 this error is checked for STOR, APPE\n\tErrStorageExceeded = errors.New(\"storage limit exceeded\")\n\t// ErrFileNameNotAllowed defines the error mapped to the FTP 553 reply code.\n\t// As for RFC 959 this error is checked for STOR, APPE, RNTO\n\tErrFileNameNotAllowed = errors.New(\"filename not allowed\")\n)",
+          "position": {
+            "file": "errors.go",
+            "line": 14
+          }
+        },
+        {
+          "name": "ErrNoAvailableListeningPort",
+          "doc": "ErrNoAvailableListeningPort is returned when no port could be found to accept incoming connection",
+          "declaration": "var ErrNoAvailableListeningPort = errors.New(\"could not find any port to listen to\")",
+          "position": {
+            "file": "transfer_pasv.go",
+            "line": 81
+          }
+        },
+        {
+          "name": "ErrNotListening",
+          "doc": "ErrNotListening is returned when we are performing an action that is only valid while listening",
+          "declaration": "var ErrNotListening = errors.New(\"we aren't listening\")",
+          "position": {
+            "file": "server.go",
+            "line": 18
+          }
+        },
+        {
+          "name": "ErrRemoteAddrFormat",
+          "doc": "ErrRemoteAddrFormat is returned when the remote address has a bad format",
+          "declaration": "var ErrRemoteAddrFormat = errors.New(\"remote address has a bad format\")",
+          "position": {
+            "file": "transfer_active.go",
+            "line": 133
+          }
+        }
+      ],
+      "funcs": [
+        {
+          "name": "Control",
+          "doc": "Control defines the function to use as dialer Control to reuse the same port/address",
+          "signature": "func Control(network, address string, c syscall.RawConn) error",
+          "position": {
+            "file": "control_windows.go",
+            "line": 10
+          },
+          "examples": []
+        },
+        {
+          "name": "NewFtpServer",
+          "doc": "NewFtpServer creates a new FtpServer instance",
+          "signature": "func NewFtpServer(driver MainDriver) *FtpServer",
+          "position": {
+            "file": "server.go",
+            "line": 346
+          },
+          "examples": []
+        }
+      ],
+      "types": [
+        {
+          "name": "AnswerCommand",
+          "doc": "AnswerCommand is a struct to answer a command to the client",
+          "declaration": "type AnswerCommand struct {\n\tCode    int\n\tMessage string\n}",
+          "kind": "struct",
+          "position": {
+            "file": "driver.go",
+            "line": 136
+          },
+          "fields": [
+            {
+              "name": "Code",
+              "doc": "",
+              "type": "int"
+            },
+            {
+              "name": "Message",
+              "doc": "",
+              "type": "string"
+            }
+          ],
+          "methods": [],
+          "examples": []
+        },
+        {
+          "name": "ClientContext",
+          "doc": "ClientContext is implemented on the server side to provide some access to few data around the client",
+          "declaration": "type ClientContext interface {\n\t// Path provides the path of the current connection\n\tPath() string\n\n\t// SetPath sets the path of the current connection.\n\t// This method is useful to set a start directory, you should use it before returning a successful\n\t// authentication response from your driver implementation.\n\t// Calling this method after the authentication step could lead to undefined behavior\n\tSetPath(value string)\n\n\t// SetListPath allows to change the path for the last LIST/NLST request.\n\t// This method is useful if the driver expands wildcards and so the returned results\n\t// refer to a path different from the requested one.\n\t// The value must be cleaned using path.Clean\n\tSetListPath(value string)\n\n\t// SetDebug activates the debugging of this connection commands\n\tSetDebug(debug bool)\n\n\t// Debug returns the current debugging status of this connection commands\n\tDebug() bool\n\n\t// Client's ID on the server\n\tID() uint32\n\n\t// Client's address\n\tRemoteAddr() net.Addr\n\n\t// Servers's address\n\tLocalAddr() net.Addr\n\n\t// Client's version can be empty\n\tGetClientVersion() string\n\n\t// Close closes the connection and disconnects the client.\n\tClose() error\n\n\t// HasTLSForControl returns true if the control connection is over TLS\n\tHasTLSForControl() bool\n\n\t// HasTLSForTransfers returns true if the transfer connection is over TLS\n\tHasTLSForTransfers() bool\n\n\t// GetLastCommand returns the last received command\n\tGetLastCommand() string\n\n\t// GetLastDataChannel returns the last data channel mode\n\tGetLastDataChannel() DataChannel\n\n\t// SetTLSRequirement sets the TLS requirement to respect on a per-client basis.\n\t// The requirement is checked when the client issues the \"USER\" command,\n\t// after executing the MainDriverExtensionUserVerifier extension, and\n\t// before opening transfer connections.\n\t// Supported values: ClearOrEncrypted, MandatoryEncryption.\n\t// If you want to enforce the same requirement for all\n\t// clients, use the TLSRequired parameter defined in server settings instead\n\tSetTLSRequirement(requirement TLSRequirement) error\n\n\t// SetExtra allows to set application specific data\n\tSetExtra(extra any)\n\n\t// Extra returns application specific data set using SetExtra\n\tExtra() any\n}",
+          "kind": "interface",
+          "position": {
+            "file": "driver.go",
+            "line": 148
+          },
+          "fields": [
+            {
+              "name": "Path",
+              "doc": "Path provides the path of the current connection",
+              "type": "func() string"
+            },
+            {
+              "name": "SetPath",
+              "doc": "SetPath sets the path of the current connection.\nThis method is useful to set a start directory, you should use it before returning a successful\nauthentication response from your driver implementation.\nCalling this method after the authentication step could lead to undefined behavior",
+              "type": "func(value string)"
+            },
+            {
+              "name": "SetListPath",
+              "doc": "SetListPath allows to change the path for the last LIST/NLST request.\nThis method is useful if the driver expands wildcards and so the returned results\nrefer to a path different from the requested one.\nThe value must be cleaned using path.Clean",
+              "type": "func(value string)"
+            },
+            {
+              "name": "SetDebug",
+              "doc": "SetDebug activates the debugging of this connection commands",
+              "type": "func(debug bool)"
+            },
+            {
+              "name": "Debug",
+              "doc": "Debug returns the current debugging status of this connection commands",
+              "type": "func() bool"
+            },
+            {
+              "name": "ID",
+              "doc": "Client's ID on the server",
+              "type": "func() uint32"
+            },
+            {
+              "name": "RemoteAddr",
+              "doc": "Client's address",
+              "type": "func() net.Addr"
+            },
+            {
+              "name": "LocalAddr",
+              "doc": "Servers's address",
+              "type": "func() net.Addr"
+            },
+            {
+              "name": "GetClientVersion",
+              "doc": "Client's version can be empty",
+              "type": "func() string"
+            },
+            {
+              "name": "Close",
+              "doc": "Close closes the connection and disconnects the client.",
+              "type": "func() error"
+            },
+            {
+              "name": "HasTLSForControl",
+              "doc": "HasTLSForControl returns true if the control connection is over TLS",
+              "type": "func() bool"
+            },
+            {
+              "name": "HasTLSForTransfers",
+              "doc": "HasTLSForTransfers returns true if the transfer connection is over TLS",
+              "type": "func() bool"
+            },
+            {
+              "name": "GetLastCommand",
+              "doc": "GetLastCommand returns the last received command",
+              "type": "func() string"
+            },
+            {
+              "name": "GetLastDataChannel",
+              "doc": "GetLastDataChannel returns the last data channel mode",
+              "type": "func() DataChannel"
+            },
+            {
+              "name": "SetTLSRequirement",
+              "doc": "SetTLSRequirement sets the TLS requirement to respect on a per-client basis.\nThe requirement is checked when the client issues the \"USER\" command,\nafter executing the MainDriverExtensionUserVerifier extension, and\nbefore opening transfer connections.\nSupported values: ClearOrEncrypted, MandatoryEncryption.\nIf you want to enforce the same requirement for all\nclients, use the TLSRequired parameter defined in server settings instead",
+              "type": "func(requirement TLSRequirement) error"
+            },
+            {
+              "name": "SetExtra",
+              "doc": "SetExtra allows to set application specific data",
+              "type": "func(extra any)"
+            },
+            {
+              "name": "Extra",
+              "doc": "Extra returns application specific data set using SetExtra",
+              "type": "func() any"
+            }
+          ],
+          "methods": [],
+          "examples": []
+        },
+        {
+          "name": "ClientDriver",
+          "doc": "ClientDriver is the base FS implementation that allows to manipulate files",
+          "declaration": "type ClientDriver interface {\n\tafero.Fs\n}",
+          "kind": "interface",
+          "position": {
+            "file": "driver.go",
+            "line": 77
+          },
+          "fields": [
+            {
+              "name": "afero.Fs",
+              "doc": "",
+              "type": "afero.Fs",
+              "embedded": true
+            }
+          ],
+          "methods": [],
+          "examples": []
+        },
+        {
+          "name": "ClientDriverExtensionAllocate",
+          "doc": "ClientDriverExtensionAllocate is an extension to support the \"ALLO\" - file allocation - command",
+          "declaration": "type ClientDriverExtensionAllocate interface {\n\t// AllocateSpace reserves the space necessary to upload files\n\tAllocateSpace(size int) error\n}",
+          "kind": "interface",
+          "position": {
+            "file": "driver.go",
+            "line": 82
+          },
+          "fields": [
+            {
+              "name": "AllocateSpace",
+              "doc": "AllocateSpace reserves the space necessary to upload files",
+              "type": "func(size int) error"
+            }
+          ],
+          "methods": [],
+          "examples": []
+        },
+        {
+          "name": "ClientDriverExtensionAvailableSpace",
+          "doc": "ClientDriverExtensionAvailableSpace is an extension to implement to support\nthe AVBL ftp command",
+          "declaration": "type ClientDriverExtensionAvailableSpace interface {\n\tGetAvailableSpace(dirName string) (int64, error)\n}",
+          "kind": "interface",
+          "position": {
+            "file": "driver.go",
+            "line": 131
+          },
+          "fields": [
+            {
+              "name": "GetAvailableSpace",
+              "doc": "",
+              "type": "func(dirName string) (int64, error)"
+            }
+          ],
+          "methods": [],
+          "examples": []
+        },
+        {
+          "name": "ClientDriverExtensionFileList",
+          "doc": "ClientDriverExtensionFileList is a convenience extension to allow to return file listing\nwithout requiring to implement the methods Open/Readdir for your custom afero.File",
+          "declaration": "type ClientDriverExtensionFileList interface {\n\t// ReadDir reads the directory named by name and return a list of directory entries.\n\tReadDir(name string) ([]os.FileInfo, error)\n}",
+          "kind": "interface",
+          "position": {
+            "file": "driver.go",
+            "line": 98
+          },
+          "fields": [
+            {
+              "name": "ReadDir",
+              "doc": "ReadDir reads the directory named by name and return a list of directory entries.",
+              "type": "func(name string) ([]os.FileInfo, error)"
+            }
+          ],
+          "methods": [],
+          "examples": []
+        },
+        {
+          "name": "ClientDriverExtensionHasher",
+          "doc": "ClientDriverExtensionHasher is an extension to implement if you want to handle file digests\nyourself. You have to set EnableHASH to true for this extension to be called",
+          "declaration": "type ClientDriverExtensionHasher interface {\n\tComputeHash(name string, algo HASHAlgo, startOffset, endOffset int64) (string, error)\n}",
+          "kind": "interface",
+          "position": {
+            "file": "driver.go",
+            "line": 125
+          },
+          "fields": [
+            {
+              "name": "ComputeHash",
+              "doc": "",
+              "type": "func(name string, algo HASHAlgo, startOffset, endOffset int64) (string, error)"
+            }
+          ],
+          "methods": [],
+          "examples": []
+        },
+        {
+          "name": "ClientDriverExtensionRemoveDir",
+          "doc": "ClientDriverExtensionRemoveDir is an extension to implement if you need to distinguish\nbetween the FTP command DELE (remove a file) and RMD (remove a dir). If you don't\nimplement this extension they will be both mapped to the Remove method defined in your\nafero.Fs implementation",
+          "declaration": "type ClientDriverExtensionRemoveDir interface {\n\tRemoveDir(name string) error\n}",
+          "kind": "interface",
+          "position": {
+            "file": "driver.go",
+            "line": 119
+          },
+          "fields": [
+            {
+              "name": "RemoveDir",
+              "doc": "",
+              "type": "func(name string) error"
+            }
+          ],
+          "methods": [],
+          "examples": []
+        },
+        {
+          "name": "ClientDriverExtensionSite",
+          "doc": "ClientDriverExtensionSite is an extension to implement if you want to handle SITE command\nyourself. You have to set DisableSite to false for this extension to be called",
+          "declaration": "type ClientDriverExtensionSite interface {\n\tSite(param string) *AnswerCommand\n}",
+          "kind": "interface",
+          "position": {
+            "file": "driver.go",
+            "line": 143
+          },
+          "fields": [
+            {
+              "name": "Site",
+              "doc": "",
+              "type": "func(param string) *AnswerCommand"
+            }
+          ],
+          "methods": [],
+          "examples": []
+        },
+        {
+          "name": "ClientDriverExtensionSymlink",
+          "doc": "ClientDriverExtensionSymlink is an extension to support the \"SITE SYMLINK\" - symbolic link creation - command",
+          "declaration": "type ClientDriverExtensionSymlink interface {\n\t// Symlink creates a symlink\n\tSymlink(oldname, newname string) error\n}",
+          "kind": "interface",
+          "position": {
+            "file": "driver.go",
+            "line": 88
+          },
+          "fields": [
+            {
+              "name": "Symlink",
+              "doc": "Symlink creates a symlink",
+              "type": "func(oldname, newname string) error"
+            }
+          ],
+          "methods": [],
+          "examples": []
+        },
+        {
+          "name": "ClientDriverExtentionFileTransfer",
+          "doc": "ClientDriverExtentionFileTransfer is a convenience extension to allow to transfer files\nwithout requiring to implement the methods Create/Open/OpenFile for your custom afero.File.",
+          "declaration": "type ClientDriverExtentionFileTransfer interface {\n\t// GetHandle return an handle to upload or download a file based on flags:\n\t// os.O_RDONLY indicates a download\n\t// os.O_WRONLY indicates an upload and can be combined with os.O_APPEND (resume) or\n\t// os.O_CREATE (upload to new file/truncate)\n\t//\n\t// offset is the argument of a previous REST command, if any, or 0\n\tGetHandle(name string, flags int, offset int64) (FileTransfer, error)\n}",
+          "kind": "interface",
+          "position": {
+            "file": "driver.go",
+            "line": 105
+          },
+          "fields": [
+            {
+              "name": "GetHandle",
+              "doc": "GetHandle return an handle to upload or download a file based on flags:\nos.O_RDONLY indicates a download\nos.O_WRONLY indicates an upload and can be combined with os.O_APPEND (resume) or\nos.O_CREATE (upload to new file/truncate)\n\noffset is the argument of a previous REST command, if any, or 0",
+              "type": "func(name string, flags int, offset int64) (FileTransfer, error)"
+            }
+          ],
+          "methods": [],
+          "examples": []
+        },
+        {
+          "name": "CommandDescription",
+          "doc": "CommandDescription defines which function should be used and if it should be open to anyone or only logged in users",
+          "declaration": "type CommandDescription struct {\n\tOpen            bool                               // Open to clients without auth\n\tTransferRelated bool                               // This is a command that can open a transfer connection\n\tSpecialAction   bool                               // Command to handle even if there is a transfer in progress\n\tFn              func(*clientHandler, string) error // Function to handle it\n}",
+          "kind": "struct",
+          "position": {
+            "file": "server.go",
+            "line": 21
+          },
+          "fields": [
+            {
+              "name": "Open",
+              "doc": "Open to clients without auth",
+              "type": "bool"
+            },
+            {
+              "name": "TransferRelated",
+              "doc": "This is a command that can open a transfer connection",
+              "type": "bool"
+            },
+            {
+              "name": "SpecialAction",
+              "doc": "Command to handle even if there is a transfer in progress",
+              "type": "bool"
+            },
+            {
+              "name": "Fn",
+              "doc": "Function to handle it",
+              "type": "func(*clientHandler, string) error"
+            }
+          ],
+          "methods": [],
+          "examples": []
+        },
+        {
+          "name": "DataChannel",
+          "doc": "DataChannel is the enumerable that represents the data channel (active or passive)",
+          "declaration": "type DataChannel int8",
+          "kind": "defined",
+          "position": {
+            "file": "client_handler.go",
+            "line": 49
+          },
+          "fields": [],
+          "methods": [],
+          "examples": []
+        },
+        {
+          "name": "DataConnectionRequirement",
+          "doc": "DataConnectionRequirement is the enumerable that represents the supported\nprotection mode for data channels",
+          "declaration": "type DataConnectionRequirement int8",
+          "kind": "defined",
+          "position": {
+            "file": "driver.go",
+            "line": 330
+          },
+          "fields": [],
+          "methods": [],
+          "examples": []
+        },
+        {
+          "name": "DriverError",
+          "doc": "DriverError is a wrapper is for any error that occur while contacting the drivers",
+          "declaration": "type DriverError struct {\n\t// contains filtered or unexported fields\n}",
+          "kind": "struct",
+          "position": {
+            "file": "errors.go",
+            "line": 29
+          },
+          "fields": [],
+          "methods": [
+            {
+              "name": "Error",
+              "doc": "",
+              "signature": "func  Error) Error() string",
+              "position": {
+                "file": "errors.go",
+                "line": 38
+              },
+              "examples": []
+            },
+            {
+              "name": "Unwrap",
+              "doc": "",
+              "signature": "func  Unwrap() error",
+              "position": {
+                "file": "errors.go",
+                "line": 42
+              },
+              "examples": []
+            }
+          ],
+          "examples": []
+        },
+        {
+          "name": "FileAccessError",
+          "doc": "FileAccessError is a wrapper for any error that occur while accessing the file system",
+          "declaration": "type FileAccessError struct {\n\t// contains filtered or unexported fields\n}",
+          "kind": "struct",
+          "position": {
+            "file": "errors.go",
+            "line": 65
+          },
+          "fields": [],
+          "methods": [
+            {
+              "name": "Error",
+              "doc": "",
+              "signature": "func  Error) Error() string",
+              "position": {
+                "file": "errors.go",
+                "line": 74
+              },
+              "examples": []
+            },
+            {
+              "name": "Unwrap",
+              "doc": "",
+              "signature": "func  Unwrap() error",
+              "position": {
+                "file": "errors.go",
+                "line": 78
+              },
+              "examples": []
+            }
+          ],
+          "examples": []
+        },
+        {
+          "name": "FileTransfer",
+          "doc": "FileTransfer defines the inferface for file transfers.",
+          "declaration": "type FileTransfer interface {\n\tio.Reader\n\tio.Writer\n\tio.Seeker\n\tio.Closer\n}",
+          "kind": "interface",
+          "position": {
+            "file": "driver.go",
+            "line": 214
+          },
+          "fields": [
+            {
+              "name": "io.Reader",
+              "doc": "",
+              "type": "io.Reader",
+              "embedded": true
+            },
+            {
+              "name": "io.Writer",
+              "doc": "",
+              "type": "io.Writer",
+              "embedded": true
+            },
+            {
+              "name": "io.Seeker",
+              "doc": "",
+              "type": "io.Seeker",
+              "embedded": true
+            },
+            {
+              "name": "io.Closer",
+              "doc": "",
+              "type": "io.Closer",
+              "embedded": true
+            }
+          ],
+          "methods": [],
+          "examples": []
+        },
+        {
+          "name": "FileTransferError",
+          "doc": "FileTransferError is a FileTransfer extension used to notify the driver\nthat a transfer did not complete normally.\n\nTransferError is called before the file's Close method whenever the data\ntransfer is interrupted by:\n  - an ABOR command from the client,\n  - the client dropping the data connection (TCP RST or otherwise),\n  - an I/O error while copying bytes between the data connection and the file.\n\nIt is NOT called when the transfer ends cleanly (the data connection is\nclosed gracefully by the client after sending all of its bytes). In that\ncase only Close is invoked.\n\nA common pattern is to set a flag in TransferError and inspect it in Close\nto distinguish a completed upload from an interrupted one:\n\n\ttype monitoredFile struct {\n\t    afero.File\n\t    transferErr error\n\t}\n\n\tfunc (f *monitoredFile) TransferError(err error) { f.transferErr = err }\n\n\tfunc (f *monitoredFile) Close() error {\n\t    err := f.File.Close()\n\t    if f.transferErr != nil {\n\t        // upload was interrupted: f.transferErr describes why\n\t    } else {\n\t        // upload completed (as far as the server can tell)\n\t    }\n\t    return err\n\t}\n\nKeep in mind that FTP provides no length header for STOR transfers, so a\nclient that closes the data connection mid-upload without sending ABOR is\nindistinguishable from a normal completion. Implementing this interface\ncatches every case the server can detect.",
+          "declaration": "type FileTransferError interface {\n\tTransferError(err error)\n}",
+          "kind": "interface",
+          "position": {
+            "file": "driver.go",
+            "line": 258
+          },
+          "fields": [
+            {
+              "name": "TransferError",
+              "doc": "",
+              "type": "func(err error)"
+            }
+          ],
+          "methods": [],
+          "examples": []
+        },
+        {
+          "name": "Flusher",
+          "doc": "Flusher is the interface that wraps the basic Flush method.",
+          "declaration": "type Flusher interface {\n\tFlush() error\n}",
+          "kind": "interface",
+          "position": {
+            "file": "client_handler.go",
+            "line": 766
+          },
+          "fields": [
+            {
+              "name": "Flush",
+              "doc": "",
+              "type": "func() error"
+            }
+          ],
+          "methods": [],
+          "examples": []
+        },
+        {
+          "name": "FtpServer",
+          "doc": "FtpServer is where everything is stored\nWe want to keep it as simple as possible",
+          "declaration": "type FtpServer struct {\n\tLogger *slog.Logger // Structured logger (log/slog)\n\t// contains filtered or unexported fields\n}",
+          "kind": "struct",
+          "position": {
+            "file": "server.go",
+            "line": 129
+          },
+          "fields": [
+            {
+              "name": "Logger",
+              "doc": "Structured logger (log/slog)",
+              "type": "*slog.Logger"
+            }
+          ],
+          "methods": [
+            {
+              "name": "Addr",
+              "doc": "Addr shows the listening address",
+              "signature": "func  Addr() string",
+              "position": {
+                "file": "server.go",
+                "line": 354
+              },
+              "examples": []
+            },
+            {
+              "name": "Listen",
+              "doc": "Listen starts the listening\nIt's not a blocking call",
+              "signature": "func  Listen() error",
+              "position": {
+                "file": "server.go",
+                "line": 206
+              },
+              "examples": []
+            },
+            {
+              "name": "ListenAndServe",
+              "doc": "ListenAndServe simply chains the Listen and Serve method calls",
+              "signature": "func  ListenAndServe() error",
+              "position": {
+                "file": "server.go",
+                "line": 335
+              },
+              "examples": []
+            },
+            {
+              "name": "Serve",
+              "doc": "Serve accepts and processes any new incoming client",
+              "signature": "func  Server) Serve() error",
+              "position": {
+                "file": "server.go",
+                "line": 268
+              },
+              "examples": []
+            },
+            {
+              "name": "Stop",
+              "doc": "Stop closes the listener",
+              "signature": "func  Stop() error",
+              "position": {
+                "file": "server.go",
+                "line": 363
+              },
+              "examples": []
+            }
+          ],
+          "examples": []
+        },
+        {
+          "name": "HASHAlgo",
+          "doc": "HASHAlgo is the enumerable that represents the supported HASH algorithms.",
+          "declaration": "type HASHAlgo int8",
+          "kind": "defined",
+          "position": {
+            "file": "client_handler.go",
+            "line": 17
+          },
+          "fields": [],
+          "methods": [],
+          "examples": []
+        },
+        {
+          "name": "MainDriver",
+          "doc": "MainDriver handles the authentication and ClientHandlingDriver selection",
+          "declaration": "type MainDriver interface {\n\t// GetSettings returns some general settings around the server setup\n\tGetSettings() (*Settings, error)\n\n\t// ClientConnected is called to send the very first welcome message\n\tClientConnected(cc ClientContext) (string, error)\n\n\t// ClientDisconnected is called when the user disconnects, even if he never authenticated\n\tClientDisconnected(cc ClientContext)\n\n\t// AuthUser authenticates the user and selects an handling driver\n\tAuthUser(cc ClientContext, user, pass string) (ClientDriver, error)\n\n\t// GetTLSConfig returns a TLS Certificate to use\n\t// The certificate could frequently change if we use something like \"let's encrypt\"\n\tGetTLSConfig() (*tls.Config, error)\n}",
+          "kind": "interface",
+          "position": {
+            "file": "driver.go",
+            "line": 17
+          },
+          "fields": [
+            {
+              "name": "GetSettings",
+              "doc": "GetSettings returns some general settings around the server setup",
+              "type": "func() (*Settings, error)"
+            },
+            {
+              "name": "ClientConnected",
+              "doc": "ClientConnected is called to send the very first welcome message",
+              "type": "func(cc ClientContext) (string, error)"
+            },
+            {
+              "name": "ClientDisconnected",
+              "doc": "ClientDisconnected is called when the user disconnects, even if he never authenticated",
+              "type": "func(cc ClientContext)"
+            },
+            {
+              "name": "AuthUser",
+              "doc": "AuthUser authenticates the user and selects an handling driver",
+              "type": "func(cc ClientContext, user, pass string) (ClientDriver, error)"
+            },
+            {
+              "name": "GetTLSConfig",
+              "doc": "GetTLSConfig returns a TLS Certificate to use\nThe certificate could frequently change if we use something like \"let's encrypt\"",
+              "type": "func() (*tls.Config, error)"
+            }
+          ],
+          "methods": [],
+          "examples": []
+        },
+        {
+          "name": "MainDriverExtensionPassiveWrapper",
+          "doc": "MainDriverExtensionPassiveWrapper is an extension that allows to wrap the listener\nused for passive connection",
+          "declaration": "type MainDriverExtensionPassiveWrapper interface {\n\t// WrapPassiveListener is called after creating the listener for passive\n\t// data connections.\n\t// You can wrap the passed listener or just return it unmodified.\n\t// Returning an error will cause the passive connection to fail\n\tWrapPassiveListener(listener net.Listener) (net.Listener, error)\n}",
+          "kind": "interface",
+          "position": {
+            "file": "driver.go",
+            "line": 47
+          },
+          "fields": [
+            {
+              "name": "WrapPassiveListener",
+              "doc": "WrapPassiveListener is called after creating the listener for passive\ndata connections.\nYou can wrap the passed listener or just return it unmodified.\nReturning an error will cause the passive connection to fail",
+              "type": "func(listener net.Listener) (net.Listener, error)"
+            }
+          ],
+          "methods": [],
+          "examples": []
+        },
+        {
+          "name": "MainDriverExtensionPostAuthMessage",
+          "doc": "MainDriverExtensionPostAuthMessage is an extension that allows to send a message\nafter the authentication",
+          "declaration": "type MainDriverExtensionPostAuthMessage interface {\n\t// PostAuthMessage is called after the authentication\n\tPostAuthMessage(cc ClientContext, user string, authErr error) string\n}",
+          "kind": "interface",
+          "position": {
+            "file": "driver.go",
+            "line": 65
+          },
+          "fields": [
+            {
+              "name": "PostAuthMessage",
+              "doc": "PostAuthMessage is called after the authentication",
+              "type": "func(cc ClientContext, user string, authErr error) string"
+            }
+          ],
+          "methods": [],
+          "examples": []
+        },
+        {
+          "name": "MainDriverExtensionQuitMessage",
+          "doc": "MainDriverExtensionQuitMessage is an extension that allows to control the quit message",
+          "declaration": "type MainDriverExtensionQuitMessage interface {\n\t// QuitMessage returns the message to display when the user quits the server\n\tQuitMessage() string\n}",
+          "kind": "interface",
+          "position": {
+            "file": "driver.go",
+            "line": 71
+          },
+          "fields": [
+            {
+              "name": "QuitMessage",
+              "doc": "QuitMessage returns the message to display when the user quits the server",
+              "type": "func() string"
+            }
+          ],
+          "methods": [],
+          "examples": []
+        },
+        {
+          "name": "MainDriverExtensionTLSVerifier",
+          "doc": "MainDriverExtensionTLSVerifier is an extension that allows to verify the TLS connection\nestabilished on the control channel",
+          "declaration": "type MainDriverExtensionTLSVerifier interface {\n\t// VerifyConnection is called when receiving the \"USER\" command.\n\t// If it returns a non-nil error, the client will receive a 530 error and it will be disconnected.\n\t// If it returns a non-nil ClientDriver and a nil error the client will be authenticated.\n\t// If it returns a nil ClientDriver and a nil error the user password is required\n\tVerifyConnection(cc ClientContext, user string, tlsConn *tls.Conn) (ClientDriver, error)\n}",
+          "kind": "interface",
+          "position": {
+            "file": "driver.go",
+            "line": 37
+          },
+          "fields": [
+            {
+              "name": "VerifyConnection",
+              "doc": "VerifyConnection is called when receiving the \"USER\" command.\nIf it returns a non-nil error, the client will receive a 530 error and it will be disconnected.\nIf it returns a non-nil ClientDriver and a nil error the client will be authenticated.\nIf it returns a nil ClientDriver and a nil error the user password is required",
+              "type": "func(cc ClientContext, user string, tlsConn *tls.Conn) (ClientDriver, error)"
+            }
+          ],
+          "methods": [],
+          "examples": []
+        },
+        {
+          "name": "MainDriverExtensionUserVerifier",
+          "doc": "MainDriverExtensionUserVerifier is an extension that allows to control user access\nonce username is known, before the authentication",
+          "declaration": "type MainDriverExtensionUserVerifier interface {\n\t// PreAuthUser is called when receiving the \"USER\" command before proceeding with any other checks\n\t// If it returns a non-nil error, the client will receive a 530 error and be disconnected.\n\tPreAuthUser(cc ClientContext, user string) error\n}",
+          "kind": "interface",
+          "position": {
+            "file": "driver.go",
+            "line": 57
+          },
+          "fields": [
+            {
+              "name": "PreAuthUser",
+              "doc": "PreAuthUser is called when receiving the \"USER\" command before proceeding with any other checks\nIf it returns a non-nil error, the client will receive a 530 error and be disconnected.",
+              "type": "func(cc ClientContext, user string) error"
+            }
+          ],
+          "methods": [],
+          "examples": []
+        },
+        {
+          "name": "NetworkError",
+          "doc": "NetworkError is a wrapper for any error that occur while contacting the network",
+          "declaration": "type NetworkError struct {\n\t// contains filtered or unexported fields\n}",
+          "kind": "struct",
+          "position": {
+            "file": "errors.go",
+            "line": 47
+          },
+          "fields": [],
+          "methods": [
+            {
+              "name": "Error",
+              "doc": "",
+              "signature": "func  Error) Error() string",
+              "position": {
+                "file": "errors.go",
+                "line": 56
+              },
+              "examples": []
+            },
+            {
+              "name": "Unwrap",
+              "doc": "",
+              "signature": "func  Unwrap() error",
+              "position": {
+                "file": "errors.go",
+                "line": 60
+              },
+              "examples": []
+            }
+          ],
+          "examples": []
+        },
+        {
+          "name": "PasvPortGetter",
+          "doc": "PasvPortGetter defined how the driver fetch a pair of ports used in passive transfer",
+          "declaration": "type PasvPortGetter interface {\n\t// FetchNext returns the exposed one, the listened one and whether succeeded\n\tFetchNext() (int, int, bool)\n\t// NumberAttempts returns maximum number of attempts on finding an available passive transfer port\n\tNumberAttempts() int\n}",
+          "kind": "interface",
+          "position": {
+            "file": "driver.go",
+            "line": 263
+          },
+          "fields": [
+            {
+              "name": "FetchNext",
+              "doc": "FetchNext returns the exposed one, the listened one and whether succeeded",
+              "type": "func() (int, int, bool)"
+            },
+            {
+              "name": "NumberAttempts",
+              "doc": "NumberAttempts returns maximum number of attempts on finding an available passive transfer port",
+              "type": "func() int"
+            }
+          ],
+          "methods": [],
+          "examples": []
+        },
+        {
+          "name": "PortMappingRange",
+          "doc": "PortMappingRange is a range of mapped ports",
+          "declaration": "type PortMappingRange struct {\n\tExposedStart  int\n\tListenedStart int\n\tCount         int\n}",
+          "kind": "struct",
+          "position": {
+            "file": "driver.go",
+            "line": 293
+          },
+          "fields": [
+            {
+              "name": "ExposedStart",
+              "doc": "",
+              "type": "int"
+            },
+            {
+              "name": "ListenedStart",
+              "doc": "",
+              "type": "int"
+            },
+            {
+              "name": "Count",
+              "doc": "",
+              "type": "int"
+            }
+          ],
+          "methods": [
+            {
+              "name": "FetchNext",
+              "doc": "FetchNext returns the next port mapping to try for the range",
+              "signature": "func  FetchNext() (int, int, bool)",
+              "position": {
+                "file": "driver.go",
+                "line": 300
+              },
+              "examples": []
+            },
+            {
+              "name": "NumberAttempts",
+              "doc": "NumberAttempts returns the number of attempts for the range",
+              "signature": "func  NumberAttempts() int",
+              "position": {
+                "file": "driver.go",
+                "line": 310
+              },
+              "examples": []
+            }
+          ],
+          "examples": []
+        },
+        {
+          "name": "PortRange",
+          "doc": "PortRange is a range of ports",
+          "declaration": "type PortRange struct {\n\tStart int // Range start\n\tEnd   int // Range end\n}",
+          "kind": "struct",
+          "position": {
+            "file": "driver.go",
+            "line": 271
+          },
+          "fields": [
+            {
+              "name": "Start",
+              "doc": "Range start",
+              "type": "int"
+            },
+            {
+              "name": "End",
+              "doc": "Range end",
+              "type": "int"
+            }
+          ],
+          "methods": [
+            {
+              "name": "FetchNext",
+              "doc": "FetchNext returns the next port to try for the range",
+              "signature": "func  FetchNext() (int, int, bool)",
+              "position": {
+                "file": "driver.go",
+                "line": 277
+              },
+              "examples": []
+            },
+            {
+              "name": "NumberAttempts",
+              "doc": "NumberAttempts returns the number of attempts for the range",
+              "signature": "func  NumberAttempts() int",
+              "position": {
+                "file": "driver.go",
+                "line": 288
+              },
+              "examples": []
+            }
+          ],
+          "examples": []
+        },
+        {
+          "name": "PublicIPResolver",
+          "doc": "PublicIPResolver takes a ClientContext for a connection and returns the public IP\nto use in the response to the PASV command, or an error if a public IP cannot be determined.",
+          "declaration": "type PublicIPResolver func(ClientContext) (string, error)",
+          "kind": "defined",
+          "position": {
+            "file": "driver.go",
+            "line": 316
+          },
+          "fields": [],
+          "methods": [],
+          "examples": []
+        },
+        {
+          "name": "Settings",
+          "doc": "Settings defines all the server settings",
+          "declaration": "type Settings struct {\n\tListener   net.Listener // (Optional) To provide an already initialized listener\n\tListenAddr string       // Listening address\n\tPublicHost string       // Public IP to expose (only an IP address is accepted at this stage)\n\tBanner     string       // Banner to use in server status response\n\t// PassiveTransferPortRange is the optional port mapping for passive data connections.\n\tPassiveTransferPortRange        PasvPortGetter\n\tPassiveTransferPortMultiplexing bool             // Allow different client IPs to share passive listener ports\n\tPublicIPResolver                PublicIPResolver // (Optional) To fetch a public IP lookup\n\tIdleTimeout                     int              // Maximum inactivity time before disconnecting (#58)\n\tConnectionTimeout               int              // Maximum time to establish passive or active transfer connections\n\tActiveTransferPortNon20         bool             // Do not impose the port 20 for active data transfer (#88, RFC 1579)\n\tDisableMLSD                     bool             // Disable MLSD support\n\tDisableMLST                     bool             // Disable MLST support\n\tDisableMFMT                     bool             // Disable MFMT support (modify file mtime)\n\tTLSRequired                     TLSRequirement   // defines the TLS mode\n\tDisableLISTArgs                 bool             // Disable ls like options (-a,-la etc.) for directory listing\n\tDisableSite                     bool             // Disable SITE command\n\tDisableActiveMode               bool             // Disable Active FTP\n\tEnableHASH                      bool             // Enable support for calculating hash value of files\n\t// DisableSTAT disables Server STATUS. STAT on files and directories still works.\n\tDisableSTAT             bool\n\tDisableSYST             bool         // Disable SYST\n\tEnableCOMB              bool         // Enable COMB support\n\tDeflateCompressionLevel int          // Deflate compression level (0-9). 0 means disabled\n\tDefaultTransferType     TransferType // Transfer type to use if the client don't send the TYPE command\n\t// DisableASCIIConversion disables CRLF/LF line-ending conversion for TYPE A (ASCII) transfers.\n\t// When true, files are transferred byte-for-byte even in ASCII mode, and SIZE is allowed in\n\t// ASCII mode. This is not RFC 959-compliant but matches the behavior of vsftpd's\n\t// ascii_download_enable/ascii_upload_enable=NO and is useful when clients do not want the\n\t// server to modify their files.\n\tDisableASCIIConversion bool\n\t// ActiveConnectionsCheck defines the security requirements for active connections\n\tActiveConnectionsCheck DataConnectionRequirement\n\t// PasvConnectionsCheck defines the security requirements for passive connections\n\tPasvConnectionsCheck DataConnectionRequirement\n}",
+          "kind": "struct",
+          "position": {
+            "file": "driver.go",
+            "line": 341
+          },
+          "fields": [
+            {
+              "name": "Listener",
+              "doc": "(Optional) To provide an already initialized listener",
+              "type": "net.Listener"
+            },
+            {
+              "name": "ListenAddr",
+              "doc": "Listening address",
+              "type": "string"
+            },
+            {
+              "name": "PublicHost",
+              "doc": "Public IP to expose (only an IP address is accepted at this stage)",
+              "type": "string"
+            },
+            {
+              "name": "Banner",
+              "doc": "Banner to use in server status response",
+              "type": "string"
+            },
+            {
+              "name": "PassiveTransferPortRange",
+              "doc": "PassiveTransferPortRange is the optional port mapping for passive data connections.",
+              "type": "PasvPortGetter"
+            },
+            {
+              "name": "PassiveTransferPortMultiplexing",
+              "doc": "Allow different client IPs to share passive listener ports",
+              "type": "bool"
+            },
+            {
+              "name": "PublicIPResolver",
+              "doc": "(Optional) To fetch a public IP lookup",
+              "type": "PublicIPResolver"
+            },
+            {
+              "name": "IdleTimeout",
+              "doc": "Maximum inactivity time before disconnecting (#58)",
+              "type": "int"
+            },
+            {
+              "name": "ConnectionTimeout",
+              "doc": "Maximum time to establish passive or active transfer connections",
+              "type": "int"
+            },
+            {
+              "name": "ActiveTransferPortNon20",
+              "doc": "Do not impose the port 20 for active data transfer (#88, RFC 1579)",
+              "type": "bool"
+            },
+            {
+              "name": "DisableMLSD",
+              "doc": "Disable MLSD support",
+              "type": "bool"
+            },
+            {
+              "name": "DisableMLST",
+              "doc": "Disable MLST support",
+              "type": "bool"
+            },
+            {
+              "name": "DisableMFMT",
+              "doc": "Disable MFMT support (modify file mtime)",
+              "type": "bool"
+            },
+            {
+              "name": "TLSRequired",
+              "doc": "defines the TLS mode",
+              "type": "TLSRequirement"
+            },
+            {
+              "name": "DisableLISTArgs",
+              "doc": "Disable ls like options (-a,-la etc.) for directory listing",
+              "type": "bool"
+            },
+            {
+              "name": "DisableSite",
+              "doc": "Disable SITE command",
+              "type": "bool"
+            },
+            {
+              "name": "DisableActiveMode",
+              "doc": "Disable Active FTP",
+              "type": "bool"
+            },
+            {
+              "name": "EnableHASH",
+              "doc": "Enable support for calculating hash value of files",
+              "type": "bool"
+            },
+            {
+              "name": "DisableSTAT",
+              "doc": "DisableSTAT disables Server STATUS. STAT on files and directories still works.",
+              "type": "bool"
+            },
+            {
+              "name": "DisableSYST",
+              "doc": "Disable SYST",
+              "type": "bool"
+            },
+            {
+              "name": "EnableCOMB",
+              "doc": "Enable COMB support",
+              "type": "bool"
+            },
+            {
+              "name": "DeflateCompressionLevel",
+              "doc": "Deflate compression level (0-9). 0 means disabled",
+              "type": "int"
+            },
+            {
+              "name": "DefaultTransferType",
+              "doc": "Transfer type to use if the client don't send the TYPE command",
+              "type": "TransferType"
+            },
+            {
+              "name": "DisableASCIIConversion",
+              "doc": "DisableASCIIConversion disables CRLF/LF line-ending conversion for TYPE A (ASCII) transfers.\nWhen true, files are transferred byte-for-byte even in ASCII mode, and SIZE is allowed in\nASCII mode. This is not RFC 959-compliant but matches the behavior of vsftpd's\nascii_download_enable/ascii_upload_enable=NO and is useful when clients do not want the\nserver to modify their files.",
+              "type": "bool"
+            },
+            {
+              "name": "ActiveConnectionsCheck",
+              "doc": "ActiveConnectionsCheck defines the security requirements for active connections",
+              "type": "DataConnectionRequirement"
+            },
+            {
+              "name": "PasvConnectionsCheck",
+              "doc": "PasvConnectionsCheck defines the security requirements for passive connections",
+              "type": "DataConnectionRequirement"
+            }
+          ],
+          "methods": [],
+          "examples": []
+        },
+        {
+          "name": "TLSRequirement",
+          "doc": "TLSRequirement is the enumerable that represents the supported TLS mode",
+          "declaration": "type TLSRequirement int8",
+          "kind": "defined",
+          "position": {
+            "file": "driver.go",
+            "line": 319
+          },
+          "fields": [],
+          "methods": [],
+          "examples": []
+        },
+        {
+          "name": "TransferFinalizer",
+          "doc": "TransferFinalizer is the interface for transfer streams that need explicit\nfinalization (e.g., deflate streams need to write end-of-stream markers).\nThis is distinct from closing the underlying connection.\nWe use FinalizeTransfer() instead of Close() to distinguish from io.Closer,\nsince net.Conn already implements io.Closer and we don't want to accidentally\nclose the underlying connection.",
+          "declaration": "type TransferFinalizer interface {\n\tFinalizeTransfer() error\n}",
+          "kind": "interface",
+          "position": {
+            "file": "client_handler.go",
+            "line": 776
+          },
+          "fields": [
+            {
+              "name": "FinalizeTransfer",
+              "doc": "",
+              "type": "func() error"
+            }
+          ],
+          "methods": [],
+          "examples": []
+        },
+        {
+          "name": "TransferMode",
+          "doc": "TransferMode is the enumerable that represents the transfer mode (stream, block, compressed, deflate)",
+          "declaration": "type TransferMode int8",
+          "kind": "defined",
+          "position": {
+            "file": "client_handler.go",
+            "line": 38
+          },
+          "fields": [],
+          "methods": [],
+          "examples": []
+        },
+        {
+          "name": "TransferType",
+          "doc": "TransferType is the enumerable that represents the supported transfer types.",
+          "declaration": "type TransferType int8",
+          "kind": "defined",
+          "position": {
+            "file": "client_handler.go",
+            "line": 29
+          },
+          "fields": [],
+          "methods": [],
+          "examples": []
+        }
+      ],
+      "examples": []
+    }
+  ]
+}

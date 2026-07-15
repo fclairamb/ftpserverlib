@@ -1,0 +1,78 @@
+name: Sourcey docs
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/sourcey-docs.yml"
+      - "docs-sourcey/**"
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/sourcey-docs.yml"
+      - "docs-sourcey/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: sourcey-pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7.0.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7.0.0
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: docs-sourcey/package-lock.json
+
+      - name: Install dependencies
+        working-directory: docs-sourcey
+        run: npm ci
+
+      - name: Build Sourcey site
+        working-directory: docs-sourcey
+        run: npm run build
+
+      - name: Validate generated documentation
+        working-directory: docs-sourcey
+        run: npm run validate
+
+      - name: Check generated internal links
+        working-directory: docs-sourcey
+        run: npm run linkcheck
+
+      - name: Verify governed receipt
+        working-directory: docs-sourcey
+        run: npm run verify-receipt
+
+      - name: Configure GitHub Pages
+        if: github.event_name != 'pull_request'
+        uses: actions/configure-pages@v6.0.0
+
+      - name: Upload GitHub Pages artifact
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-pages-artifact@v5.0.0
+        with:
+          path: docs-sourcey/dist
+
+  deploy:
+    if: github.event_name != 'pull_request'
+    needs: build
+    runs-on: ubuntu-24.04
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5.0.0

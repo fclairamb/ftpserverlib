@@ -1,0 +1,15 @@
+{
+  "name": "ftpserverlib-sourcey-docs",
+  "private": true,
+  "scripts": {
+    "build": "sourcey build && node validation/write-compat-aliases.mjs",
+    "linkcheck": "node validation/linkcheck.mjs",
+    "snapshot": "sourcey godoc --module .. --packages ./... --out godoc.json",
+    "test-linkcheck": "node --test validation/linkcheck.test.mjs",
+    "validate": "node validation/run.mjs",
+    "verify-receipt": "node validation/verify-receipt.mjs"
+  },
+  "devDependencies": {
+    "sourcey": "3.6.5"
+  }
+}
