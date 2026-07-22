@@ -1,0 +1,44 @@
+{
+  "schema": "sourcey.validation.evidence.v1",
+  "ecosystem": "Go",
+  "repo": "https://github.com/fclairamb/ftpserverlib",
+  "commit": "b4c3694ee73399d8a55293d568e5100c25e4d2d4",
+  "license": "MIT",
+  "adapter": "sourcey godoc snapshot",
+  "sourcey_version": "3.6.5",
+  "runx_version": "runx-cli 0.7.0",
+  "snapshot_command": "sourcey godoc --module .. --packages ./... --out godoc.json",
+  "build_command": "npm ci && npm run build",
+  "validation_command": "npm run validate",
+  "receipt_verification_command": "npm run verify-receipt",
+  "observations": {
+    "module_path": "github.com/fclairamb/ftpserverlib",
+    "snapshot_generated_at": "2026-07-13T07:35:52Z",
+    "public_api_count": 92,
+    "generated_html_pages": 8,
+    "pinned_source_links": 65,
+    "receipt_id": "sha256:b3d9a335f55e06c13c5766977ac7f31ae3b8480051c6f01e42001c496aefd269",
+    "receipt_signature_mode": "production",
+    "receipt_valid": true,
+    "pages": [
+      "index.html",
+      "guides/overview.html",
+      "guides/quickstart.html",
+      "guides/driver-contract.html",
+      "guides/server-settings.html",
+      "guides/extensions.html",
+      "api.html",
+      "api/package-root.html"
+    ],
+    "text_artifacts": [
+      "llms.txt",
+      "llms-full.txt"
+    ]
+  },
+  "public_url_expected": "https://fclairamb.github.io/ftpserverlib/",
+  "public_url_status": "pending repository-owner merge and GitHub Pages deployment",
+  "gaps": [
+    "GitHub Pages must be enabled with GitHub Actions as the repository source if it is not already enabled.",
+    "The live public URL is only asserted after the deployment succeeds."
+  ]
+}

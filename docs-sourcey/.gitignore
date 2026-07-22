@@ -1,0 +1,5 @@
+node_modules/
+dist/
+validation-receipts/
+validation-run.json
+/sha256-*.json
