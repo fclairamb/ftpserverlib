@@ -856,6 +856,43 @@ func TestREST(t *testing.T) {
 	require.True(t, strings.HasPrefix(response, "Couldn't parse size"))
 }
 
+func TestRESTInASCIIWithConversionDisabled(t *testing.T) {
+	driver := &TestServerDriver{
+		Settings: &Settings{DisableASCIIConversion: true},
+	}
+	server := NewTestServerWithTestDriver(t, driver)
+	conf := goftp.Config{
+		User:     authUser,
+		Password: authPass,
+	}
+
+	client, err := goftp.DialConfig(conf, server.Addr())
+	require.NoError(t, err, "Couldn't connect")
+
+	defer func() { panicOnError(client.Close()) }()
+
+	raw, err := client.OpenRawConn()
+	require.NoError(t, err, "Couldn't open raw connection")
+
+	defer func() { require.NoError(t, raw.Close()) }()
+
+	// With DisableASCIIConversion transfers are byte-for-byte even in ASCII
+	// mode, so REST must be accepted.
+	returnCode, response, err := raw.SendCommand("TYPE A")
+	require.NoError(t, err)
+	require.Equal(t, StatusOK, returnCode, response)
+
+	returnCode, response, err = raw.SendCommand("REST 10")
+	require.NoError(t, err)
+	require.Equal(t, StatusFileActionPending, returnCode, response)
+
+	// Invalid argument is still rejected regardless of conversion setting.
+	returnCode, response, err = raw.SendCommand("REST a")
+	require.NoError(t, err)
+	require.Equal(t, StatusActionNotTaken, returnCode, response)
+	require.True(t, strings.HasPrefix(response, "Couldn't parse size"))
+}
+
 func TestSIZE(t *testing.T) {
 	server := NewTestServer(t, false)
 	conf := goftp.Config{

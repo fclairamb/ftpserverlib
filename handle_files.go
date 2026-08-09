@@ -521,7 +521,7 @@ func (c *clientHandler) handleALLO(param string) error {
 
 func (c *clientHandler) handleREST(param string) error {
 	if size, err := strconv.ParseInt(param, 10, 0); err == nil {
-		if c.currentTransferType == TransferTypeASCII {
+		if c.currentTransferType == TransferTypeASCII && !c.server.settings.DisableASCIIConversion {
 			c.writeMessage(StatusSyntaxErrorParameters, "Resuming transfers not allowed in ASCII mode")
 
 			return nil
