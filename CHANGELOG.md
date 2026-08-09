@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.32.3](https://github.com/fclairamb/ftpserverlib/compare/v0.32.2...v0.32.3) (2026-08-09)
+
+
+### Bug Fixes
+
+* allow REST in ASCII mode when ASCII conversion is disabled ([#660](https://github.com/fclairamb/ftpserverlib/issues/660)) ([06ee380](https://github.com/fclairamb/ftpserverlib/commit/06ee380ace7853f3da7f0b82e3dd99a25215a4a1))
+
 ## [0.32.2](https://github.com/fclairamb/ftpserverlib/compare/v0.32.1...v0.32.2) (2026-08-09)
 
 
