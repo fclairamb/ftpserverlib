@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.32.4](https://github.com/fclairamb/ftpserverlib/compare/v0.32.3...v0.32.4) (2026-08-20)
+
+
+### Bug Fixes
+
+* **deps:** update module github.com/stretchr/testify to v1.12.0 ([#664](https://github.com/fclairamb/ftpserverlib/issues/664)) ([2adac1d](https://github.com/fclairamb/ftpserverlib/commit/2adac1dc69d677cd4a31a3a9bf901f81823d14bc))
+* **deps:** update module github.com/stretchr/testify to v1.12.1 ([#667](https://github.com/fclairamb/ftpserverlib/issues/667)) ([56a4bb3](https://github.com/fclairamb/ftpserverlib/commit/56a4bb38dd1dd1c9591dc47a60df33201ab412cd))
+
 ## [0.32.3](https://github.com/fclairamb/ftpserverlib/compare/v0.32.2...v0.32.3) (2026-08-09)
 
 
