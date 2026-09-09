@@ -66,9 +66,9 @@ func TestActiveTransferLocalIPResolver(t *testing.T) {
 	// does on Linux, not everywhere, so the test steps aside where it cannot be bound.
 	const sourceIP = "127.0.0.2"
 
-	lc := &net.ListenConfig{}
+	listenConfig := &net.ListenConfig{}
 
-	probe, err := lc.Listen(t.Context(), "tcp", net.JoinHostPort(sourceIP, "0"))
+	probe, err := listenConfig.Listen(t.Context(), "tcp", net.JoinHostPort(sourceIP, "0"))
 	if err != nil {
 		t.Skipf("Binding on %s is not supported here: %v", sourceIP, err)
 	}
@@ -98,37 +98,44 @@ func TestActiveTransferLocalIPResolver(t *testing.T) {
 	defer func() { require.NoError(t, raw.Close()) }()
 
 	// We play the client side of the data connection ourselves, to see which address dials in
-	dataListener, err := lc.Listen(t.Context(), "tcp", "127.0.0.1:0")
+	dataListener, err := listenConfig.Listen(t.Context(), "tcp", "127.0.0.1:0")
 	require.NoError(t, err)
 
 	defer func() { require.NoError(t, dataListener.Close()) }()
 
-	dataAddr, ok := dataListener.Addr().(*net.TCPAddr)
-	require.True(t, ok)
+	dataAddr := requireTCPAddr(t, dataListener.Addr())
 
-	rc, response, err := raw.SendCommand("PORT 127,0,0,1,%d,%d", dataAddr.Port/256, dataAddr.Port%256)
+	returnCode, response, err := raw.SendCommand("PORT 127,0,0,1,%d,%d", dataAddr.Port/256, dataAddr.Port%256)
 	require.NoError(t, err)
-	require.Equal(t, StatusOK, rc, response)
+	require.Equal(t, StatusOK, returnCode, response)
 
-	rc, response, err = raw.SendCommand("LIST")
+	returnCode, response, err = raw.SendCommand("LIST")
 	require.NoError(t, err)
-	require.Equal(t, StatusFileStatusOK, rc, response)
+	require.Equal(t, StatusFileStatusOK, returnCode, response)
 
 	dataConn, err := dataListener.Accept()
 	require.NoError(t, err)
 
-	peer, ok := dataConn.RemoteAddr().(*net.TCPAddr)
-	require.True(t, ok)
+	peer := requireTCPAddr(t, dataConn.RemoteAddr())
 	require.Equal(t, sourceIP, peer.IP.String(), "the data connection must come from the resolved address")
 
 	_, err = io.Copy(io.Discard, dataConn)
 	require.NoError(t, err)
 	require.NoError(t, dataConn.Close())
 
-	rc, response, err = raw.ReadResponse()
+	returnCode, response, err = raw.ReadResponse()
 	require.NoError(t, err)
-	require.Equal(t, StatusClosingDataConn, rc, response)
+	require.Equal(t, StatusClosingDataConn, returnCode, response)
 
 	// The resolver saw the control connection, whose local address is the server's listening address
 	require.Equal(t, server.Addr(), <-resolvedFor)
+}
+
+func requireTCPAddr(t *testing.T, addr net.Addr) *net.TCPAddr {
+	t.Helper()
+
+	tcpAddr, ok := addr.(*net.TCPAddr)
+	require.True(t, ok, "expected a TCP address, got %T", addr)
+
+	return tcpAddr
 }
