@@ -56,10 +56,17 @@ func (c *clientHandler) handlePORT(param string) error {
 		}
 	}
 
+	var laddr net.IP
+
+	if resolver := c.server.settings.ActiveTransferLocalIPResolver; resolver != nil {
+		laddr = resolver(c)
+	}
+
 	c.transferMu.Lock()
 
 	c.transfer = &activeTransferHandler{
 		raddr:     raddr,
+		laddr:     laddr,
 		settings:  c.server.settings,
 		tlsConfig: tlsConfig,
 	}
@@ -78,6 +85,7 @@ var _ transferHandler = (*activeTransferHandler)(nil)
 // Active connection
 type activeTransferHandler struct {
 	raddr     *net.TCPAddr // Remote address of the client
+	laddr     net.IP       // Local address to dial from, nil lets the operating system choose
 	conn      net.Conn     // Connection used to connect to him
 	settings  *Settings    // Settings
 	tlsConfig *tls.Config  // not nil if the active connection requires TLS
@@ -97,8 +105,11 @@ func (a *activeTransferHandler) Open() (net.Conn, error) {
 	dialer := &net.Dialer{Timeout: timeout}
 
 	if !a.settings.ActiveTransferPortNon20 {
-		dialer.LocalAddr, _ = net.ResolveTCPAddr("tcp", ":20")
+		// Several transfers may dial from port 20 at once, so the socket must be reusable
+		dialer.LocalAddr = &net.TCPAddr{IP: a.laddr, Port: 20}
 		dialer.Control = Control
+	} else if a.laddr != nil {
+		dialer.LocalAddr = &net.TCPAddr{IP: a.laddr}
 	}
 
 	conn, err := dialer.Dial("tcp", a.raddr.String())
