@@ -315,6 +315,11 @@ func (r PortMappingRange) NumberAttempts() int {
 // to use in the response to the PASV command, or an error if a public IP cannot be determined.
 type PublicIPResolver func(ClientContext) (string, error)
 
+// ActiveTransferLocalIPResolver takes the ClientContext of a control connection and returns the
+// local IP address the server dials from when it opens an active mode (PORT or EPRT) data
+// connection to that client. A nil result leaves the choice to the operating system.
+type ActiveTransferLocalIPResolver func(ClientContext) net.IP
+
 // TLSRequirement is the enumerable that represents the supported TLS mode
 type TLSRequirement int8
 
@@ -374,4 +379,10 @@ type Settings struct {
 	ActiveConnectionsCheck DataConnectionRequirement
 	// PasvConnectionsCheck defines the security requirements for passive connections
 	PasvConnectionsCheck DataConnectionRequirement
+	// ActiveTransferLocalIPResolver (Optional) selects the local IP address active mode (PORT, EPRT)
+	// data connections are dialed from. Without it the operating system picks the source address
+	// from its routing table, which on a multi homed host is not necessarily the address the client
+	// connected to, and clients and firewalls generally expect the data connection to come from
+	// that address. Only the address is taken from it, the port still follows ActiveTransferPortNon20.
+	ActiveTransferLocalIPResolver ActiveTransferLocalIPResolver
 }
