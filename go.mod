@@ -1,6 +1,6 @@
 module github.com/fclairamb/ftpserverlib
 
-go 1.25.0
+go 1.26.0
 
 toolchain go1.27.1
 
@@ -8,7 +8,7 @@ require (
 	github.com/secsy/goftp v0.0.0-20200609142545-aa2de14babf4
 	github.com/spf13/afero v1.15.0
 	github.com/stretchr/testify v1.12.1
-	golang.org/x/sys v0.47.0
+	golang.org/x/sys v0.48.0
 )
 
 require (
