@@ -3,6 +3,7 @@ package ftpserver
 import (
 	"bufio"
 	"compress/flate"
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"io"
@@ -62,6 +63,8 @@ var (
 	errNoTransferConnection  = errors.New("unable to open transfer: no transfer connection")
 	errTLSRequired           = errors.New("unable to open transfer: TLS is required")
 	errInvalidTLSRequirement = errors.New("invalid TLS requirement")
+	errProtMismatch          = errors.New("unable to open transfer: the data connection does not " +
+		"match the requested protection level, issue PASV or PORT again")
 )
 
 func getHashMapping() map[string]HASHAlgo {
@@ -734,6 +737,19 @@ func (c *clientHandler) TransferOpen(info string) (io.ReadWriter, error) {
 		err = newNetworkError("Unable to open transfer", err)
 
 		return nil, err
+	}
+
+	// PASV/PORT prepare the data connection with the protection in force at that time, so a PROT
+	// received afterwards can leave it different from the one the client asked for.
+	if _, isTLS := conn.(*tls.Conn); isTLS != c.HasTLSForTransfers() {
+		c.logger.Warn(
+			"Data connection protection does not match the PROT command",
+			"encrypted", isTLS,
+			"requested", c.HasTLSForTransfers())
+
+		c.writeMessage(StatusCannotOpenDataConnection, errProtMismatch.Error())
+
+		return nil, errProtMismatch
 	}
 
 	var transferStream io.ReadWriter = conn
