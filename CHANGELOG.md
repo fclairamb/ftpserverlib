@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.32.6](https://github.com/fclairamb/ftpserverlib/compare/v0.32.5...v0.32.6) (2026-10-30)
+
+
+### Bug Fixes
+
+* **server:** close passive data-connection hijack and leak paths, redact PASS, harden path and SITE CHMOD ([#686](https://github.com/fclairamb/ftpserverlib/issues/686)) ([e6cf483](https://github.com/fclairamb/ftpserverlib/commit/e6cf483f24f7bbd8a9f661082e5f371ef676ca22))
+
 ## [0.32.5](https://github.com/fclairamb/ftpserverlib/compare/v0.32.4...v0.32.5) (2026-10-30)
 
 
