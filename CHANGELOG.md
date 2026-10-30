@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.32.5](https://github.com/fclairamb/ftpserverlib/compare/v0.32.4...v0.32.5) (2026-10-30)
+
+
+### Bug Fixes
+
+* check the protection of the data connection in TransferOpen ([#685](https://github.com/fclairamb/ftpserverlib/issues/685)) ([c7715c4](https://github.com/fclairamb/ftpserverlib/commit/c7715c43fa86f89eafaff414b36fed66ad436960))
+* **deps:** update module golang.org/x/sys to v0.49.0 ([#682](https://github.com/fclairamb/ftpserverlib/issues/682)) ([1a86b65](https://github.com/fclairamb/ftpserverlib/commit/1a86b65cac18cc1671583071fe1e99e62d7c0512))
+* update golang.org/x/sys to v0.48.0 and bump CI Go matrix to 1.26/1.27 ([#675](https://github.com/fclairamb/ftpserverlib/issues/675)) ([33fed17](https://github.com/fclairamb/ftpserverlib/commit/33fed17dcbe9cb93b929411847e166d510d8ee26))
+
 ## [0.32.4](https://github.com/fclairamb/ftpserverlib/compare/v0.32.3...v0.32.4) (2026-09-01)
 
 
