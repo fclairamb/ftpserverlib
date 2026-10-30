@@ -625,7 +625,9 @@ func (c *clientHandler) handleGenericHash(param string, algo HASHAlgo, isCustomM
 		return nil //nolint:nilerr
 	}
 
-	info, err := c.driver.Stat(args[0])
+	filePath := c.absPath(args[0])
+
+	info, err := c.driver.Stat(filePath)
 	if err != nil {
 		c.writeMessage(StatusActionNotTaken, fmt.Sprintf("%v: %v", param, err))
 
@@ -654,9 +656,9 @@ func (c *clientHandler) handleGenericHash(param string, algo HASHAlgo, isCustomM
 
 	var result string
 	if hasher, ok := c.driver.(ClientDriverExtensionHasher); ok {
-		result, err = hasher.ComputeHash(c.absPath(args[0]), algo, start, end)
+		result, err = hasher.ComputeHash(filePath, algo, start, end)
 	} else {
-		result, err = c.computeHashForFile(c.absPath(args[0]), algo, start, end)
+		result, err = c.computeHashForFile(filePath, algo, start, end)
 	}
 
 	if err != nil {

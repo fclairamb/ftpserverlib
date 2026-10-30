@@ -633,6 +633,46 @@ func testListDirArgs(t *testing.T, server *FtpServer) {
 	}
 }
 
+func TestListArgsStatAbsolutePath(t *testing.T) {
+	t.Parallel()
+
+	req := require.New(t)
+	server, recorder := newStatRecordingServer(t, &Settings{DisableMLSD: true})
+
+	client, err := goftp.DialConfig(goftp.Config{User: authUser, Password: authPass}, server.Addr())
+	req.NoError(err, "Couldn't connect")
+
+	defer func() { panicOnError(client.Close()) }()
+
+	_, err = client.Mkdir("/testdir")
+	req.NoError(err)
+	_, err = client.Mkdir("/testdir/child")
+	req.NoError(err)
+
+	recorder.statPaths()
+
+	// The LIST option probe only hands absolute, cleaned paths to Stat
+	_, err = client.ReadDir("-la ../x")
+	req.Error(err, "../x does not exist")
+
+	paths := recorder.statPaths()
+	req.Contains(paths, "/-la ../x")
+
+	for _, p := range paths {
+		req.True(path.IsAbs(p), "Stat got a relative path: %q", p)
+	}
+
+	// Positive control: LIST -la on an existing directory still lists it
+	contents, err := client.ReadDir("-la /testdir")
+	req.NoError(err)
+	req.Len(contents, 1)
+	req.Equal("child", contents[0].Name())
+
+	for _, p := range recorder.statPaths() {
+		req.True(path.IsAbs(p), "Stat got a relative path: %q", p)
+	}
+}
+
 func TestMLSDTimezone(t *testing.T) {
 	server := NewTestServer(t, false)
 	conf := goftp.Config{

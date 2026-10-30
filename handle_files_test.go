@@ -583,6 +583,51 @@ func TestHASHCommand(t *testing.T) {
 	require.True(t, strings.HasSuffix(message, fmt.Sprintf("CRC32 0-36 %v file.txt", crc32Sum)))
 }
 
+func TestHashStatsAbsolutePath(t *testing.T) {
+	t.Parallel()
+
+	req := require.New(t)
+	server, recorder := newStatRecordingServer(t, &Settings{EnableHASH: true})
+
+	client, err := goftp.DialConfig(goftp.Config{User: authUser, Password: authPass}, server.Addr())
+	req.NoError(err, "Couldn't connect")
+
+	defer func() { panicOnError(client.Close()) }()
+
+	_, err = client.Mkdir("/sub")
+	req.NoError(err)
+	_, err = client.Mkdir("/sub/deep")
+	req.NoError(err)
+
+	tempFile, err := os.CreateTemp(t.TempDir(), "ftpserver")
+	req.NoError(err)
+	req.NoError(os.WriteFile(tempFile.Name(), []byte("sample data with know checksum/hash\n"), 0o600))
+	ftpUpload(t, client, tempFile, "/sub/deep/file.txt")
+
+	raw, err := client.OpenRawConn()
+	req.NoError(err, "Couldn't open raw connection")
+
+	defer func() { req.NoError(raw.Close()) }()
+
+	returnCode, _, err := raw.SendCommand("CWD /sub/deep")
+	req.NoError(err)
+	req.Equal(StatusFileOK, returnCode)
+
+	recorder.statPaths()
+
+	// A path escaping upwards reaches Stat cleaned and absolute
+	_, _, err = raw.SendCommand("XSHA256 ../../x")
+	req.NoError(err)
+	req.Equal([]string{"/x"}, recorder.statPaths())
+
+	// A relative name is resolved against the current directory, and still hashes the right file
+	returnCode, message, err := raw.SendCommand("XSHA256 file.txt")
+	req.NoError(err)
+	req.Equal(StatusFileOK, returnCode)
+	req.Contains(message, "ceee704dd96e2b8c2ceca59c4c697bc01123fb9e66a1a3ac34dbdd2d6da9659b")
+	req.Equal([]string{"/sub/deep/file.txt"}, recorder.statPaths())
+}
+
 func TestHashWithoutParams(t *testing.T) {
 	server := NewTestServerWithTestDriver(
 		t,
