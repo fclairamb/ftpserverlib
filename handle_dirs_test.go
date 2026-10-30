@@ -458,6 +458,81 @@ func TestPerClientTLSTransfer(t *testing.T) {
 	require.Equal(t, "unable to open transfer: TLS is required", response)
 }
 
+func TestTLSTransferPROTAfterDataCommand(t *testing.T) {
+	for _, active := range []bool{false, true} {
+		t.Run(fmt.Sprintf("active=%t", active), func(t *testing.T) {
+			req := require.New(t)
+			server := NewTestServerWithTestDriver(t, &TestServerDriver{
+				TLS: true,
+				Settings: &Settings{
+					TLSRequired:             MandatoryEncryption,
+					ActiveTransferPortNon20: true,
+				},
+			})
+
+			conf := goftp.Config{
+				User:     authUser,
+				Password: authPass,
+				TLSConfig: &tls.Config{
+					InsecureSkipVerify: true, //nolint:gosec
+				},
+				TLSMode: goftp.TLSExplicit,
+			}
+
+			client, err := goftp.DialConfig(conf, server.Addr())
+			req.NoError(err, "Couldn't connect")
+
+			defer func() { panicOnError(client.Close()) }()
+
+			raw, err := client.OpenRawConn()
+			req.NoError(err, "Couldn't open raw connection")
+
+			defer func() { require.NoError(t, raw.Close()) }()
+
+			returnCode, response, err := raw.SendCommand("PROT C")
+			req.NoError(err)
+			req.Equal(StatusOK, returnCode, response)
+
+			// the data connection is prepared while PROT C is in force
+			if active {
+				var dataListener net.Listener
+
+				dataListener, err = (&net.ListenConfig{}).Listen(t.Context(), "tcp", "127.0.0.1:0")
+				req.NoError(err)
+
+				defer func() { require.NoError(t, dataListener.Close()) }()
+
+				dataAddr := requireTCPAddr(t, dataListener.Addr())
+				returnCode, response, err = raw.SendCommand("PORT 127,0,0,1,%d,%d", dataAddr.Port/256, dataAddr.Port%256)
+				req.NoError(err)
+				req.Equal(StatusOK, returnCode, response)
+			} else {
+				returnCode, response, err = raw.SendCommand("PASV")
+				req.NoError(err)
+				req.Equal(StatusEnteringPASV, returnCode, response)
+
+				var dataConn net.Conn
+
+				dialer := &net.Dialer{Timeout: 5 * time.Second}
+				dataConn, err = dialer.DialContext(t.Context(), "tcp",
+					fmt.Sprintf("127.0.0.1:%d", getPortFromPASVResponse(t, response)))
+				req.NoError(err)
+
+				defer func() { require.NoError(t, dataConn.Close()) }()
+			}
+
+			returnCode, response, err = raw.SendCommand("PROT P")
+			req.NoError(err)
+			req.Equal(StatusOK, returnCode, response)
+
+			returnCode, response, err = raw.SendCommand("MLSD /")
+			req.NoError(err)
+			req.Equal(StatusCannotOpenDataConnection, returnCode, response)
+			req.Equal(errProtMismatch.Error(), response)
+		})
+	}
+}
+
 func TestDirListingBeforeLogin(t *testing.T) {
 	s := NewTestServer(t, false)
 	dialer := &net.Dialer{Timeout: 5 * time.Second}
