@@ -25,8 +25,7 @@ import (
 )
 
 func getABORCmd() string {
-	runes := []rune{}
-	runes = append(runes, rune(242), rune(255))
+	runes := []rune{rune(242), rune(255)}
 	str := string(runes)
 
 	return str + "ABOR"
@@ -135,7 +134,7 @@ func ftpDownloadAndHashWithRawConnection(
 	dcGetter, err := raw.PrepareDataConn()
 	req.NoError(err)
 
-	returnCode, response, err := raw.SendCommand(fmt.Sprintf("RETR %v", fileName))
+	returnCode, response, err := raw.SendCommand("RETR %v", fileName)
 	require.NoError(t, err)
 	req.Equal(StatusFileStatusOK, returnCode, response)
 
@@ -191,7 +190,7 @@ func ftpUploadWithRawConnection(
 		cmd = "APPE"
 	}
 
-	returnCode, response, err := raw.SendCommand(fmt.Sprintf("%v %v", cmd, fileName))
+	returnCode, response, err := raw.SendCommand("%v %v", cmd, fileName)
 	require.NoError(t, err)
 	require.Equal(t, StatusFileStatusOK, returnCode, response)
 
@@ -861,7 +860,7 @@ func TestBasicABOR(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, StatusEnteringEPSV, returnCode)
 
-	returnCode, _, err = raw.SendCommand(getABORCmd())
+	returnCode, _, err = raw.SendCommand("%s", getABORCmd())
 	require.NoError(t, err)
 	require.Equal(t, StatusClosingDataConn, returnCode)
 
@@ -968,10 +967,10 @@ func TestABORWithoutOpenTransfer(t *testing.T) {
 		_, err = raw.PrepareDataConn()
 		require.NoError(t, err)
 
-		err = raw.SendCommandNoWaitResponse(cmd)
+		err = raw.SendCommandNoWaitResponse("%s", cmd)
 		require.NoError(t, err)
 
-		returnCode, response, err = raw.SendCommand(getABORCmd())
+		returnCode, response, err = raw.SendCommand("%s", getABORCmd())
 		require.NoError(t, err)
 		require.Equal(t, StatusClosingDataConn, returnCode, response)
 		require.Equal(t, "ABOR successful; closing transfer connection", response)
@@ -1046,14 +1045,14 @@ func aborTransfer(t *testing.T, client *goftp.Client) {
 	require.Equal(t, StatusFileStatusOK, returnCode, response)
 	require.Equal(t, "Using transfer connection", response)
 
-	returnCode, response, err = raw.SendCommand("STAT")
+	returnCode, response, err = raw.SendCommand(cmdSTAT)
 	require.NoError(t, err)
 	require.Equal(t, StatusSystemStatus, returnCode, response)
 	require.Contains(t, response, "RETR delay-io.bin")
 	require.NotContains(t, response, "Using transfer connection")
 	require.NotContains(t, response, "Closing transfer connection")
 
-	returnCode, response, err = raw.SendCommand(getABORCmd())
+	returnCode, response, err = raw.SendCommand("%s", getABORCmd())
 	require.NoError(t, err)
 	require.Equal(t, StatusTransferAborted, returnCode, response)
 	require.Equal(t, "Connection closed; transfer aborted", response)
@@ -1097,7 +1096,7 @@ func aborBeforeOpenTransfer(t *testing.T, client *goftp.Client) {
 	err = raw.SendCommandNoWaitResponse("RETR delay-io.bin")
 	require.NoError(t, err)
 
-	returnCode, response, err = raw.SendCommand(getABORCmd())
+	returnCode, response, err = raw.SendCommand("%s", getABORCmd())
 	require.NoError(t, err)
 	require.Equal(t, StatusClosingDataConn, returnCode, response)
 	require.Equal(t, "ABOR successful; closing transfer connection", response)
@@ -1310,14 +1309,10 @@ func TestPASVPublicIPResolver(t *testing.T) {
 	require.Contains(t, resp, "couldn't fetch public IP")
 }
 
-func TestPASVConnectionWait(t *testing.T) {
-	addr, err := net.ResolveTCPAddr("tcp", ":0")
-	require.NoError(t, err)
+func newTestPassiveTransferHandler(t *testing.T, listener net.Listener) *passiveTransferHandler {
+	t.Helper()
 
-	tcpListener, err := net.ListenTCP("tcp", addr)
-	require.NoError(t, err)
-
-	cltHandler := clientHandler{
+	cltHandler := &clientHandler{
 		conn: &testNetConn{
 			remoteAddr: &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: 21},
 		},
@@ -1329,37 +1324,190 @@ func TestPASVConnectionWait(t *testing.T) {
 		},
 	}
 
-	transferHandler := passiveTransferHandler{ //nolint:forcetypeassert
-		listener: &testNetListener{
-			conn: &testNetConn{
-				remoteAddr: &net.TCPAddr{IP: nil, Port: 21}, // invalid IP
-			},
-		},
-		deadlineSetter: tcpListener,
-		Port:           tcpListener.Addr().(*net.TCPAddr).Port,
-		settings:       cltHandler.server.settings,
-		logger:         slog.New(slog.NewTextHandler(io.Discard, nil)), //nolint:sloglint // DiscardHandler requires Go 1.23+
-		checkDataConn:  cltHandler.checkDataConnectionRequirement,
+	return &passiveTransferHandler{
+		listener:      listener,
+		settings:      cltHandler.server.settings,
+		logger:        slog.New(slog.NewTextHandler(io.Discard, nil)), //nolint:sloglint // DiscardHandler requires Go 1.23+
+		checkDataConn: cltHandler.checkDataConnectionRequirement,
 	}
+}
 
-	defer func() {
-		err = transferHandler.Close()
-		assert.NoError(t, err)
-	}()
+func TestPASVConnectionWait(t *testing.T) {
+	invalidConn := &testNetConn{remoteAddr: &net.TCPAddr{IP: nil, Port: 21}} // invalid IP
+	transferHandler := newTestPassiveTransferHandler(t, &testNetListener{conns: []net.Conn{invalidConn}})
 
-	_, err = transferHandler.ConnectionWait(1 * time.Second)
+	_, err := transferHandler.ConnectionWait(time.Second)
 	if assert.Error(t, err) {
 		assert.Contains(t, err.Error(), "invalid remote IP")
 	}
 
-	transferHandler.listener = &testNetListener{
-		conn: &testNetConn{
-			remoteAddr: &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: 21},
+	assert.True(t, invalidConn.closed, "the rejected connection must be closed")
+
+	validConn := &testNetConn{remoteAddr: &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: 21}}
+	transferHandler.listener = &testNetListener{conns: []net.Conn{validConn}}
+
+	conn, err := transferHandler.ConnectionWait(time.Second)
+	require.NoError(t, err)
+	require.Same(t, validConn, conn)
+
+	// the accepted connection is kept for the transfer
+	conn, err = transferHandler.ConnectionWait(time.Second)
+	require.NoError(t, err)
+	require.Same(t, validConn, conn)
+
+	require.NoError(t, transferHandler.Close())
+	assert.True(t, validConn.closed)
+}
+
+func TestPASVConnectionWaitSkipsNonMatchingIP(t *testing.T) {
+	foreignConn := &testNetConn{remoteAddr: &net.TCPAddr{IP: net.ParseIP("192.0.2.1"), Port: 2121}}
+	invalidConn := &testNetConn{remoteAddr: &net.TCPAddr{IP: nil, Port: 2121}}
+	clientConn := &testNetConn{remoteAddr: &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: 2121}}
+
+	transferHandler := newTestPassiveTransferHandler(t, &testNetListener{
+		conns: []net.Conn{foreignConn, invalidConn, clientConn},
+	})
+
+	conn, err := transferHandler.ConnectionWait(time.Second)
+	require.NoError(t, err)
+	require.Same(t, clientConn, conn)
+	assert.True(t, foreignConn.closed, "the connection from a foreign IP must be closed")
+	assert.True(t, invalidConn.closed, "the connection with an invalid IP must be closed")
+	assert.False(t, clientConn.closed)
+}
+
+func TestPASVConnectionWaitOnlyNonMatchingIP(t *testing.T) {
+	t.Run("listener error", func(t *testing.T) {
+		foreignConns := []*testNetConn{
+			{remoteAddr: &net.TCPAddr{IP: net.ParseIP("192.0.2.1"), Port: 2121}},
+			{remoteAddr: &net.TCPAddr{IP: net.ParseIP("192.0.2.2"), Port: 2121}},
+		}
+		listener := &testNetListener{conns: []net.Conn{foreignConns[0], foreignConns[1]}}
+		transferHandler := newTestPassiveTransferHandler(t, listener)
+
+		_, err := transferHandler.ConnectionWait(time.Second)
+		require.Error(t, err)
+		require.Equal(t, "data connection security requirements not met", err.Error())
+
+		for _, conn := range foreignConns {
+			assert.True(t, conn.closed)
+		}
+
+		conn, err := transferHandler.ConnectionWait(time.Second)
+		require.Error(t, err)
+		require.Nil(t, conn)
+	})
+
+	t.Run("deadline", func(t *testing.T) {
+		foreignConn := &testNetConn{remoteAddr: &net.TCPAddr{IP: net.ParseIP("192.0.2.1"), Port: 2121}}
+		// the listener yields the foreign connection forever: only the deadline stops the wait
+		transferHandler := newTestPassiveTransferHandler(t, &testNetListener{conn: foreignConn})
+
+		start := time.Now()
+		_, err := transferHandler.ConnectionWait(100 * time.Millisecond)
+		require.Error(t, err)
+		require.Equal(t, "data connection security requirements not met", err.Error())
+		require.Less(t, time.Since(start), 5*time.Second)
+		assert.True(t, foreignConn.closed)
+
+		foreignConn.closed = false
+		conn, err := transferHandler.ConnectionWait(100 * time.Millisecond)
+		require.Error(t, err)
+		require.Nil(t, conn)
+		assert.True(t, foreignConn.closed)
+	})
+}
+
+// requireRawCommand sends a command and checks its return code
+func requireRawCommand(t *testing.T, raw goftp.RawConn, command string, expectedCode int) string {
+	t.Helper()
+
+	returnCode, response, err := raw.SendCommand("%s", command)
+	require.NoError(t, err)
+	require.Equal(t, expectedCode, returnCode, response)
+
+	return response
+}
+
+// dialPassive sends PASV and connects to the passive port from the control IP
+func dialPassive(t *testing.T, raw goftp.RawConn) net.Conn {
+	t.Helper()
+
+	response := requireRawCommand(t, raw, "PASV", StatusEnteringPASV)
+
+	dialer := &net.Dialer{Timeout: 5 * time.Second}
+	dataConn, err := dialer.DialContext(t.Context(), "tcp",
+		fmt.Sprintf("127.0.0.1:%d", getPortFromPASVResponse(t, response)))
+	require.NoError(t, err)
+
+	return dataConn
+}
+
+// A failed transfer must not leave its data connection behind for the next transfer command
+func TestPASVFailedTransferIsNotReused(t *testing.T) {
+	req := require.New(t)
+	server := NewTestServerWithTestDriver(t, &TestServerDriver{
+		Debug: true,
+		TLS:   true,
+	})
+
+	conf := goftp.Config{
+		User:     authUser,
+		Password: authPass,
+		TLSConfig: &tls.Config{
+			InsecureSkipVerify: true, //nolint:gosec
 		},
+		TLSMode: goftp.TLSExplicit,
 	}
 
-	_, err = transferHandler.ConnectionWait(1 * time.Second)
-	assert.NoError(t, err)
+	client, err := goftp.DialConfig(conf, server.Addr())
+	req.NoError(err, "Couldn't connect")
+
+	defer func() { panicOnError(client.Close()) }()
+
+	ftpUpload(t, client, createTemporaryFile(t, 1024), "file.bin")
+
+	raw, err := client.OpenRawConn()
+	req.NoError(err, "Couldn't open raw connection")
+
+	defer func() { require.NoError(t, raw.Close()) }()
+
+	requireRawCommand(t, raw, "PROT C", StatusOK)
+
+	dataConn := dialPassive(t, raw)
+
+	defer func() { require.NoError(t, dataConn.Close()) }()
+
+	requireRawCommand(t, raw, "PROT P", StatusOK)
+
+	// the data connection is in clear while PROT P is in force: refused
+	response := requireRawCommand(t, raw, "RETR file.bin", StatusCannotOpenDataConnection)
+	req.Equal(errProtMismatch.Error(), response)
+
+	// the refused connection was closed by the server
+	req.NoError(dataConn.SetReadDeadline(time.Now().Add(5 * time.Second)))
+	_, err = dataConn.Read(make([]byte, 1))
+	req.ErrorIs(err, io.EOF)
+
+	// without a new PASV, there is no transfer connection left to reuse
+	response = requireRawCommand(t, raw, "RETR file.bin", StatusActionNotTaken)
+	req.Equal(errNoTransferConnection.Error(), response)
+
+	// positive control: a new PASV from the control IP works
+	requireRawCommand(t, raw, "PROT C", StatusOK)
+
+	controlConn := dialPassive(t, raw)
+
+	requireRawCommand(t, raw, "RETR file.bin", StatusFileStatusOK)
+
+	data, err := io.ReadAll(controlConn)
+	req.NoError(err)
+	req.Len(data, 1024)
+	req.NoError(controlConn.Close())
+
+	returnCode, response, err := raw.ReadResponse()
+	req.NoError(err)
+	req.Equal(StatusClosingDataConn, returnCode, response)
 }
 
 // On Mac Os X, this requires to issue the following command:
@@ -1605,7 +1753,7 @@ func getPortFromPASVResponse(t *testing.T, resp string) int {
 		portOctet, err := strconv.Atoi(part)
 		require.NoError(t, err)
 
-		port |= portOctet << (byte(1-i) * 8)
+		port |= portOctet << (uint(1-i) * 8)
 	}
 
 	return port
@@ -1790,4 +1938,121 @@ func TestConnectionCloseDuringTransfer(t *testing.T) {
 	// Verify the file is still there and accessible
 	_, err = newClient.Stat("large-file.bin")
 	require.NoError(t, err, "File should still be accessible after interrupted transfer")
+}
+
+func TestPASVThenPORTReleasesPassivePort(t *testing.T) {
+	req := require.New(t)
+	port := getFreePassivePort(t)
+	server := NewTestServerWithTestDriver(t, &TestServerDriver{
+		Debug: true,
+		Settings: &Settings{
+			ListenAddr:               testServerListenAddr,
+			DefaultTransferType:      TransferTypeBinary,
+			PassiveTransferPortRange: &PortRange{Start: port, End: port},
+		},
+	})
+
+	client, err := goftp.DialConfig(goftp.Config{User: authUser, Password: authPass}, server.Addr())
+	req.NoError(err)
+
+	defer func() { panicOnError(client.Close()) }()
+
+	raw, err := client.OpenRawConn()
+	req.NoError(err)
+
+	defer func() { req.NoError(raw.Close()) }()
+
+	for range 3 {
+		returnCode, message, errCmd := raw.SendCommand("PASV")
+		req.NoError(errCmd)
+		req.Equal(StatusEnteringPASV, returnCode, message)
+
+		returnCode, message, errCmd = raw.SendCommand("PORT 127,0,0,1,%d,%d", port/256, port%256)
+		req.NoError(errCmd)
+		req.Equal(StatusOK, returnCode, message)
+	}
+
+	// The one passive port is free again: a passive transfer from another connection works.
+	files, err := client.ReadDir("/")
+	req.NoError(err)
+	req.Empty(files)
+}
+
+func TestPASVWrappedListenerErrorReleasesPort(t *testing.T) {
+	req := require.New(t)
+	port := getFreePassivePort(t)
+	server := NewTestServerWithTestDriver(t, &TestServerDriver{
+		Debug:              true,
+		errPassiveListener: os.ErrClosed,
+		Settings: &Settings{
+			ListenAddr:               testServerListenAddr,
+			DefaultTransferType:      TransferTypeBinary,
+			PassiveTransferPortRange: &PortRange{Start: port, End: port},
+		},
+	})
+
+	client, err := goftp.DialConfig(goftp.Config{User: authUser, Password: authPass}, server.Addr())
+	req.NoError(err)
+
+	defer func() { panicOnError(client.Close()) }()
+
+	raw, err := client.OpenRawConn()
+	req.NoError(err)
+
+	defer func() { req.NoError(raw.Close()) }()
+
+	for range 2 {
+		returnCode, message, errCmd := raw.SendCommand("PASV")
+		req.NoError(errCmd)
+		req.Equal(StatusServiceNotAvailable, returnCode, message)
+		req.Contains(message, os.ErrClosed.Error())
+		req.NotContains(message, ErrNoAvailableListeningPort.Error())
+	}
+
+	listener, err := (&net.ListenConfig{}).Listen(t.Context(), "tcp", fmt.Sprintf(":%d", port))
+	req.NoError(err, "the passive port should have been released")
+	req.NoError(listener.Close())
+}
+
+func TestPASVOverIPv6WithoutPublicHostReleasesPort(t *testing.T) {
+	req := require.New(t)
+
+	ipv6Listener, err := (&net.ListenConfig{}).Listen(t.Context(), "tcp", "[::1]:0")
+	if err != nil {
+		t.Skip("IPv6 loopback not available")
+	}
+
+	req.NoError(ipv6Listener.Close())
+
+	port := getFreePassivePort(t)
+	server := NewTestServerWithTestDriver(t, &TestServerDriver{
+		Debug: true,
+		Settings: &Settings{
+			ListenAddr:               "[::1]:0",
+			DefaultTransferType:      TransferTypeBinary,
+			PassiveTransferPortRange: &PortRange{Start: port, End: port},
+		},
+	})
+
+	client, err := goftp.DialConfig(goftp.Config{User: authUser, Password: authPass}, server.Addr())
+	req.NoError(err)
+
+	defer func() { panicOnError(client.Close()) }()
+
+	raw, err := client.OpenRawConn()
+	req.NoError(err)
+
+	defer func() { req.NoError(raw.Close()) }()
+
+	for range 2 {
+		returnCode, message, errCmd := raw.SendCommand("PASV")
+		req.NoError(errCmd)
+		req.Equal(StatusServiceNotAvailable, returnCode, message)
+		req.NotContains(message, ErrNoAvailableListeningPort.Error())
+	}
+
+	// EPSV still gets the port: the failed PASV did not keep it.
+	returnCode, message, err := raw.SendCommand("EPSV")
+	req.NoError(err)
+	req.Equal(StatusEnteringEPSV, returnCode, message)
 }

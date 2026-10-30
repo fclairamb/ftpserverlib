@@ -158,6 +158,51 @@ type TestClientDriver struct {
 	server *TestServerDriver
 }
 
+// statRecordingDriver is a TestClientDriver that records every path given to Stat.
+type statRecordingDriver struct {
+	*TestClientDriver
+	mu    sync.Mutex
+	paths []string
+}
+
+func (driver *statRecordingDriver) Stat(name string) (os.FileInfo, error) {
+	driver.mu.Lock()
+	driver.paths = append(driver.paths, name)
+	driver.mu.Unlock()
+
+	return driver.TestClientDriver.Stat(name)
+}
+
+// statPaths returns the paths Stat was called with, and resets the record.
+func (driver *statRecordingDriver) statPaths() []string {
+	driver.mu.Lock()
+	defer driver.mu.Unlock()
+
+	paths := driver.paths
+	driver.paths = nil
+
+	return paths
+}
+
+// newStatRecordingServer starts a test server whose client driver records Stat calls.
+func newStatRecordingServer(t *testing.T, settings *Settings) (*FtpServer, *statRecordingDriver) {
+	t.Helper()
+
+	recorder := &statRecordingDriver{}
+	serverDriver := &TestServerDriver{Debug: false, Settings: settings}
+	serverDriver.AuthProvider = func(_, _ string) (ClientDriver, error) {
+		recorder.mu.Lock()
+		if recorder.TestClientDriver == nil {
+			recorder.TestClientDriver = NewTestClientDriver(serverDriver)
+		}
+		recorder.mu.Unlock()
+
+		return recorder, nil
+	}
+
+	return NewTestServerWithTestDriver(t, serverDriver), recorder
+}
+
 type testFile struct {
 	afero.File
 	errTransferMu sync.Mutex
@@ -295,7 +340,7 @@ func (driver *TestServerDriver) AuthUser(_ ClientContext, user, pass string) (Cl
 		clientdriver := NewTestClientDriver(driver)
 
 		return clientdriver, nil
-	} else if user == "nil" && pass == "nil" {
+	} else if user == nilUser && pass == nilUser {
 		// Definitely a bad behavior (but can be done on the driver side)
 		return nil, nil //nolint:nilnil
 	}
@@ -664,3 +709,9 @@ func TestCryptoRandError(t *testing.T) {
 	req.Equal(8000, exposedPort)
 	req.Equal(9000, listenedPort)
 }
+
+const (
+	nilUser    = "nil"
+	firstLine  = "first line"
+	secondLine = "second line"
+)

@@ -147,6 +147,11 @@ func TestCHMOD(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, StatusActionNotTaken, returnCode, "Should have been refused")
 
+	returnCode, response, err := raw.SendCommand("SITE CHMOD 644")
+	require.NoError(t, err)
+	require.Equal(t, StatusSyntaxErrorParameters, returnCode, "A missing path should be refused")
+	require.NotContains(t, response, "internal error")
+
 	returnCode, _, err = raw.SendCommand("SITE CHMOD 600 file")
 	require.NoError(t, err)
 	require.Equal(t, StatusOK, returnCode, "Should have been accepted")
@@ -359,7 +364,7 @@ func TestSTATFile(t *testing.T) {
 	dirName, err := client.Mkdir("fail-to-open")
 	require.NoError(t, err)
 
-	returnCode, _, err = raw.SendCommand(fmt.Sprintf("STAT %v", dirName))
+	returnCode, _, err = raw.SendCommand("STAT %v", dirName)
 	require.NoError(t, err)
 	require.Equal(t, StatusFileActionNotTaken, returnCode)
 }
@@ -556,7 +561,7 @@ func TestHASHCommand(t *testing.T) {
 	defer func() { require.NoError(t, raw.Close()) }()
 
 	// ask hash for a directory
-	returnCode, _, err := raw.SendCommand(fmt.Sprintf("XSHA256 %v", dir))
+	returnCode, _, err := raw.SendCommand("XSHA256 %v", dir)
 	require.NoError(t, err)
 	require.Equal(t, StatusActionNotTakenNoFile, returnCode)
 
@@ -581,6 +586,51 @@ func TestHASHCommand(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, StatusFileStatus, returnCode)
 	require.True(t, strings.HasSuffix(message, fmt.Sprintf("CRC32 0-36 %v file.txt", crc32Sum)))
+}
+
+func TestHashStatsAbsolutePath(t *testing.T) {
+	t.Parallel()
+
+	req := require.New(t)
+	server, recorder := newStatRecordingServer(t, &Settings{EnableHASH: true})
+
+	client, err := goftp.DialConfig(goftp.Config{User: authUser, Password: authPass}, server.Addr())
+	req.NoError(err, "Couldn't connect")
+
+	defer func() { panicOnError(client.Close()) }()
+
+	_, err = client.Mkdir("/sub")
+	req.NoError(err)
+	_, err = client.Mkdir("/sub/deep")
+	req.NoError(err)
+
+	tempFile, err := os.CreateTemp(t.TempDir(), "ftpserver")
+	req.NoError(err)
+	req.NoError(os.WriteFile(tempFile.Name(), []byte("sample data with know checksum/hash\n"), 0o600))
+	ftpUpload(t, client, tempFile, "/sub/deep/file.txt")
+
+	raw, err := client.OpenRawConn()
+	req.NoError(err, "Couldn't open raw connection")
+
+	defer func() { req.NoError(raw.Close()) }()
+
+	returnCode, _, err := raw.SendCommand("CWD /sub/deep")
+	req.NoError(err)
+	req.Equal(StatusFileOK, returnCode)
+
+	recorder.statPaths()
+
+	// A path escaping upwards reaches Stat cleaned and absolute
+	_, _, err = raw.SendCommand("XSHA256 ../../x")
+	req.NoError(err)
+	req.Equal([]string{"/x"}, recorder.statPaths())
+
+	// A relative name is resolved against the current directory, and still hashes the right file
+	returnCode, message, err := raw.SendCommand("XSHA256 file.txt")
+	req.NoError(err)
+	req.Equal(StatusFileOK, returnCode)
+	req.Contains(message, "ceee704dd96e2b8c2ceca59c4c697bc01123fb9e66a1a3ac34dbdd2d6da9659b")
+	req.Equal([]string{"/sub/deep/file.txt"}, recorder.statPaths())
 }
 
 func TestHashWithoutParams(t *testing.T) {
@@ -648,7 +698,7 @@ func TestCustomHASHCommands(t *testing.T) {
 	var message string
 
 	for cmd, expected := range hashMapping {
-		returnCode, message, err = raw.SendCommand(fmt.Sprintf("%v file.txt", cmd))
+		returnCode, message, err = raw.SendCommand("%v file.txt", cmd)
 		require.NoError(t, err)
 		require.Equal(t, StatusFileOK, returnCode)
 		require.True(t, strings.HasSuffix(message, expected))
@@ -694,7 +744,7 @@ func TestCOMB(t *testing.T) {
 
 	server.settings.EnableCOMB = true
 
-	var parts []*os.File
+	parts := make([]*os.File, 0, 4)
 
 	partSize := 1024
 	hasher := sha256.New()
@@ -759,7 +809,7 @@ func TestCOMBAppend(t *testing.T) {
 	_, err = io.Copy(hasher, initialFile)
 	require.NoError(t, err)
 
-	var parts []*os.File
+	parts := make([]*os.File, 0, 2)
 
 	parts = append(parts, createTemporaryFile(t, partSize), createTemporaryFile(t, partSize))
 

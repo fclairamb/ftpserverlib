@@ -141,15 +141,15 @@ func TestDirHandling(t *testing.T) {
 	require.Equal(t, StatusFileOK, returnCode)
 
 	testSubdir := ` strange\\ sub" dìr`
-	returnCode, _, err = raw.SendCommand(fmt.Sprintf("MKD %v", testSubdir))
+	returnCode, _, err = raw.SendCommand("MKD %v", testSubdir)
 	require.NoError(t, err)
 	require.Equal(t, StatusPathCreated, returnCode)
 
-	returnCode, response, err := raw.SendCommand(fmt.Sprintf("CWD %v", testSubdir))
+	returnCode, response, err := raw.SendCommand("CWD %v", testSubdir)
 	require.NoError(t, err)
 	require.Equal(t, StatusFileOK, returnCode, response)
 
-	returnCode, response, err = raw.SendCommand(fmt.Sprintf("PWD %v", testSubdir))
+	returnCode, response, err = raw.SendCommand("PWD %v", testSubdir)
 	require.NoError(t, err)
 	require.Equal(t, StatusPathCreated, returnCode, response)
 	require.Equal(t, `"/known/ strange\\ sub"" dìr" is the current directory`, response)
@@ -298,7 +298,7 @@ func TestDirListingWithSpace(t *testing.T) {
 
 	defer func() { require.NoError(t, raw.Close()) }()
 
-	returnCode, response, err := raw.SendCommand("CWD /" + dirName)
+	returnCode, response, err := raw.SendCommand("CWD /%s", dirName)
 	require.NoError(t, err)
 	require.Equal(t, StatusFileOK, returnCode)
 	require.Equal(t, "CD worked on /"+dirName, response)
@@ -355,7 +355,7 @@ func TestCleanPath(t *testing.T) {
 		"/./",
 		"/././.",
 	} {
-		rc, response, err := raw.SendCommand("CWD " + dir)
+		rc, response, err := raw.SendCommand("CWD %s", dir)
 		require.NoError(t, err)
 		require.Equal(t, StatusFileOK, rc)
 		require.Equal(t, "CD worked on /", response)
@@ -633,6 +633,46 @@ func testListDirArgs(t *testing.T, server *FtpServer) {
 	}
 }
 
+func TestListArgsStatAbsolutePath(t *testing.T) {
+	t.Parallel()
+
+	req := require.New(t)
+	server, recorder := newStatRecordingServer(t, &Settings{DisableMLSD: true})
+
+	client, err := goftp.DialConfig(goftp.Config{User: authUser, Password: authPass}, server.Addr())
+	req.NoError(err, "Couldn't connect")
+
+	defer func() { panicOnError(client.Close()) }()
+
+	_, err = client.Mkdir("/testdir")
+	req.NoError(err)
+	_, err = client.Mkdir("/testdir/child")
+	req.NoError(err)
+
+	recorder.statPaths()
+
+	// The LIST option probe only hands absolute, cleaned paths to Stat
+	_, err = client.ReadDir("-la ../x")
+	req.Error(err, "../x does not exist")
+
+	paths := recorder.statPaths()
+	req.Contains(paths, "/-la ../x")
+
+	for _, p := range paths {
+		req.True(path.IsAbs(p), "Stat got a relative path: %q", p)
+	}
+
+	// Positive control: LIST -la on an existing directory still lists it
+	contents, err := client.ReadDir("-la /testdir")
+	req.NoError(err)
+	req.Len(contents, 1)
+	req.Equal("child", contents[0].Name())
+
+	for _, p := range recorder.statPaths() {
+		req.True(path.IsAbs(p), "Stat got a relative path: %q", p)
+	}
+}
+
 func TestMLSDTimezone(t *testing.T) {
 	server := NewTestServer(t, false)
 	conf := goftp.Config{
@@ -685,7 +725,7 @@ func TestMLSDAndNLSTFilePathError(t *testing.T) {
 	dcGetter, err := raw.PrepareDataConn()
 	require.NoError(t, err)
 
-	rc, response, err := raw.SendCommand("NLST /../" + fileName)
+	rc, response, err := raw.SendCommand("NLST /../%s", fileName)
 	require.NoError(t, err)
 	require.Equal(t, StatusFileStatusOK, rc, response)
 

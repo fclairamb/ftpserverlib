@@ -116,8 +116,8 @@ func TestLoginNil(t *testing.T) {
 	req := require.New(t)
 
 	conf := goftp.Config{
-		User:     "nil",
-		Password: "nil",
+		User:     nilUser,
+		Password: nilUser,
 	}
 
 	client, err := goftp.DialConfig(conf, server.Addr())
@@ -214,7 +214,7 @@ func TestAuthTLSRequired(t *testing.T) {
 
 	defer func() { require.NoError(t, raw.Close()) }()
 
-	rc, _, err := raw.SendCommand("STAT")
+	rc, _, err := raw.SendCommand(cmdSTAT)
 	require.NoError(t, err)
 	require.Equal(t, StatusSystemStatus, rc)
 }
@@ -271,7 +271,7 @@ func TestAuthTLSCertificate(t *testing.T) {
 
 	defer func() { require.NoError(t, raw.Close()) }()
 
-	rc, _, err := raw.SendCommand("STAT")
+	rc, _, err := raw.SendCommand(cmdSTAT)
 	require.NoError(t, err)
 	require.Equal(t, StatusSystemStatus, rc)
 }
@@ -310,7 +310,7 @@ func TestAuthPerClientTLSRequired(t *testing.T) {
 
 	defer func() { require.NoError(t, raw.Close()) }()
 
-	rc, _, err := raw.SendCommand("STAT")
+	rc, _, err := raw.SendCommand(cmdSTAT)
 	require.NoError(t, err)
 	require.Equal(t, StatusSystemStatus, rc)
 }

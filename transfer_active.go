@@ -23,7 +23,7 @@ func (c *clientHandler) handlePORT(param string) error {
 	var err error
 	var raddr *net.TCPAddr
 
-	if command == "EPRT" {
+	if command == cmdEPRT {
 		raddr, err = parseEPRTAddr(param)
 	} else { // PORT
 		raddr, err = parsePORTAddr(param)
@@ -63,6 +63,11 @@ func (c *clientHandler) handlePORT(param string) error {
 	}
 
 	c.transferMu.Lock()
+
+	// Release any previous handler (e.g. a passive listener from an earlier PASV), as handlePASV does.
+	if c.transfer != nil {
+		c.transfer.Close() //nolint:errcheck,gosec
+	}
 
 	c.transfer = &activeTransferHandler{
 		raddr:     raddr,

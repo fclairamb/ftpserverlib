@@ -171,7 +171,7 @@ func (c *clientHandler) checkLISTArgs(args string) string {
 			// a check for a non-existent directory error is more appropriate here
 			// but we cannot assume that the driver implementation will return an
 			// os.IsNotExist error.
-			if _, err := c.driver.Stat(args); err != nil {
+			if _, err := c.driver.Stat(c.absPath(args)); err != nil {
 				params := strings.SplitN(args, " ", 2)
 				if len(params) == 1 {
 					result = ""

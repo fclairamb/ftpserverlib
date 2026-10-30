@@ -288,11 +288,11 @@ func TestMultiLineMessages(t *testing.T) {
 		},
 		{
 			message:       "first line\r\nsecond line\r\n",
-			expectedLines: []string{"first line", "second line"},
+			expectedLines: []string{firstLine, secondLine},
 		},
 		{
 			message:       "first line\nsecond line\n",
-			expectedLines: []string{"first line", "second line"},
+			expectedLines: []string{firstLine, secondLine},
 		},
 		{
 			message:       "first line\rsecond line",
@@ -304,7 +304,7 @@ func TestMultiLineMessages(t *testing.T) {
 second line
 
 `,
-			expectedLines: []string{"first line", "", "second line", ""},
+			expectedLines: []string{firstLine, "", secondLine, ""},
 		},
 	}
 
@@ -344,7 +344,7 @@ func TestUnknownCommand(t *testing.T) {
 	defer func() { require.NoError(t, raw.Close()) }()
 
 	cmd := "UNSUPPORTED"
-	rc, response, err := raw.SendCommand(cmd)
+	rc, response, err := raw.SendCommand("%s", cmd)
 	require.NoError(t, err)
 	require.Equal(t, StatusSyntaxErrorNotRecognised, rc)
 	require.Equal(t, fmt.Sprintf("Unknown command %#v", cmd), response)
@@ -353,6 +353,7 @@ func TestUnknownCommand(t *testing.T) {
 // testNetConn implements net.Conn interface
 type testNetConn struct {
 	remoteAddr net.Addr
+	closed     bool
 }
 
 func (*testNetConn) Read(_ []byte) (int, error) {
@@ -363,7 +364,9 @@ func (*testNetConn) Write(_ []byte) (int, error) {
 	return 0, nil
 }
 
-func (*testNetConn) Close() error {
+func (c *testNetConn) Close() error {
+	c.closed = true
+
 	return nil
 }
 
@@ -387,12 +390,21 @@ func (*testNetConn) SetWriteDeadline(_ time.Time) error {
 	return nil
 }
 
-// testNetListener implements net.Listener interface
+// testNetListener implements net.Listener interface. It yields the connections of conns in order, then conn
+// forever if set, then an error.
 type testNetListener struct {
-	conn net.Conn
+	conns []net.Conn
+	conn  net.Conn
 }
 
 func (l *testNetListener) Accept() (net.Conn, error) {
+	if len(l.conns) > 0 {
+		conn := l.conns[0]
+		l.conns = l.conns[1:]
+
+		return conn, nil
+	}
+
 	if l.conn != nil {
 		return l.conn, nil
 	}
@@ -735,4 +747,73 @@ func TestMultipleImmediateDisconnects(t *testing.T) {
 
 	_, err = client.ReadDir("/")
 	require.NoError(t, err)
+}
+
+type syncBuffer struct {
+	mu  sync.Mutex
+	buf bytes.Buffer
+}
+
+func (b *syncBuffer) Write(p []byte) (int, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	return b.buf.Write(p)
+}
+
+func (b *syncBuffer) String() string {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	return b.buf.String()
+}
+
+func TestRedactLine(t *testing.T) {
+	t.Parallel()
+
+	assert.Equal(t, "PASS ****", redactLine("PASS secret"))
+	assert.Equal(t, "pass ****", redactLine("pass secret with spaces"))
+	assert.Equal(t, "PASS", redactLine("PASS"))
+	assert.Equal(t, "USER acme", redactLine("USER acme"))
+	assert.Equal(t, "CWD /dir", redactLine("CWD /dir"))
+	assert.Equal(t, "****", redactParam("PASS", "secret"))
+	assert.Equal(t, "/dir", redactParam("CWD", "/dir"))
+}
+
+func TestDebugLogRedactsPassword(t *testing.T) {
+	const password = "s3cr3t-acme-password"
+
+	logs := &syncBuffer{}
+	logger := slog.New(slog.NewTextHandler(logs, &slog.HandlerOptions{Level: slog.LevelDebug}))
+
+	driver := &TestServerDriver{Debug: true}
+	driver.AuthProvider = func(user, pass string) (ClientDriver, error) {
+		if user == "acme" && pass == password {
+			return NewTestClientDriver(driver), nil
+		}
+
+		return nil, errInvalidChownUser
+	}
+	driver.Init()
+
+	server := NewTestServerWithDriverAndLogger(t, driver, logger)
+
+	client, err := goftp.DialConfig(goftp.Config{User: "acme", Password: password}, server.Addr())
+	require.NoError(t, err, "Couldn't connect")
+
+	defer func() { panicOnError(client.Close()) }()
+
+	raw, err := client.OpenRawConn()
+	require.NoError(t, err, "Couldn't open raw connection")
+
+	defer func() { require.NoError(t, raw.Close()) }()
+
+	_, _, err = raw.SendCommand("CWD /dir")
+	require.NoError(t, err)
+
+	output := logs.String()
+	require.NotContains(t, output, password)
+	require.Contains(t, output, `line="PASS ****"`)
+	require.Contains(t, output, `line="USER acme"`)
+	require.Contains(t, output, `line="CWD /dir"`)
 }
