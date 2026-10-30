@@ -246,3 +246,10 @@ GitHub Actions workflow (`.github/workflows/build.yml`):
 A PR labelled `automerge` merges on its own once CI is green: `.github/workflows/auto-merge.yml` enables GitHub's
 auto-merge (squash) and updates a branch that is behind main, with the `CI_PAT` secret (a branch update pushed with
 `GITHUB_TOKEN` would not trigger CI). Renovate's minor/patch updates get the label.
+
+## Vulnerabilities
+
+Follow [SECURITY.md](SECURITY.md). A vulnerability that is not public yet, whoever found it, is never described in a
+public issue, pull request, commit message, spec or changelog before its fix is released: the fix is made in the
+private fork of its GitHub security advisory, and the advisory is published after the release. SECURITY.md also says
+what is in scope (the library) and what belongs to the driver.
