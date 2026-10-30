@@ -364,7 +364,7 @@ func TestSTATFile(t *testing.T) {
 	dirName, err := client.Mkdir("fail-to-open")
 	require.NoError(t, err)
 
-	returnCode, _, err = raw.SendCommand(fmt.Sprintf("STAT %v", dirName))
+	returnCode, _, err = raw.SendCommand("STAT %v", dirName)
 	require.NoError(t, err)
 	require.Equal(t, StatusFileActionNotTaken, returnCode)
 }
@@ -561,7 +561,7 @@ func TestHASHCommand(t *testing.T) {
 	defer func() { require.NoError(t, raw.Close()) }()
 
 	// ask hash for a directory
-	returnCode, _, err := raw.SendCommand(fmt.Sprintf("XSHA256 %v", dir))
+	returnCode, _, err := raw.SendCommand("XSHA256 %v", dir)
 	require.NoError(t, err)
 	require.Equal(t, StatusActionNotTakenNoFile, returnCode)
 
@@ -698,7 +698,7 @@ func TestCustomHASHCommands(t *testing.T) {
 	var message string
 
 	for cmd, expected := range hashMapping {
-		returnCode, message, err = raw.SendCommand(fmt.Sprintf("%v file.txt", cmd))
+		returnCode, message, err = raw.SendCommand("%v file.txt", cmd)
 		require.NoError(t, err)
 		require.Equal(t, StatusFileOK, returnCode)
 		require.True(t, strings.HasSuffix(message, expected))
@@ -744,7 +744,7 @@ func TestCOMB(t *testing.T) {
 
 	server.settings.EnableCOMB = true
 
-	var parts []*os.File
+	parts := make([]*os.File, 0, 4)
 
 	partSize := 1024
 	hasher := sha256.New()
@@ -809,7 +809,7 @@ func TestCOMBAppend(t *testing.T) {
 	_, err = io.Copy(hasher, initialFile)
 	require.NoError(t, err)
 
-	var parts []*os.File
+	parts := make([]*os.File, 0, 2)
 
 	parts = append(parts, createTemporaryFile(t, partSize), createTemporaryFile(t, partSize))
 
