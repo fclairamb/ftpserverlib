@@ -23,7 +23,7 @@ func (c *clientHandler) handlePORT(param string) error {
 	var err error
 	var raddr *net.TCPAddr
 
-	if command == "EPRT" {
+	if command == cmdEPRT {
 		raddr, err = parseEPRTAddr(param)
 	} else { // PORT
 		raddr, err = parsePORTAddr(param)

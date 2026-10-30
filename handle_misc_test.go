@@ -86,7 +86,7 @@ func TestStat(t *testing.T) {
 	raw, err := client.OpenRawConn()
 	require.NoError(t, err, "Couldn't open raw connection")
 
-	returnCode, str, err := raw.SendCommand("STAT")
+	returnCode, str, err := raw.SendCommand(cmdSTAT)
 	require.NoError(t, err)
 	require.Equal(t, StatusSystemStatus, returnCode)
 
@@ -96,7 +96,7 @@ func TestStat(t *testing.T) {
 
 	server.settings.DisableSTAT = true
 
-	returnCode, str, err = raw.SendCommand("STAT")
+	returnCode, str, err = raw.SendCommand(cmdSTAT)
 	require.NoError(t, err)
 	require.Equal(t, StatusCommandNotImplemented, returnCode, str)
 }
@@ -141,7 +141,7 @@ func TestOPTSUTF8(t *testing.T) {
 	defer func() { require.NoError(t, raw.Close()) }()
 
 	for _, cmd := range []string{"OPTS UTF8", "OPTS UTF8 ON"} {
-		rc, message, err := raw.SendCommand(cmd)
+		rc, message, err := raw.SendCommand("%s", cmd)
 		require.NoError(t, err)
 		require.Equal(t, StatusOK, rc)
 		require.Equal(t, "I'm in UTF8 only anyway", message)
@@ -238,7 +238,7 @@ func TestAVBL(t *testing.T) {
 	noavblDir, err := client.Mkdir("noavbl")
 	require.NoError(t, err)
 
-	returnCode, response, err = raw.SendCommand(fmt.Sprintf("AVBL %v", noavblDir))
+	returnCode, response, err = raw.SendCommand("AVBL %v", noavblDir)
 	require.NoError(t, err)
 	require.Equal(t, StatusActionNotTaken, returnCode)
 	require.Equal(t, fmt.Sprintf("Couldn't get space for path %v: %v", noavblDir, errAvblNotPermitted.Error()), response)
@@ -338,7 +338,7 @@ func TestQuitWithTransferInProgress(t *testing.T) {
 
 		file := createTemporaryFile(t, 256*1024)
 		fileName := filepath.Base(file.Name())
-		rc, response, err := raw.SendCommand(fmt.Sprintf("%s %s", "STOR", fileName))
+		rc, response, err := raw.SendCommand("%s %s", "STOR", fileName)
 		req.NoError(err)
 		req.Equal(StatusFileStatusOK, rc, response)
 

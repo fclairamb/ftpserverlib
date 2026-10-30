@@ -14,6 +14,11 @@ import (
 	"time"
 )
 
+const (
+	cmdSTAT = "STAT"
+	cmdEPRT = "EPRT"
+)
+
 // ErrNotListening is returned when we are performing an action that is only valid while listening
 var ErrNotListening = errors.New("we aren't listening")
 
@@ -63,7 +68,7 @@ var commandsMap = map[string]*CommandDescription{ //nolint:gochecknoglobals
 	// File access
 	"SIZE":    {Fn: (*clientHandler).handleSIZE},
 	"DSIZ":    {Fn: (*clientHandler).handleNotImplemented},
-	"STAT":    {Fn: (*clientHandler).handleSTAT, SpecialAction: true},
+	cmdSTAT:   {Fn: (*clientHandler).handleSTAT, SpecialAction: true},
 	"MDTM":    {Fn: (*clientHandler).handleMDTM},
 	"MFMT":    {Fn: (*clientHandler).handleMFMT},
 	"MFF":     {Fn: (*clientHandler).handleNotImplemented},
@@ -110,19 +115,19 @@ var commandsMap = map[string]*CommandDescription{ //nolint:gochecknoglobals
 	"XCUP": {Fn: (*clientHandler).handleNotImplemented},
 
 	// Connection handling
-	"TYPE": {Fn: (*clientHandler).handleTYPE},
-	"MODE": {Fn: (*clientHandler).handleMODE},
-	"PASV": {Fn: (*clientHandler).handlePASV},
-	"EPSV": {Fn: (*clientHandler).handlePASV},
-	"LPSV": {Fn: (*clientHandler).handleNotImplemented},
-	"SPSV": {Fn: (*clientHandler).handleNotImplemented},
-	"PORT": {Fn: (*clientHandler).handlePORT},
-	"LRPT": {Fn: (*clientHandler).handleNotImplemented},
-	"EPRT": {Fn: (*clientHandler).handlePORT},
-	"REIN": {Fn: (*clientHandler).handleNotImplemented},
+	"TYPE":  {Fn: (*clientHandler).handleTYPE},
+	"MODE":  {Fn: (*clientHandler).handleMODE},
+	"PASV":  {Fn: (*clientHandler).handlePASV},
+	"EPSV":  {Fn: (*clientHandler).handlePASV},
+	"LPSV":  {Fn: (*clientHandler).handleNotImplemented},
+	"SPSV":  {Fn: (*clientHandler).handleNotImplemented},
+	"PORT":  {Fn: (*clientHandler).handlePORT},
+	"LRPT":  {Fn: (*clientHandler).handleNotImplemented},
+	cmdEPRT: {Fn: (*clientHandler).handlePORT},
+	"REIN":  {Fn: (*clientHandler).handleNotImplemented},
 }
 
-var specialAttentionCommands = []string{"ABOR", "STAT", "QUIT"} //nolint:gochecknoglobals
+var specialAttentionCommands = []string{"ABOR", cmdSTAT, "QUIT"} //nolint:gochecknoglobals
 
 // FtpServer is where everything is stored
 // We want to keep it as simple as possible

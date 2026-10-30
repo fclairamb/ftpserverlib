@@ -340,7 +340,7 @@ func (driver *TestServerDriver) AuthUser(_ ClientContext, user, pass string) (Cl
 		clientdriver := NewTestClientDriver(driver)
 
 		return clientdriver, nil
-	} else if user == "nil" && pass == "nil" {
+	} else if user == nilUser && pass == nilUser {
 		// Definitely a bad behavior (but can be done on the driver side)
 		return nil, nil //nolint:nilnil
 	}
@@ -709,3 +709,9 @@ func TestCryptoRandError(t *testing.T) {
 	req.Equal(8000, exposedPort)
 	req.Equal(9000, listenedPort)
 }
+
+const (
+	nilUser    = "nil"
+	firstLine  = "first line"
+	secondLine = "second line"
+)

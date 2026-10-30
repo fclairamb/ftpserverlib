@@ -25,8 +25,7 @@ import (
 )
 
 func getABORCmd() string {
-	runes := []rune{}
-	runes = append(runes, rune(242), rune(255))
+	runes := []rune{rune(242), rune(255)}
 	str := string(runes)
 
 	return str + "ABOR"
@@ -135,7 +134,7 @@ func ftpDownloadAndHashWithRawConnection(
 	dcGetter, err := raw.PrepareDataConn()
 	req.NoError(err)
 
-	returnCode, response, err := raw.SendCommand(fmt.Sprintf("RETR %v", fileName))
+	returnCode, response, err := raw.SendCommand("RETR %v", fileName)
 	require.NoError(t, err)
 	req.Equal(StatusFileStatusOK, returnCode, response)
 
@@ -191,7 +190,7 @@ func ftpUploadWithRawConnection(
 		cmd = "APPE"
 	}
 
-	returnCode, response, err := raw.SendCommand(fmt.Sprintf("%v %v", cmd, fileName))
+	returnCode, response, err := raw.SendCommand("%v %v", cmd, fileName)
 	require.NoError(t, err)
 	require.Equal(t, StatusFileStatusOK, returnCode, response)
 
@@ -861,7 +860,7 @@ func TestBasicABOR(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, StatusEnteringEPSV, returnCode)
 
-	returnCode, _, err = raw.SendCommand(getABORCmd())
+	returnCode, _, err = raw.SendCommand("%s", getABORCmd())
 	require.NoError(t, err)
 	require.Equal(t, StatusClosingDataConn, returnCode)
 
@@ -968,10 +967,10 @@ func TestABORWithoutOpenTransfer(t *testing.T) {
 		_, err = raw.PrepareDataConn()
 		require.NoError(t, err)
 
-		err = raw.SendCommandNoWaitResponse(cmd)
+		err = raw.SendCommandNoWaitResponse("%s", cmd)
 		require.NoError(t, err)
 
-		returnCode, response, err = raw.SendCommand(getABORCmd())
+		returnCode, response, err = raw.SendCommand("%s", getABORCmd())
 		require.NoError(t, err)
 		require.Equal(t, StatusClosingDataConn, returnCode, response)
 		require.Equal(t, "ABOR successful; closing transfer connection", response)
@@ -1046,14 +1045,14 @@ func aborTransfer(t *testing.T, client *goftp.Client) {
 	require.Equal(t, StatusFileStatusOK, returnCode, response)
 	require.Equal(t, "Using transfer connection", response)
 
-	returnCode, response, err = raw.SendCommand("STAT")
+	returnCode, response, err = raw.SendCommand(cmdSTAT)
 	require.NoError(t, err)
 	require.Equal(t, StatusSystemStatus, returnCode, response)
 	require.Contains(t, response, "RETR delay-io.bin")
 	require.NotContains(t, response, "Using transfer connection")
 	require.NotContains(t, response, "Closing transfer connection")
 
-	returnCode, response, err = raw.SendCommand(getABORCmd())
+	returnCode, response, err = raw.SendCommand("%s", getABORCmd())
 	require.NoError(t, err)
 	require.Equal(t, StatusTransferAborted, returnCode, response)
 	require.Equal(t, "Connection closed; transfer aborted", response)
@@ -1097,7 +1096,7 @@ func aborBeforeOpenTransfer(t *testing.T, client *goftp.Client) {
 	err = raw.SendCommandNoWaitResponse("RETR delay-io.bin")
 	require.NoError(t, err)
 
-	returnCode, response, err = raw.SendCommand(getABORCmd())
+	returnCode, response, err = raw.SendCommand("%s", getABORCmd())
 	require.NoError(t, err)
 	require.Equal(t, StatusClosingDataConn, returnCode, response)
 	require.Equal(t, "ABOR successful; closing transfer connection", response)
@@ -1754,7 +1753,7 @@ func getPortFromPASVResponse(t *testing.T, resp string) int {
 		portOctet, err := strconv.Atoi(part)
 		require.NoError(t, err)
 
-		port |= portOctet << (byte(1-i) * 8)
+		port |= portOctet << (uint(1-i) * 8)
 	}
 
 	return port

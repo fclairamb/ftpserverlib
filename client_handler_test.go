@@ -288,11 +288,11 @@ func TestMultiLineMessages(t *testing.T) {
 		},
 		{
 			message:       "first line\r\nsecond line\r\n",
-			expectedLines: []string{"first line", "second line"},
+			expectedLines: []string{firstLine, secondLine},
 		},
 		{
 			message:       "first line\nsecond line\n",
-			expectedLines: []string{"first line", "second line"},
+			expectedLines: []string{firstLine, secondLine},
 		},
 		{
 			message:       "first line\rsecond line",
@@ -304,7 +304,7 @@ func TestMultiLineMessages(t *testing.T) {
 second line
 
 `,
-			expectedLines: []string{"first line", "", "second line", ""},
+			expectedLines: []string{firstLine, "", secondLine, ""},
 		},
 	}
 
@@ -344,7 +344,7 @@ func TestUnknownCommand(t *testing.T) {
 	defer func() { require.NoError(t, raw.Close()) }()
 
 	cmd := "UNSUPPORTED"
-	rc, response, err := raw.SendCommand(cmd)
+	rc, response, err := raw.SendCommand("%s", cmd)
 	require.NoError(t, err)
 	require.Equal(t, StatusSyntaxErrorNotRecognised, rc)
 	require.Equal(t, fmt.Sprintf("Unknown command %#v", cmd), response)

@@ -451,20 +451,8 @@ func (c *clientHandler) readCommand() bool {
 	}
 
 	// florent(2018-01-14): #58: IDLE timeout: Preparing the deadline before we read
-	if c.server.settings.IdleTimeout > 0 {
-		if err := c.conn.SetDeadline(
-			time.Now().Add(time.Duration(time.Second.Nanoseconds() * int64(c.server.settings.IdleTimeout)))); err != nil {
-			// If the connection is already closed, return early instead of trying to read
-			if isClosedConnError(err) {
-				if c.debug {
-					c.logger.Debug("Client disconnected before first command")
-				}
-
-				return true
-			}
-
-			c.logger.Error("Network error", "err", err)
-		}
+	if c.server.settings.IdleTimeout > 0 && c.setIdleDeadline() {
+		return true
 	}
 
 	lineSlice, isPrefix, err := c.reader.ReadLine()
@@ -498,57 +486,8 @@ func (c *clientHandler) readCommand() bool {
 func (c *clientHandler) handleCommandsStreamError(err error) bool {
 	// florent(2018-01-14): #58: IDLE timeout: Adding some code to deal with the deadline
 	var errNetError net.Error
-	if errors.As(err, &errNetError) { //nolint:nestif // too much effort to change for now
-		if errNetError.Timeout() {
-			// Check if there's an active data transfer before closing the control connection
-			c.transferMu.Lock()
-			hasActiveTransfer := c.isTransferOpen
-			c.transferMu.Unlock()
-
-			if hasActiveTransfer {
-				// If there's an active data transfer, extend the deadline and continue
-				extendedDeadline := time.Now().Add(time.Duration(time.Second.Nanoseconds() * int64(c.server.settings.IdleTimeout)))
-				if errSet := c.conn.SetDeadline(extendedDeadline); errSet != nil {
-					c.logger.Error("Could not extend read deadline during active transfer", "err", errSet)
-				}
-
-				if c.debug {
-					c.logger.Debug("Idle timeout occurred during active transfer, extending deadline")
-				}
-
-				// Don't disconnect - the transfer is still active
-				return false
-			}
-
-			// We have to extend the deadline now
-			if errSet := c.conn.SetDeadline(time.Now().Add(time.Minute)); errSet != nil {
-				c.logger.Error("Could not set read deadline", "err", errSet)
-			}
-
-			c.logger.Info("Client IDLE timeout", "err", err)
-			c.writeMessage(
-				StatusServiceNotAvailable,
-				fmt.Sprintf("command timeout (%d seconds): closing control connection", c.server.settings.IdleTimeout))
-
-			if errFlush := c.writer.Flush(); errFlush != nil {
-				c.logger.Error("Flush error", "err", errFlush)
-			}
-
-			return true
-		}
-
-		// Check if this is a closed connection error - treat as normal disconnect
-		if isClosedConnError(err) {
-			if c.debug {
-				c.logger.Debug("Client disconnected", "clean", false)
-			}
-
-			return true
-		}
-
-		c.logger.Error("Network error", "err", err)
-
-		return true
+	if errors.As(err, &errNetError) {
+		return c.handleNetworkError(err, errNetError)
 	}
 
 	// Check for closed connection errors before logging as error
@@ -567,6 +506,52 @@ func (c *clientHandler) handleCommandsStreamError(err error) bool {
 	} else {
 		c.logger.Error("Read error", "err", err)
 	}
+
+	return true
+}
+
+// setIdleDeadline arms the idle deadline. It returns true if the connection is already closed.
+func (c *clientHandler) setIdleDeadline() bool {
+	err := c.conn.SetDeadline(c.idleDeadline())
+	if err == nil {
+		return false
+	}
+
+	// If the connection is already closed, return early instead of trying to read
+	if isClosedConnError(err) {
+		if c.debug {
+			c.logger.Debug("Client disconnected before first command")
+		}
+
+		return true
+	}
+
+	c.logger.Error("Network error", "err", err)
+
+	return false
+}
+
+func (c *clientHandler) idleDeadline() time.Time {
+	return time.Now().Add(time.Duration(time.Second.Nanoseconds() * int64(c.server.settings.IdleTimeout)))
+}
+
+// handleNetworkError handles a network error while reading a command: it returns true if the client
+// should be disconnected.
+func (c *clientHandler) handleNetworkError(err error, errNetError net.Error) bool {
+	if errNetError.Timeout() {
+		return c.handleTimeout(err)
+	}
+
+	// Check if this is a closed connection error - treat as normal disconnect
+	if isClosedConnError(err) {
+		if c.debug {
+			c.logger.Debug("Client disconnected", "clean", false)
+		}
+
+		return true
+	}
+
+	c.logger.Error("Network error", "err", err)
 
 	return true
 }
@@ -612,7 +597,7 @@ func (c *clientHandler) handleCommand(line string) {
 	// have at most one command that can open a transfer connection and one special
 	// action command running at the same time.
 	// Only server STAT is a special action command so we do an additional check here
-	if !cmdDesc.SpecialAction || (command == "STAT" && param != "") {
+	if !cmdDesc.SpecialAction || (command == cmdSTAT && param != "") {
 		c.transferWg.Wait()
 	}
 
@@ -1029,4 +1014,42 @@ func newDeflateTransfer(conn io.ReadWriter, level int) (*deflateReadWriter, erro
 		reader: reader,
 		writer: writer,
 	}, nil
+}
+
+// handleTimeout handles a read timeout: it returns true if the client should be disconnected.
+func (c *clientHandler) handleTimeout(err error) bool {
+	// Check if there's an active data transfer before closing the control connection
+	c.transferMu.Lock()
+	hasActiveTransfer := c.isTransferOpen
+	c.transferMu.Unlock()
+
+	if hasActiveTransfer {
+		// If there's an active data transfer, extend the deadline and continue
+		if errSet := c.conn.SetDeadline(c.idleDeadline()); errSet != nil {
+			c.logger.Error("Could not extend read deadline during active transfer", "err", errSet)
+		}
+
+		if c.debug {
+			c.logger.Debug("Idle timeout occurred during active transfer, extending deadline")
+		}
+
+		// Don't disconnect - the transfer is still active
+		return false
+	}
+
+	// We have to extend the deadline now
+	if errSet := c.conn.SetDeadline(time.Now().Add(time.Minute)); errSet != nil {
+		c.logger.Error("Could not set read deadline", "err", errSet)
+	}
+
+	c.logger.Info("Client IDLE timeout", "err", err)
+	c.writeMessage(
+		StatusServiceNotAvailable,
+		fmt.Sprintf("command timeout (%d seconds): closing control connection", c.server.settings.IdleTimeout))
+
+	if errFlush := c.writer.Flush(); errFlush != nil {
+		c.logger.Error("Flush error", "err", errFlush)
+	}
+
+	return true
 }
