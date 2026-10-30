@@ -147,6 +147,11 @@ func TestCHMOD(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, StatusActionNotTaken, returnCode, "Should have been refused")
 
+	returnCode, response, err := raw.SendCommand("SITE CHMOD 644")
+	require.NoError(t, err)
+	require.Equal(t, StatusSyntaxErrorParameters, returnCode, "A missing path should be refused")
+	require.NotContains(t, response, "internal error")
+
 	returnCode, _, err = raw.SendCommand("SITE CHMOD 600 file")
 	require.NoError(t, err)
 	require.Equal(t, StatusOK, returnCode, "Should have been accepted")

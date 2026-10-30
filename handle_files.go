@@ -262,6 +262,13 @@ func (c *clientHandler) combineFiles(targetPath string, fileFlag int, sourcePath
 
 func (c *clientHandler) handleCHMOD(params string) {
 	spl := strings.SplitN(params, " ", 2)
+
+	if len(spl) != 2 {
+		c.writeMessage(StatusSyntaxErrorParameters, "bad command")
+
+		return
+	}
+
 	modeNb, err := strconv.ParseUint(spl[0], 8, 32)
 
 	mode := os.FileMode(modeNb)
