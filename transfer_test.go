@@ -1940,3 +1940,120 @@ func TestConnectionCloseDuringTransfer(t *testing.T) {
 	_, err = newClient.Stat("large-file.bin")
 	require.NoError(t, err, "File should still be accessible after interrupted transfer")
 }
+
+func TestPASVThenPORTReleasesPassivePort(t *testing.T) {
+	req := require.New(t)
+	port := getFreePassivePort(t)
+	server := NewTestServerWithTestDriver(t, &TestServerDriver{
+		Debug: true,
+		Settings: &Settings{
+			ListenAddr:               testServerListenAddr,
+			DefaultTransferType:      TransferTypeBinary,
+			PassiveTransferPortRange: &PortRange{Start: port, End: port},
+		},
+	})
+
+	client, err := goftp.DialConfig(goftp.Config{User: authUser, Password: authPass}, server.Addr())
+	req.NoError(err)
+
+	defer func() { panicOnError(client.Close()) }()
+
+	raw, err := client.OpenRawConn()
+	req.NoError(err)
+
+	defer func() { req.NoError(raw.Close()) }()
+
+	for range 3 {
+		returnCode, message, errCmd := raw.SendCommand("PASV")
+		req.NoError(errCmd)
+		req.Equal(StatusEnteringPASV, returnCode, message)
+
+		returnCode, message, errCmd = raw.SendCommand("PORT 127,0,0,1,%d,%d", port/256, port%256)
+		req.NoError(errCmd)
+		req.Equal(StatusOK, returnCode, message)
+	}
+
+	// The one passive port is free again: a passive transfer from another connection works.
+	files, err := client.ReadDir("/")
+	req.NoError(err)
+	req.Empty(files)
+}
+
+func TestPASVWrappedListenerErrorReleasesPort(t *testing.T) {
+	req := require.New(t)
+	port := getFreePassivePort(t)
+	server := NewTestServerWithTestDriver(t, &TestServerDriver{
+		Debug:              true,
+		errPassiveListener: os.ErrClosed,
+		Settings: &Settings{
+			ListenAddr:               testServerListenAddr,
+			DefaultTransferType:      TransferTypeBinary,
+			PassiveTransferPortRange: &PortRange{Start: port, End: port},
+		},
+	})
+
+	client, err := goftp.DialConfig(goftp.Config{User: authUser, Password: authPass}, server.Addr())
+	req.NoError(err)
+
+	defer func() { panicOnError(client.Close()) }()
+
+	raw, err := client.OpenRawConn()
+	req.NoError(err)
+
+	defer func() { req.NoError(raw.Close()) }()
+
+	for range 2 {
+		returnCode, message, errCmd := raw.SendCommand("PASV")
+		req.NoError(errCmd)
+		req.Equal(StatusServiceNotAvailable, returnCode, message)
+		req.Contains(message, os.ErrClosed.Error())
+		req.NotContains(message, ErrNoAvailableListeningPort.Error())
+	}
+
+	listener, err := (&net.ListenConfig{}).Listen(t.Context(), "tcp", fmt.Sprintf(":%d", port))
+	req.NoError(err, "the passive port should have been released")
+	req.NoError(listener.Close())
+}
+
+func TestPASVOverIPv6WithoutPublicHostReleasesPort(t *testing.T) {
+	req := require.New(t)
+
+	ipv6Listener, err := (&net.ListenConfig{}).Listen(t.Context(), "tcp", "[::1]:0")
+	if err != nil {
+		t.Skip("IPv6 loopback not available")
+	}
+
+	req.NoError(ipv6Listener.Close())
+
+	port := getFreePassivePort(t)
+	server := NewTestServerWithTestDriver(t, &TestServerDriver{
+		Debug: true,
+		Settings: &Settings{
+			ListenAddr:               "[::1]:0",
+			DefaultTransferType:      TransferTypeBinary,
+			PassiveTransferPortRange: &PortRange{Start: port, End: port},
+		},
+	})
+
+	client, err := goftp.DialConfig(goftp.Config{User: authUser, Password: authPass}, server.Addr())
+	req.NoError(err)
+
+	defer func() { panicOnError(client.Close()) }()
+
+	raw, err := client.OpenRawConn()
+	req.NoError(err)
+
+	defer func() { req.NoError(raw.Close()) }()
+
+	for range 2 {
+		returnCode, message, errCmd := raw.SendCommand("PASV")
+		req.NoError(errCmd)
+		req.Equal(StatusServiceNotAvailable, returnCode, message)
+		req.NotContains(message, ErrNoAvailableListeningPort.Error())
+	}
+
+	// EPSV still gets the port: the failed PASV did not keep it.
+	returnCode, message, err := raw.SendCommand("EPSV")
+	req.NoError(err)
+	req.Equal(StatusEnteringEPSV, returnCode, message)
+}

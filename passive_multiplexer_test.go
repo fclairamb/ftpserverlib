@@ -2,6 +2,7 @@ package ftpserver
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"net"
@@ -260,4 +261,42 @@ func TestSharedPassiveListenerDispatchRejectionsAndClosedManager(t *testing.T) {
 
 	_, err = newSharedPassiveListener(-1, slog.New(slog.NewTextHandler(io.Discard, nil))) //nolint:sloglint
 	req.Error(err)
+}
+
+func TestPassivePortMultiplexingPORTReleasesReservation(t *testing.T) {
+	req := require.New(t)
+	port := getFreePassivePort(t)
+	driver := &TestServerDriver{
+		Settings: &Settings{
+			ListenAddr:                      testServerListenAddr,
+			DefaultTransferType:             TransferTypeBinary,
+			PassiveTransferPortRange:        &PortRange{Start: port, End: port},
+			PassiveTransferPortMultiplexing: true,
+		},
+	}
+	server := NewTestServerWithTestDriver(t, driver)
+
+	client, err := goftp.DialConfig(goftp.Config{
+		User:     authUser,
+		Password: authPass,
+	}, server.Addr())
+	req.NoError(err)
+	defer func() { panicOnError(client.Close()) }()
+
+	raw, err := client.OpenRawConn()
+	req.NoError(err)
+	defer func() { req.NoError(raw.Close()) }()
+
+	expected := fmt.Sprintf(",%d,%d)", port/256, port%256)
+
+	for range 3 {
+		returnCode, message, errCmd := raw.SendCommand("PASV")
+		req.NoError(errCmd)
+		req.Equal(StatusEnteringPASV, returnCode, message)
+		req.Contains(message, expected)
+
+		returnCode, message, errCmd = raw.SendCommand("PORT 127,0,0,1,%d,%d", port/256, port%256)
+		req.NoError(errCmd)
+		req.Equal(StatusOK, returnCode, message)
+	}
 }

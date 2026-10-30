@@ -158,6 +158,17 @@ func (c *clientHandler) handlePASV(_ string) error {
 		return nil
 	}
 
+	// Until the transfer handler is installed, any early return must release the listener: otherwise the
+	// port (or the multiplexed reservation) stays bound until the GC finalizer closes it.
+	installed := false
+	toClose := listener
+
+	defer func() {
+		if !installed && toClose != nil {
+			toClose.Close() //nolint:errcheck,gosec
+		}
+	}()
+
 	if wrapper, ok := c.server.driver.(MainDriverExtensionPassiveWrapper); ok {
 		listener, err = wrapper.WrapPassiveListener(listener)
 		if err != nil {
@@ -166,6 +177,8 @@ func (c *clientHandler) handlePASV(_ string) error {
 
 			return nil
 		}
+
+		toClose = listener
 	}
 
 	if c.HasTLSForTransfers() || c.server.settings.TLSRequired == ImplicitEncryption {
@@ -207,6 +220,7 @@ func (c *clientHandler) handlePASV(_ string) error {
 	}
 
 	c.transfer = transferHandler
+	installed = true
 	c.transferMu.Unlock()
 	c.setLastDataChannel(DataChannelPassive)
 
