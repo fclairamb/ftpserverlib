@@ -240,3 +240,12 @@ GitHub Actions workflow (`.github/workflows/build.yml`):
 - `client_handler.go` - Client state machine (largest file)
 - `consts.go` - FTP status codes and command registration
 - `driver_test.go` - Reference driver implementation for testing
+
+## Autopilot and automerge
+
+- The `autopilot` label on a PR or an issue hands it to the `/autopilot` loop (wabot scheduler
+  `everything/schedulers/<repo>-autopilot.md`, woken by the repo's GitHub webhook through ntfy `github-autopilot`).
+  It keeps the PR mergeable (base merges, CI, coverage) and never merges it.
+- The `automerge` label merges a PR on its own once CI is green: `.github/workflows/auto-merge.yml` enables
+  GitHub's auto-merge (squash) and updates a branch that is behind main, with the `CI_PAT` secret (a branch update
+  pushed with `GITHUB_TOKEN` would not trigger CI). Renovate's minor/patch updates get it.
