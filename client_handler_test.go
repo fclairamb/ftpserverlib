@@ -748,3 +748,72 @@ func TestMultipleImmediateDisconnects(t *testing.T) {
 	_, err = client.ReadDir("/")
 	require.NoError(t, err)
 }
+
+type syncBuffer struct {
+	mu  sync.Mutex
+	buf bytes.Buffer
+}
+
+func (b *syncBuffer) Write(p []byte) (int, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	return b.buf.Write(p)
+}
+
+func (b *syncBuffer) String() string {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	return b.buf.String()
+}
+
+func TestRedactLine(t *testing.T) {
+	t.Parallel()
+
+	assert.Equal(t, "PASS ****", redactLine("PASS secret"))
+	assert.Equal(t, "pass ****", redactLine("pass secret with spaces"))
+	assert.Equal(t, "PASS", redactLine("PASS"))
+	assert.Equal(t, "USER acme", redactLine("USER acme"))
+	assert.Equal(t, "CWD /dir", redactLine("CWD /dir"))
+	assert.Equal(t, "****", redactParam("PASS", "secret"))
+	assert.Equal(t, "/dir", redactParam("CWD", "/dir"))
+}
+
+func TestDebugLogRedactsPassword(t *testing.T) {
+	const password = "s3cr3t-acme-password"
+
+	logs := &syncBuffer{}
+	logger := slog.New(slog.NewTextHandler(logs, &slog.HandlerOptions{Level: slog.LevelDebug}))
+
+	driver := &TestServerDriver{Debug: true}
+	driver.AuthProvider = func(user, pass string) (ClientDriver, error) {
+		if user == "acme" && pass == password {
+			return NewTestClientDriver(driver), nil
+		}
+
+		return nil, errInvalidChownUser
+	}
+	driver.Init()
+
+	server := NewTestServerWithDriverAndLogger(t, driver, logger)
+
+	client, err := goftp.DialConfig(goftp.Config{User: "acme", Password: password}, server.Addr())
+	require.NoError(t, err, "Couldn't connect")
+
+	defer func() { panicOnError(client.Close()) }()
+
+	raw, err := client.OpenRawConn()
+	require.NoError(t, err, "Couldn't open raw connection")
+
+	defer func() { require.NoError(t, raw.Close()) }()
+
+	_, _, err = raw.SendCommand("CWD /dir")
+	require.NoError(t, err)
+
+	output := logs.String()
+	require.NotContains(t, output, password)
+	require.Contains(t, output, `line="PASS ****"`)
+	require.Contains(t, output, `line="USER acme"`)
+	require.Contains(t, output, `line="CWD /dir"`)
+}

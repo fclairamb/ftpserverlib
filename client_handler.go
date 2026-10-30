@@ -487,7 +487,7 @@ func (c *clientHandler) readCommand() bool {
 	line := string(lineSlice)
 
 	if c.debug {
-		c.logger.Debug("Received line", "line", line)
+		c.logger.Debug("Received line", "line", redactLine(line))
 	}
 
 	c.handleCommand(line)
@@ -652,7 +652,7 @@ func (c *clientHandler) executeCommandFn(cmdDesc *CommandDescription, command, p
 				"Internal command handling error",
 				"err", r,
 				"command", command,
-				"param", param,
+				"param", redactParam(command, param),
 			)
 		}
 	}()
@@ -931,6 +931,27 @@ func parseLine(line string) (string, string) {
 	}
 
 	return params[0], params[1]
+}
+
+const redactedValue = "****"
+
+// redactLine hides the parameter of credential-carrying commands so it never reaches the logs
+func redactLine(line string) string {
+	command, param := parseLine(line)
+	if param != "" && strings.EqualFold(command, "PASS") {
+		return command + " " + redactedValue
+	}
+
+	return line
+}
+
+// redactParam hides the parameter of credential-carrying commands so it never reaches the logs
+func redactParam(command, param string) string {
+	if param != "" && strings.EqualFold(command, "PASS") {
+		return redactedValue
+	}
+
+	return param
 }
 
 func (c *clientHandler) multilineAnswer(code int, message string) func() {
