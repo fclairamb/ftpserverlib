@@ -1310,14 +1310,10 @@ func TestPASVPublicIPResolver(t *testing.T) {
 	require.Contains(t, resp, "couldn't fetch public IP")
 }
 
-func TestPASVConnectionWait(t *testing.T) {
-	addr, err := net.ResolveTCPAddr("tcp", ":0")
-	require.NoError(t, err)
+func newTestPassiveTransferHandler(t *testing.T, listener net.Listener) *passiveTransferHandler {
+	t.Helper()
 
-	tcpListener, err := net.ListenTCP("tcp", addr)
-	require.NoError(t, err)
-
-	cltHandler := clientHandler{
+	cltHandler := &clientHandler{
 		conn: &testNetConn{
 			remoteAddr: &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: 21},
 		},
@@ -1329,37 +1325,190 @@ func TestPASVConnectionWait(t *testing.T) {
 		},
 	}
 
-	transferHandler := passiveTransferHandler{ //nolint:forcetypeassert
-		listener: &testNetListener{
-			conn: &testNetConn{
-				remoteAddr: &net.TCPAddr{IP: nil, Port: 21}, // invalid IP
-			},
-		},
-		deadlineSetter: tcpListener,
-		Port:           tcpListener.Addr().(*net.TCPAddr).Port,
-		settings:       cltHandler.server.settings,
-		logger:         slog.New(slog.NewTextHandler(io.Discard, nil)), //nolint:sloglint // DiscardHandler requires Go 1.23+
-		checkDataConn:  cltHandler.checkDataConnectionRequirement,
+	return &passiveTransferHandler{
+		listener:      listener,
+		settings:      cltHandler.server.settings,
+		logger:        slog.New(slog.NewTextHandler(io.Discard, nil)), //nolint:sloglint // DiscardHandler requires Go 1.23+
+		checkDataConn: cltHandler.checkDataConnectionRequirement,
 	}
+}
 
-	defer func() {
-		err = transferHandler.Close()
-		assert.NoError(t, err)
-	}()
+func TestPASVConnectionWait(t *testing.T) {
+	invalidConn := &testNetConn{remoteAddr: &net.TCPAddr{IP: nil, Port: 21}} // invalid IP
+	transferHandler := newTestPassiveTransferHandler(t, &testNetListener{conns: []net.Conn{invalidConn}})
 
-	_, err = transferHandler.ConnectionWait(1 * time.Second)
+	_, err := transferHandler.ConnectionWait(time.Second)
 	if assert.Error(t, err) {
 		assert.Contains(t, err.Error(), "invalid remote IP")
 	}
 
-	transferHandler.listener = &testNetListener{
-		conn: &testNetConn{
-			remoteAddr: &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: 21},
+	assert.True(t, invalidConn.closed, "the rejected connection must be closed")
+
+	validConn := &testNetConn{remoteAddr: &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: 21}}
+	transferHandler.listener = &testNetListener{conns: []net.Conn{validConn}}
+
+	conn, err := transferHandler.ConnectionWait(time.Second)
+	require.NoError(t, err)
+	require.Same(t, validConn, conn)
+
+	// the accepted connection is kept for the transfer
+	conn, err = transferHandler.ConnectionWait(time.Second)
+	require.NoError(t, err)
+	require.Same(t, validConn, conn)
+
+	require.NoError(t, transferHandler.Close())
+	assert.True(t, validConn.closed)
+}
+
+func TestPASVConnectionWaitSkipsNonMatchingIP(t *testing.T) {
+	foreignConn := &testNetConn{remoteAddr: &net.TCPAddr{IP: net.ParseIP("192.0.2.1"), Port: 2121}}
+	invalidConn := &testNetConn{remoteAddr: &net.TCPAddr{IP: nil, Port: 2121}}
+	clientConn := &testNetConn{remoteAddr: &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: 2121}}
+
+	transferHandler := newTestPassiveTransferHandler(t, &testNetListener{
+		conns: []net.Conn{foreignConn, invalidConn, clientConn},
+	})
+
+	conn, err := transferHandler.ConnectionWait(time.Second)
+	require.NoError(t, err)
+	require.Same(t, clientConn, conn)
+	assert.True(t, foreignConn.closed, "the connection from a foreign IP must be closed")
+	assert.True(t, invalidConn.closed, "the connection with an invalid IP must be closed")
+	assert.False(t, clientConn.closed)
+}
+
+func TestPASVConnectionWaitOnlyNonMatchingIP(t *testing.T) {
+	t.Run("listener error", func(t *testing.T) {
+		foreignConns := []*testNetConn{
+			{remoteAddr: &net.TCPAddr{IP: net.ParseIP("192.0.2.1"), Port: 2121}},
+			{remoteAddr: &net.TCPAddr{IP: net.ParseIP("192.0.2.2"), Port: 2121}},
+		}
+		listener := &testNetListener{conns: []net.Conn{foreignConns[0], foreignConns[1]}}
+		transferHandler := newTestPassiveTransferHandler(t, listener)
+
+		_, err := transferHandler.ConnectionWait(time.Second)
+		require.Error(t, err)
+		require.Equal(t, "data connection security requirements not met", err.Error())
+
+		for _, conn := range foreignConns {
+			assert.True(t, conn.closed)
+		}
+
+		conn, err := transferHandler.ConnectionWait(time.Second)
+		require.Error(t, err)
+		require.Nil(t, conn)
+	})
+
+	t.Run("deadline", func(t *testing.T) {
+		foreignConn := &testNetConn{remoteAddr: &net.TCPAddr{IP: net.ParseIP("192.0.2.1"), Port: 2121}}
+		// the listener yields the foreign connection forever: only the deadline stops the wait
+		transferHandler := newTestPassiveTransferHandler(t, &testNetListener{conn: foreignConn})
+
+		start := time.Now()
+		_, err := transferHandler.ConnectionWait(100 * time.Millisecond)
+		require.Error(t, err)
+		require.Equal(t, "data connection security requirements not met", err.Error())
+		require.Less(t, time.Since(start), 5*time.Second)
+		assert.True(t, foreignConn.closed)
+
+		foreignConn.closed = false
+		conn, err := transferHandler.ConnectionWait(100 * time.Millisecond)
+		require.Error(t, err)
+		require.Nil(t, conn)
+		assert.True(t, foreignConn.closed)
+	})
+}
+
+// requireRawCommand sends a command and checks its return code
+func requireRawCommand(t *testing.T, raw goftp.RawConn, command string, expectedCode int) string {
+	t.Helper()
+
+	returnCode, response, err := raw.SendCommand("%s", command)
+	require.NoError(t, err)
+	require.Equal(t, expectedCode, returnCode, response)
+
+	return response
+}
+
+// dialPassive sends PASV and connects to the passive port from the control IP
+func dialPassive(t *testing.T, raw goftp.RawConn) net.Conn {
+	t.Helper()
+
+	response := requireRawCommand(t, raw, "PASV", StatusEnteringPASV)
+
+	dialer := &net.Dialer{Timeout: 5 * time.Second}
+	dataConn, err := dialer.DialContext(t.Context(), "tcp",
+		fmt.Sprintf("127.0.0.1:%d", getPortFromPASVResponse(t, response)))
+	require.NoError(t, err)
+
+	return dataConn
+}
+
+// A failed transfer must not leave its data connection behind for the next transfer command
+func TestPASVFailedTransferIsNotReused(t *testing.T) {
+	req := require.New(t)
+	server := NewTestServerWithTestDriver(t, &TestServerDriver{
+		Debug: true,
+		TLS:   true,
+	})
+
+	conf := goftp.Config{
+		User:     authUser,
+		Password: authPass,
+		TLSConfig: &tls.Config{
+			InsecureSkipVerify: true, //nolint:gosec
 		},
+		TLSMode: goftp.TLSExplicit,
 	}
 
-	_, err = transferHandler.ConnectionWait(1 * time.Second)
-	assert.NoError(t, err)
+	client, err := goftp.DialConfig(conf, server.Addr())
+	req.NoError(err, "Couldn't connect")
+
+	defer func() { panicOnError(client.Close()) }()
+
+	ftpUpload(t, client, createTemporaryFile(t, 1024), "file.bin")
+
+	raw, err := client.OpenRawConn()
+	req.NoError(err, "Couldn't open raw connection")
+
+	defer func() { require.NoError(t, raw.Close()) }()
+
+	requireRawCommand(t, raw, "PROT C", StatusOK)
+
+	dataConn := dialPassive(t, raw)
+
+	defer func() { require.NoError(t, dataConn.Close()) }()
+
+	requireRawCommand(t, raw, "PROT P", StatusOK)
+
+	// the data connection is in clear while PROT P is in force: refused
+	response := requireRawCommand(t, raw, "RETR file.bin", StatusCannotOpenDataConnection)
+	req.Equal(errProtMismatch.Error(), response)
+
+	// the refused connection was closed by the server
+	req.NoError(dataConn.SetReadDeadline(time.Now().Add(5 * time.Second)))
+	_, err = dataConn.Read(make([]byte, 1))
+	req.ErrorIs(err, io.EOF)
+
+	// without a new PASV, there is no transfer connection left to reuse
+	response = requireRawCommand(t, raw, "RETR file.bin", StatusActionNotTaken)
+	req.Equal(errNoTransferConnection.Error(), response)
+
+	// positive control: a new PASV from the control IP works
+	requireRawCommand(t, raw, "PROT C", StatusOK)
+
+	controlConn := dialPassive(t, raw)
+
+	requireRawCommand(t, raw, "RETR file.bin", StatusFileStatusOK)
+
+	data, err := io.ReadAll(controlConn)
+	req.NoError(err)
+	req.Len(data, 1024)
+	req.NoError(controlConn.Close())
+
+	returnCode, response, err := raw.ReadResponse()
+	req.NoError(err)
+	req.Equal(StatusClosingDataConn, returnCode, response)
 }
 
 // On Mac Os X, this requires to issue the following command:

@@ -353,6 +353,7 @@ func TestUnknownCommand(t *testing.T) {
 // testNetConn implements net.Conn interface
 type testNetConn struct {
 	remoteAddr net.Addr
+	closed     bool
 }
 
 func (*testNetConn) Read(_ []byte) (int, error) {
@@ -363,7 +364,9 @@ func (*testNetConn) Write(_ []byte) (int, error) {
 	return 0, nil
 }
 
-func (*testNetConn) Close() error {
+func (c *testNetConn) Close() error {
+	c.closed = true
+
 	return nil
 }
 
@@ -387,12 +390,21 @@ func (*testNetConn) SetWriteDeadline(_ time.Time) error {
 	return nil
 }
 
-// testNetListener implements net.Listener interface
+// testNetListener implements net.Listener interface. It yields the connections of conns in order, then conn
+// forever if set, then an error.
 type testNetListener struct {
-	conn net.Conn
+	conns []net.Conn
+	conn  net.Conn
 }
 
 func (l *testNetListener) Accept() (net.Conn, error) {
+	if len(l.conns) > 0 {
+		conn := l.conns[0]
+		l.conns = l.conns[1:]
+
+		return conn, nil
+	}
+
 	if l.conn != nil {
 		return l.conn, nil
 	}

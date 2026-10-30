@@ -703,6 +703,14 @@ func (c *clientHandler) GetTranferInfo() string {
 	return c.transfer.GetInfo()
 }
 
+// discardFailedTransfer closes the transfer handler after a failed TransferOpen, so that its data connection
+// can't be reused by a later transfer: the client has to send PASV/PORT again. transferMu must be held.
+func (c *clientHandler) discardFailedTransfer() {
+	if err := c.closeTransfer(); err != nil {
+		c.logger.Warn("Problem closing the failed transfer", "err", err)
+	}
+}
+
 func (c *clientHandler) TransferOpen(info string) (io.ReadWriter, error) {
 	c.transferMu.Lock()
 	defer c.transferMu.Unlock()
@@ -733,6 +741,7 @@ func (c *clientHandler) TransferOpen(info string) (io.ReadWriter, error) {
 			"error", err)
 
 		c.writeMessage(StatusCannotOpenDataConnection, err.Error())
+		c.discardFailedTransfer()
 
 		err = newNetworkError("Unable to open transfer", err)
 
@@ -748,6 +757,7 @@ func (c *clientHandler) TransferOpen(info string) (io.ReadWriter, error) {
 			"requested", c.HasTLSForTransfers())
 
 		c.writeMessage(StatusCannotOpenDataConnection, errProtMismatch.Error())
+		c.discardFailedTransfer()
 
 		return nil, errProtMismatch
 	}
@@ -758,6 +768,7 @@ func (c *clientHandler) TransferOpen(info string) (io.ReadWriter, error) {
 		transferStream, err = newDeflateTransfer(transferStream, c.server.settings.DeflateCompressionLevel)
 		if err != nil {
 			c.writeMessage(StatusActionNotTaken, fmt.Sprintf("Could not switch to deflate mode: %v", err))
+			c.discardFailedTransfer()
 
 			return nil, fmt.Errorf("could not switch to deflate mode: %w", err)
 		}

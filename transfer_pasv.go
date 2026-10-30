@@ -271,34 +271,62 @@ func (p *passiveTransferHandler) ConnectionWait(wait time.Duration) (net.Conn, e
 		return p.connection, nil
 	}
 
-	var err error
+	deadline := time.Now().Add(wait)
+
 	if p.deadlineSetter != nil {
-		err = p.deadlineSetter.SetDeadline(time.Now().Add(wait))
-	}
-	if err != nil {
-		return nil, fmt.Errorf("failed to set deadline: %w", err)
-	}
-
-	p.connection, err = p.listener.Accept()
-	if err != nil {
-		return nil, fmt.Errorf("failed to accept passive transfer connection: %w", err)
+		if err := p.deadlineSetter.SetDeadline(deadline); err != nil {
+			return nil, fmt.Errorf("failed to set deadline: %w", err)
+		}
 	}
 
-	ipAddress, err := getIPFromRemoteAddr(p.connection.RemoteAddr())
+	// A connection that fails the checks is closed and we keep accepting until the deadline: a peer racing
+	// the client must neither be served nor block the transfer.
+	var rejectErr error
+
+	for {
+		conn, err := p.listener.Accept()
+		if err != nil {
+			if rejectErr != nil {
+				return nil, rejectErr
+			}
+
+			return nil, fmt.Errorf("failed to accept passive transfer connection: %w", err)
+		}
+
+		rejectErr = p.validateConnection(conn)
+		if rejectErr == nil {
+			p.connection = conn
+
+			return conn, nil
+		}
+
+		if errClose := conn.Close(); errClose != nil {
+			p.logger.Warn("Problem closing rejected passive connection", "err", errClose)
+		}
+
+		if !time.Now().Before(deadline) {
+			return nil, rejectErr
+		}
+	}
+}
+
+// validateConnection checks that an accepted passive connection meets the data connection requirements
+func (p *passiveTransferHandler) validateConnection(conn net.Conn) error {
+	ipAddress, err := getIPFromRemoteAddr(conn.RemoteAddr())
 	if err != nil {
 		p.logger.Warn("Could get remote passive IP address", "err", err)
 
-		return nil, err
+		return err
 	}
 
 	if err := p.checkDataConn(ipAddress, DataChannelPassive); err != nil {
 		// we don't want to expose the full error to the client, we just log it
 		p.logger.Warn("Could not validate passive data connection requirement", "err", err)
 
-		return nil, &ipValidationError{error: "data connection security requirements not met"}
+		return &ipValidationError{error: "data connection security requirements not met"}
 	}
 
-	return p.connection, nil
+	return nil
 }
 
 func (p *passiveTransferHandler) GetInfo() string {
