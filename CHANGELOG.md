@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.32.7](https://github.com/fclairamb/ftpserverlib/compare/v0.32.6...v0.32.7) (2026-11-01)
+
+
+### Bug Fixes
+
+* **transfer:** fix passive port multiplexing races ([#692](https://github.com/fclairamb/ftpserverlib/issues/692)) ([e6c70f9](https://github.com/fclairamb/ftpserverlib/commit/e6c70f9a845631d11e9c9318435518f9c19c4112))
+
 ## [0.32.6](https://github.com/fclairamb/ftpserverlib/compare/v0.32.5...v0.32.6) (2026-10-30)
 
 
