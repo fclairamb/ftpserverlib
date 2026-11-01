@@ -1,11 +1,14 @@
 package ftpserver
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
 	"log/slog"
 	"net"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -18,6 +21,11 @@ type trackingTestConn struct {
 	closed bool
 }
 
+type closeCountingConn struct {
+	testNetConn
+	closed atomic.Bool
+}
+
 const testServerListenAddr = "127.0.0.1:0"
 
 var (
@@ -28,6 +36,12 @@ var (
 
 func (c *trackingTestConn) Close() error {
 	c.closed = true
+
+	return nil
+}
+
+func (c *closeCountingConn) Close() error {
+	c.closed.Store(true)
 
 	return nil
 }
@@ -105,6 +119,109 @@ func TestPassiveListenersManagerRejectsSameIPForSamePort(t *testing.T) {
 	req.Zero(exposedPort)
 	req.Nil(listener)
 	req.Nil(deadlineSetter)
+}
+
+func TestPassiveReservationCloseKeepsNewerReservation(t *testing.T) {
+	port := getFreePassivePort(t)
+	manager := newPassiveListenersManager(slog.New(slog.DiscardHandler))
+	defer func() {
+		require.NoError(t, manager.close())
+	}()
+
+	portRange := PortRange{Start: port, End: port}
+	clientIP := net.ParseIP("127.0.0.1")
+
+	_, first, _, err := manager.reserve(clientIP, portRange)
+	require.NoError(t, err)
+
+	dialer := net.Dialer{Timeout: time.Second}
+	firstClient, err := dialer.DialContext(context.Background(), "tcp", fmt.Sprintf("127.0.0.1:%d", port))
+	require.NoError(t, err)
+	defer func() { _ = firstClient.Close() }()
+
+	firstConn, err := first.Accept()
+	require.NoError(t, err)
+	defer func() { _ = firstConn.Close() }()
+
+	// The first data connection consumed its reservation, so the port is free for the same IP
+	_, second, secondDeadline, err := manager.reserve(clientIP, portRange)
+	require.NoError(t, err)
+	defer func() { _ = second.Close() }()
+
+	require.NoError(t, first.Close())
+
+	secondClient, err := dialer.DialContext(context.Background(), "tcp", fmt.Sprintf("127.0.0.1:%d", port))
+	require.NoError(t, err)
+	defer func() { _ = secondClient.Close() }()
+
+	require.NoError(t, secondDeadline.SetDeadline(time.Now().Add(5*time.Second)))
+	secondConn, err := second.Accept()
+	require.NoError(t, err)
+	require.NoError(t, secondConn.Close())
+}
+
+func TestPassiveReservationDeliverCloseRace(t *testing.T) {
+	const rounds = 50000
+
+	parent := &sharedPassiveListener{
+		logger:       slog.New(slog.DiscardHandler),
+		reservations: make(map[string]*passiveReservationListener),
+	}
+	clientIP := net.ParseIP("127.0.0.1")
+
+	for range rounds {
+		reservation, err := parent.reserve(clientIP)
+		require.NoError(t, err)
+		delete(parent.reservations, clientIP.String()) // as dispatch does before calling deliver
+
+		conn := &closeCountingConn{}
+		start := make(chan struct{})
+		var delivered bool
+		var waitGroup sync.WaitGroup
+
+		waitGroup.Go(func() {
+			<-start
+			delivered = reservation.deliver(conn)
+		})
+		waitGroup.Go(func() {
+			<-start
+			_ = reservation.Close()
+		})
+		close(start)
+		waitGroup.Wait()
+
+		if delivered {
+			require.True(t, conn.closed.Load(), "the connection was left with nobody to read or close it")
+		}
+		require.Empty(t, reservation.connCh)
+	}
+}
+
+func TestPassiveListenersManagerConcurrentFirstUse(t *testing.T) {
+	const (
+		rounds  = 50
+		clients = 8
+	)
+
+	for range rounds {
+		port := getFreePassivePort(t)
+		manager := newPassiveListenersManager(slog.New(slog.DiscardHandler))
+		portRange := PortRange{Start: port, End: port}
+		errs := make([]error, clients)
+
+		var waitGroup sync.WaitGroup
+		for client := range clients {
+			waitGroup.Go(func() {
+				_, _, _, errs[client] = manager.reserve(net.ParseIP(fmt.Sprintf("127.0.0.%d", client+1)), portRange)
+			})
+		}
+		waitGroup.Wait()
+
+		for _, err := range errs {
+			require.NoError(t, err)
+		}
+		require.NoError(t, manager.close())
+	}
 }
 
 func TestPassiveListenersManagerCloseReleasesReservation(t *testing.T) {
