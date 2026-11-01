@@ -85,36 +85,18 @@ func (m *passiveListenersManager) close() error {
 
 func (m *passiveListenersManager) getOrCreate(port int) (*sharedPassiveListener, error) {
 	m.mu.Lock()
-	if m.closed {
-		m.mu.Unlock()
+	defer m.mu.Unlock()
 
+	if m.closed {
 		return nil, net.ErrClosed
 	}
 	if listener, ok := m.listeners[port]; ok {
-		m.mu.Unlock()
-
 		return listener, nil
 	}
-	m.mu.Unlock()
 
 	listener, err := newSharedPassiveListener(port, m.logger.With("passivePort", port))
 	if err != nil {
 		return nil, err
-	}
-
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	if m.closed {
-		_ = listener.close()
-
-		return nil, net.ErrClosed
-	}
-
-	if existing, ok := m.listeners[port]; ok {
-		_ = listener.close()
-
-		return existing, nil
 	}
 
 	m.listeners[port] = listener
@@ -225,13 +207,12 @@ func (l *sharedPassiveListener) dispatch(conn net.Conn) {
 	}
 }
 
-func (l *sharedPassiveListener) release(remoteIP string) {
+func (l *sharedPassiveListener) release(reservation *passiveReservationListener) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
-	if reservation, ok := l.reservations[remoteIP]; ok {
-		delete(l.reservations, remoteIP)
-		reservation.markReleased()
+	if l.reservations[reservation.remoteIP] == reservation {
+		delete(l.reservations, reservation.remoteIP)
 	}
 }
 
@@ -271,7 +252,7 @@ type passiveReservationListener struct {
 	closeOnce  sync.Once
 	stateMu    sync.Mutex
 	deadline   time.Time
-	released   bool
+	closing    bool
 	failureErr error
 }
 
@@ -307,8 +288,8 @@ func (l *passiveReservationListener) Accept() (net.Conn, error) {
 
 func (l *passiveReservationListener) Close() error {
 	l.closeOnce.Do(func() {
-		l.parent.release(l.remoteIP)
-		l.markReleased()
+		l.parent.release(l)
+		l.markClosing()
 
 		select {
 		case conn := <-l.connCh:
@@ -337,21 +318,26 @@ func (l *passiveReservationListener) SetDeadline(deadline time.Time) error {
 	return nil
 }
 
+// deliver hands conn over unless Close started: connCh has room for the single connection a reservation
+// gets, so the send cannot block, and Close drains connCh only after setting closing.
 func (l *passiveReservationListener) deliver(conn net.Conn) bool {
-	select {
-	case <-l.closedCh:
-		return false
-	default:
-	}
+	l.stateMu.Lock()
+	defer l.stateMu.Unlock()
 
-	select {
-	case l.connCh <- conn:
-		l.markReleased()
-
-		return true
-	case <-l.closedCh:
+	if l.closing {
 		return false
 	}
+
+	l.connCh <- conn
+
+	return true
+}
+
+func (l *passiveReservationListener) markClosing() {
+	l.stateMu.Lock()
+	defer l.stateMu.Unlock()
+
+	l.closing = true
 }
 
 func (l *passiveReservationListener) fail(err error) {
@@ -362,13 +348,6 @@ func (l *passiveReservationListener) fail(err error) {
 	l.stateMu.Unlock()
 
 	_ = l.Close()
-}
-
-func (l *passiveReservationListener) markReleased() {
-	l.stateMu.Lock()
-	defer l.stateMu.Unlock()
-
-	l.released = true
 }
 
 func (l *passiveReservationListener) getDeadline() time.Time {
