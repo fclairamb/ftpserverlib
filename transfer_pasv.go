@@ -233,6 +233,11 @@ func (c *clientHandler) handlePASV(_ string) error {
 func (c *clientHandler) getPassiveListener() (int, net.Listener, passiveDeadlineSetter, error) {
 	portMapping := c.server.settings.PassiveTransferPortRange
 	if c.server.settings.PassiveTransferPortMultiplexing && portMapping != nil {
+		// Without IP matching, the data connection may come from any IP
+		if c.server.settings.PasvConnectionsCheck == IPMatchDisabled {
+			return c.server.passiveListeners.reserve(nil, portMapping)
+		}
+
 		controlConnIP, err := getIPFromRemoteAddr(c.RemoteAddr())
 		if err != nil {
 			return 0, nil, nil, err

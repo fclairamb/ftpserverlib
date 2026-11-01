@@ -558,3 +558,111 @@ func TestPassiveMultiplexingWrapErrorReleasesPort(t *testing.T) {
 	req.NoError(err)
 	req.NoError(tcpListener.Close())
 }
+
+func TestSharedPassiveListenerAnyIPReservationHasPortToItself(t *testing.T) {
+	req := require.New(t)
+	listener, err := newSharedPassiveListener(getFreePassivePort(t), slog.New(slog.DiscardHandler), nil)
+	req.NoError(err)
+	defer func() { req.NoError(listener.close()) }()
+
+	byIP, err := listener.reserve(net.ParseIP("127.0.0.2"))
+	req.NoError(err)
+
+	_, err = listener.reserve(nil)
+	req.ErrorIs(err, errPassiveListenerReservedForIP)
+
+	req.NoError(byIP.Close())
+
+	anyIP, err := listener.reserve(nil)
+	req.NoError(err)
+
+	_, err = listener.reserve(net.ParseIP("127.0.0.3"))
+	req.ErrorIs(err, errPassiveListenerReservedForIP)
+	_, err = listener.reserve(nil)
+	req.ErrorIs(err, errPassiveListenerReservedForIP)
+
+	req.NoError(anyIP.Close())
+
+	byIP, err = listener.reserve(net.ParseIP("127.0.0.3"))
+	req.NoError(err)
+	req.NoError(byIP.Close())
+}
+
+func TestPassiveListenersManagerAnyIPReservation(t *testing.T) {
+	req := require.New(t)
+	port := getFreePassivePort(t)
+	manager := newPassiveListenersManager(slog.New(slog.DiscardHandler), nil)
+	defer func() { req.NoError(manager.close()) }()
+
+	portRange := PortRange{Start: port, End: port}
+
+	// The connection comes from 127.0.0.1, which is not the IP of any reservation
+	_, reservation, deadlineSetter, err := manager.reserve(nil, portRange)
+	req.NoError(err)
+	defer func() { _ = reservation.Close() }()
+
+	client := dialPassivePort(t, port, "")
+	defer func() { _ = client.Close() }()
+
+	req.NoError(deadlineSetter.SetDeadline(time.Now().Add(5 * time.Second)))
+	conn, err := reservation.Accept()
+	req.NoError(err)
+	req.NoError(conn.Close())
+
+	// Once used, the reservation no longer holds the port
+	_, next, _, err := manager.reserve(net.ParseIP("192.0.2.10"), portRange)
+	req.NoError(err)
+	req.NoError(next.Close())
+}
+
+func TestPassivePortMultiplexingIPMatchDisabled(t *testing.T) {
+	// 127.0.1.1 is a loopback address on Linux, macOS needs 'sudo ifconfig lo0 alias 127.0.1.1 up'
+	probe, err := net.ListenTCP("tcp", &net.TCPAddr{IP: net.ParseIP("127.0.1.1")})
+	if err != nil {
+		t.Skip("Skipping test: 127.0.1.1 not available")
+	}
+
+	req := require.New(t)
+	req.NoError(probe.Close())
+
+	port := getFreePassivePort(t)
+	server := NewTestServerWithTestDriver(t, &TestServerDriver{
+		Settings: &Settings{
+			ListenAddr:                      testServerListenAddr,
+			PassiveTransferPortRange:        &PortRange{Start: port, End: port},
+			PassiveTransferPortMultiplexing: true,
+			PasvConnectionsCheck:            IPMatchDisabled,
+		},
+	})
+
+	dialer := &net.Dialer{Timeout: 5 * time.Second}
+	conn, err := dialer.DialContext(t.Context(), "tcp", server.Addr())
+	req.NoError(err)
+	defer func() { req.NoError(conn.Close()) }()
+
+	buf := make([]byte, 1024)
+	_, err = conn.Read(buf)
+	req.NoError(err)
+
+	loginConnection(t, conn)
+
+	_, err = conn.Write([]byte("PASV\r\n"))
+	req.NoError(err)
+
+	readBytes, err := conn.Read(buf)
+	req.NoError(err)
+	req.Equal(port, getPortFromPASVResponse(t, string(buf[:readBytes])))
+
+	_, err = conn.Write([]byte("LIST\r\n"))
+	req.NoError(err)
+
+	// The control connection comes from 127.0.0.1, the data connection from 127.0.1.1
+	dataDialer := net.Dialer{LocalAddr: &net.TCPAddr{IP: net.ParseIP("127.0.1.1")}, Timeout: 5 * time.Second}
+	dataConn, err := dataDialer.DialContext(t.Context(), "tcp", fmt.Sprintf("127.0.0.1:%d", port))
+	req.NoError(err)
+	defer func() { _ = dataConn.Close() }()
+
+	readBytes, err = conn.Read(buf)
+	req.NoError(err)
+	req.True(strings.HasPrefix(string(buf[:readBytes]), "150 Using transfer connection"), string(buf[:readBytes]))
+}

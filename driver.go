@@ -353,8 +353,11 @@ type Settings struct {
 	PublicHost string       // Public IP to expose (only an IP address is accepted at this stage)
 	Banner     string       // Banner to use in server status response
 	// PassiveTransferPortRange is the optional port mapping for passive data connections.
-	PassiveTransferPortRange        PasvPortGetter
-	PassiveTransferPortMultiplexing bool             // Allow different client IPs to share passive listener ports
+	PassiveTransferPortRange PasvPortGetter
+	// PassiveTransferPortMultiplexing allows different client IPs to share passive listener ports.
+	// With PasvConnectionsCheck set to IPMatchDisabled, a data connection can't be matched on its IP,
+	// so a pending transfer has its port to itself, as without multiplexing.
+	PassiveTransferPortMultiplexing bool
 	PublicIPResolver                PublicIPResolver // (Optional) To fetch a public IP lookup
 	IdleTimeout                     int              // Maximum inactivity time before disconnecting (#58)
 	ConnectionTimeout               int              // Maximum time to establish passive or active transfer connections

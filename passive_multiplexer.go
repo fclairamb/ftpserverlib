@@ -13,6 +13,10 @@ const errStrClosedNetworkConnection = "use of closed network connection"
 
 var errPassiveListenerReservedForIP = errors.New("passive listener already reserved for client ip")
 
+// anyIPKey is the reservation key of a client whose data connection may come from any IP. Such a
+// reservation can't be told apart from others by IP, so it has the port to itself until it is used.
+const anyIPKey = ""
+
 type passiveDeadlineSetter interface {
 	SetDeadline(deadline time.Time) error
 }
@@ -182,8 +186,12 @@ func (l *sharedPassiveListener) serve() {
 	}
 }
 
+// reserve reserves the port for the next data connection from remoteIP, or from any IP if it is nil
 func (l *sharedPassiveListener) reserve(remoteIP net.IP) (*passiveReservationListener, error) {
-	key := remoteIP.String()
+	key := anyIPKey
+	if remoteIP != nil {
+		key = remoteIP.String()
+	}
 
 	l.mu.Lock()
 	defer l.mu.Unlock()
@@ -191,7 +199,11 @@ func (l *sharedPassiveListener) reserve(remoteIP net.IP) (*passiveReservationLis
 	if l.closed {
 		return nil, net.ErrClosed
 	}
-	if _, ok := l.reservations[key]; ok {
+
+	_, taken := l.reservations[key]
+	_, takenByAnyIP := l.reservations[anyIPKey]
+
+	if taken || takenByAnyIP || (key == anyIPKey && len(l.reservations) > 0) {
 		return nil, errPassiveListenerReservedForIP
 	}
 
@@ -218,7 +230,11 @@ func (l *sharedPassiveListener) dispatch(conn net.Conn) {
 	key := ipAddress.String()
 
 	l.mu.Lock()
-	reservation := l.reservations[key]
+	reservation, ok := l.reservations[key]
+	if !ok {
+		key = anyIPKey
+		reservation = l.reservations[key]
+	}
 	if reservation != nil {
 		delete(l.reservations, key)
 	}
