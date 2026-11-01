@@ -1,12 +1,14 @@
 package ftpserver
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
 	"io"
 	"log/slog"
 	"net"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -64,7 +66,7 @@ func getFreePassivePort(t *testing.T) int {
 func TestPassiveListenersManagerMultiplexesByClientIP(t *testing.T) {
 	req := require.New(t)
 	port := getFreePassivePort(t)
-	manager := newPassiveListenersManager(slog.New(slog.NewTextHandler(io.Discard, nil))) //nolint:sloglint
+	manager := newPassiveListenersManager(slog.New(slog.NewTextHandler(io.Discard, nil)), nil) //nolint:sloglint
 	defer func() {
 		req.NoError(manager.close())
 	}()
@@ -100,7 +102,7 @@ func TestPassiveListenersManagerMultiplexesByClientIP(t *testing.T) {
 func TestPassiveListenersManagerRejectsSameIPForSamePort(t *testing.T) {
 	req := require.New(t)
 	port := getFreePassivePort(t)
-	manager := newPassiveListenersManager(slog.New(slog.NewTextHandler(io.Discard, nil))) //nolint:sloglint
+	manager := newPassiveListenersManager(slog.New(slog.NewTextHandler(io.Discard, nil)), nil) //nolint:sloglint
 	defer func() {
 		req.NoError(manager.close())
 	}()
@@ -123,7 +125,7 @@ func TestPassiveListenersManagerRejectsSameIPForSamePort(t *testing.T) {
 
 func TestPassiveReservationCloseKeepsNewerReservation(t *testing.T) {
 	port := getFreePassivePort(t)
-	manager := newPassiveListenersManager(slog.New(slog.DiscardHandler))
+	manager := newPassiveListenersManager(slog.New(slog.DiscardHandler), nil)
 	defer func() {
 		require.NoError(t, manager.close())
 	}()
@@ -205,7 +207,7 @@ func TestPassiveListenersManagerConcurrentFirstUse(t *testing.T) {
 
 	for range rounds {
 		port := getFreePassivePort(t)
-		manager := newPassiveListenersManager(slog.New(slog.DiscardHandler))
+		manager := newPassiveListenersManager(slog.New(slog.DiscardHandler), nil)
 		portRange := PortRange{Start: port, End: port}
 		errs := make([]error, clients)
 
@@ -227,7 +229,7 @@ func TestPassiveListenersManagerConcurrentFirstUse(t *testing.T) {
 func TestPassiveListenersManagerCloseReleasesReservation(t *testing.T) {
 	req := require.New(t)
 	port := getFreePassivePort(t)
-	manager := newPassiveListenersManager(slog.New(slog.NewTextHandler(io.Discard, nil))) //nolint:sloglint
+	manager := newPassiveListenersManager(slog.New(slog.NewTextHandler(io.Discard, nil)), nil) //nolint:sloglint
 	defer func() {
 		req.NoError(manager.close())
 	}()
@@ -285,7 +287,7 @@ func TestPassivePortMultiplexingSameClientExhaustion(t *testing.T) {
 func TestPassiveReservationListenerTimeoutAndHelpers(t *testing.T) {
 	req := require.New(t)
 	port := getFreePassivePort(t)
-	listener, err := newSharedPassiveListener(port, slog.New(slog.NewTextHandler(io.Discard, nil))) //nolint:sloglint
+	listener, err := newSharedPassiveListener(port, slog.New(slog.NewTextHandler(io.Discard, nil)), nil) //nolint:sloglint
 	req.NoError(err)
 	defer func() {
 		req.NoError(listener.close())
@@ -316,7 +318,7 @@ func TestPassiveReservationListenerTimeoutAndHelpers(t *testing.T) {
 func TestPassiveReservationListenerCloseAndFailures(t *testing.T) {
 	req := require.New(t)
 	port := getFreePassivePort(t)
-	listener, err := newSharedPassiveListener(port, slog.New(slog.NewTextHandler(io.Discard, nil))) //nolint:sloglint
+	listener, err := newSharedPassiveListener(port, slog.New(slog.NewTextHandler(io.Discard, nil)), nil) //nolint:sloglint
 	req.NoError(err)
 	defer func() {
 		req.NoError(listener.close())
@@ -350,14 +352,14 @@ func TestPassiveReservationListenerCloseAndFailures(t *testing.T) {
 func TestSharedPassiveListenerDispatchRejectionsAndClosedManager(t *testing.T) {
 	req := require.New(t)
 	port := getFreePassivePort(t)
-	manager := newPassiveListenersManager(slog.New(slog.NewTextHandler(io.Discard, nil))) //nolint:sloglint
+	manager := newPassiveListenersManager(slog.New(slog.NewTextHandler(io.Discard, nil)), nil) //nolint:sloglint
 	req.NoError(manager.close())
 	req.NoError(manager.close())
 
 	_, err := manager.getOrCreate(port)
 	req.ErrorIs(err, net.ErrClosed)
 
-	listener, err := newSharedPassiveListener(port, slog.New(slog.NewTextHandler(io.Discard, nil))) //nolint:sloglint
+	listener, err := newSharedPassiveListener(port, slog.New(slog.NewTextHandler(io.Discard, nil)), nil) //nolint:sloglint
 	req.NoError(err)
 
 	unknownConn := &trackingTestConn{
@@ -376,7 +378,7 @@ func TestSharedPassiveListenerDispatchRejectionsAndClosedManager(t *testing.T) {
 	_, err = listener.reserve(net.ParseIP("127.0.0.4"))
 	req.ErrorIs(err, net.ErrClosed)
 
-	_, err = newSharedPassiveListener(-1, slog.New(slog.NewTextHandler(io.Discard, nil))) //nolint:sloglint
+	_, err = newSharedPassiveListener(-1, slog.New(slog.NewTextHandler(io.Discard, nil)), nil) //nolint:sloglint
 	req.Error(err)
 }
 
@@ -416,4 +418,143 @@ func TestPassivePortMultiplexingPORTReleasesReservation(t *testing.T) {
 		req.NoError(errCmd)
 		req.Equal(StatusOK, returnCode, message)
 	}
+
+	// The shared port is wrapped once, not on each PASV
+	req.Equal(int32(1), driver.passiveWrapCalls.Load())
+}
+
+// proxyHeaderTestListener mimics a PROXY protocol listener: its connections read a
+// "PROXY TCP4 <src> <dst> <srcport> <dstport>\r\n" header when their remote address is first asked for
+type proxyHeaderTestListener struct {
+	net.Listener
+}
+
+type proxyHeaderTestConn struct {
+	net.Conn
+	once       sync.Once
+	remoteAddr net.Addr
+}
+
+func (l *proxyHeaderTestListener) Accept() (net.Conn, error) {
+	conn, err := l.Listener.Accept()
+	if err != nil {
+		return nil, err
+	}
+
+	return &proxyHeaderTestConn{Conn: conn}, nil
+}
+
+func (c *proxyHeaderTestConn) RemoteAddr() net.Addr {
+	c.once.Do(func() {
+		c.remoteAddr = c.Conn.RemoteAddr()
+
+		// One byte at a time, to leave what follows the header to the reader
+		var header []byte
+		buf := make([]byte, 1)
+
+		for !bytes.HasSuffix(header, []byte("\r\n")) {
+			if _, err := c.Read(buf); err != nil {
+				return
+			}
+
+			header = append(header, buf[0])
+		}
+
+		if fields := strings.Fields(string(header)); len(fields) == 6 && fields[0] == "PROXY" {
+			c.remoteAddr = &net.TCPAddr{IP: net.ParseIP(fields[2])}
+		}
+	})
+
+	return c.remoteAddr
+}
+
+func newProxyHeaderTestManager() *passiveListenersManager {
+	return newPassiveListenersManager(slog.New(slog.DiscardHandler), func(listener net.Listener) (net.Listener, error) {
+		return &proxyHeaderTestListener{Listener: listener}, nil
+	})
+}
+
+func dialPassivePort(t *testing.T, port int, data string) net.Conn {
+	t.Helper()
+
+	dialer := net.Dialer{Timeout: time.Second}
+	conn, err := dialer.DialContext(context.Background(), "tcp", fmt.Sprintf("127.0.0.1:%d", port))
+	require.NoError(t, err)
+
+	if data != "" {
+		_, err = conn.Write([]byte(data))
+		require.NoError(t, err)
+	}
+
+	return conn
+}
+
+func TestPassiveMultiplexingMatchesProxiedClientIP(t *testing.T) {
+	req := require.New(t)
+	port := getFreePassivePort(t)
+	manager := newProxyHeaderTestManager()
+	defer func() { req.NoError(manager.close()) }()
+
+	_, reservation, deadlineSetter, err := manager.reserve(net.ParseIP("192.0.2.10"), PortRange{Start: port, End: port})
+	req.NoError(err)
+	defer func() { _ = reservation.Close() }()
+
+	client := dialPassivePort(t, port, fmt.Sprintf("PROXY TCP4 192.0.2.10 127.0.0.1 40000 %d\r\nhello", port))
+	defer func() { _ = client.Close() }()
+
+	req.NoError(deadlineSetter.SetDeadline(time.Now().Add(5 * time.Second)))
+	conn, err := reservation.Accept()
+	req.NoError(err)
+	defer func() { _ = conn.Close() }()
+
+	payload := make([]byte, 5)
+	_, err = io.ReadFull(conn, payload)
+	req.NoError(err)
+	req.Equal("hello", string(payload))
+}
+
+func TestPassiveMultiplexingSilentClientDoesNotBlockPort(t *testing.T) {
+	req := require.New(t)
+	port := getFreePassivePort(t)
+	manager := newProxyHeaderTestManager()
+	defer func() { req.NoError(manager.close()) }()
+
+	portRange := PortRange{Start: port, End: port}
+
+	_, first, _, err := manager.reserve(net.ParseIP("192.0.2.10"), portRange)
+	req.NoError(err)
+	defer func() { _ = first.Close() }()
+
+	_, second, secondDeadline, err := manager.reserve(net.ParseIP("192.0.2.11"), portRange)
+	req.NoError(err)
+	defer func() { _ = second.Close() }()
+
+	// Accepted first, this connection never sends its header
+	silent := dialPassivePort(t, port, "")
+	defer func() { _ = silent.Close() }()
+
+	client := dialPassivePort(t, port, fmt.Sprintf("PROXY TCP4 192.0.2.11 127.0.0.1 40000 %d\r\n", port))
+	defer func() { _ = client.Close() }()
+
+	req.NoError(secondDeadline.SetDeadline(time.Now().Add(2 * time.Second)))
+	conn, err := second.Accept()
+	req.NoError(err)
+	req.NoError(conn.Close())
+}
+
+func TestPassiveMultiplexingWrapErrorReleasesPort(t *testing.T) {
+	req := require.New(t)
+	port := getFreePassivePort(t)
+	manager := newPassiveListenersManager(slog.New(slog.DiscardHandler), func(net.Listener) (net.Listener, error) {
+		return nil, errTestPassiveFailure
+	})
+	defer func() { req.NoError(manager.close()) }()
+
+	_, listener, _, err := manager.reserve(net.ParseIP("127.0.0.1"), PortRange{Start: port, End: port})
+	req.ErrorIs(err, ErrNoAvailableListeningPort)
+	req.Nil(listener)
+
+	tcpListener, err := net.ListenTCP("tcp", &net.TCPAddr{Port: port})
+	req.NoError(err)
+	req.NoError(tcpListener.Close())
 }

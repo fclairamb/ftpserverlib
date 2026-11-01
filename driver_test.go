@@ -9,6 +9,7 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -124,6 +125,7 @@ type authUserProvider func(user, pass string) (ClientDriver, error)
 type TestServerDriver struct {
 	Clients              []ClientContext
 	errPassiveListener   error
+	passiveWrapCalls     atomic.Int32
 	serverDir            string
 	fs                   afero.Fs
 	clientMU             sync.Mutex
@@ -469,6 +471,8 @@ func (driver *TestServerDriver) VerifyConnection(_ ClientContext, _ string,
 }
 
 func (driver *TestServerDriver) WrapPassiveListener(listener net.Listener) (net.Listener, error) {
+	driver.passiveWrapCalls.Add(1)
+
 	if driver.errPassiveListener != nil {
 		return nil, driver.errPassiveListener
 	}

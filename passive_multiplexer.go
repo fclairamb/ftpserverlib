@@ -22,16 +22,21 @@ type passivePortCandidate struct {
 	listenedPort int
 }
 
+// passiveListenerWrapper wraps the listener of a shared port, see MainDriverExtensionPassiveWrapper
+type passiveListenerWrapper func(listener net.Listener) (net.Listener, error)
+
 type passiveListenersManager struct {
 	logger    *slog.Logger
+	wrap      passiveListenerWrapper
 	mu        sync.Mutex
 	listeners map[int]*sharedPassiveListener
 	closed    bool
 }
 
-func newPassiveListenersManager(logger *slog.Logger) *passiveListenersManager {
+func newPassiveListenersManager(logger *slog.Logger, wrap passiveListenerWrapper) *passiveListenersManager {
 	return &passiveListenersManager{
 		logger:    logger,
+		wrap:      wrap,
 		listeners: make(map[int]*sharedPassiveListener),
 	}
 }
@@ -94,7 +99,7 @@ func (m *passiveListenersManager) getOrCreate(port int) (*sharedPassiveListener,
 		return listener, nil
 	}
 
-	listener, err := newSharedPassiveListener(port, m.logger.With("passivePort", port))
+	listener, err := newSharedPassiveListener(port, m.logger.With("passivePort", port), m.wrap)
 	if err != nil {
 		return nil, err
 	}
@@ -106,13 +111,17 @@ func (m *passiveListenersManager) getOrCreate(port int) (*sharedPassiveListener,
 
 type sharedPassiveListener struct {
 	logger       *slog.Logger
-	listener     *net.TCPListener
+	listener     net.Listener
 	mu           sync.Mutex
 	reservations map[string]*passiveReservationListener
 	closed       bool
 }
 
-func newSharedPassiveListener(port int, logger *slog.Logger) (*sharedPassiveListener, error) {
+func newSharedPassiveListener(
+	port int,
+	logger *slog.Logger,
+	wrap passiveListenerWrapper,
+) (*sharedPassiveListener, error) {
 	laddr, err := net.ResolveTCPAddr("tcp", fmt.Sprintf("0.0.0.0:%d", port))
 	if err != nil {
 		return nil, newNetworkError(fmt.Sprintf("could not resolve port %d", port), err)
@@ -123,9 +132,20 @@ func newSharedPassiveListener(port int, logger *slog.Logger) (*sharedPassiveList
 		return nil, err
 	}
 
+	// Wrapping happens before connections are matched by IP, so a wrapper reading the PROXY protocol
+	// header gets them matched on the client's IP instead of the proxy's
+	var listener net.Listener = tcpListener
+	if wrap != nil {
+		if listener, err = wrap(tcpListener); err != nil {
+			_ = tcpListener.Close()
+
+			return nil, err
+		}
+	}
+
 	result := &sharedPassiveListener{
 		logger:       logger,
-		listener:     tcpListener,
+		listener:     listener,
 		reservations: make(map[string]*passiveReservationListener),
 	}
 
@@ -156,7 +176,9 @@ func (l *sharedPassiveListener) serve() {
 			return
 		}
 
-		l.dispatch(conn)
+		// A wrapper may read from the connection to get its remote address, which must not block the
+		// other clients of this port
+		go l.dispatch(conn)
 	}
 }
 

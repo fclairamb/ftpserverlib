@@ -169,7 +169,10 @@ func (c *clientHandler) handlePASV(_ string) error {
 		}
 	}()
 
-	if wrapper, ok := c.server.driver.(MainDriverExtensionPassiveWrapper); ok {
+	// A multiplexed reservation comes from a shared listener that was already wrapped
+	_, multiplexed := listener.(*passiveReservationListener)
+
+	if wrapper, ok := c.server.driver.(MainDriverExtensionPassiveWrapper); ok && !multiplexed {
 		listener, err = wrapper.WrapPassiveListener(listener)
 		if err != nil {
 			c.logger.Error("Could not wrap passive connection", "err", err)

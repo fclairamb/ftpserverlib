@@ -48,7 +48,11 @@ type MainDriverExtensionPassiveWrapper interface {
 	// WrapPassiveListener is called after creating the listener for passive
 	// data connections.
 	// You can wrap the passed listener or just return it unmodified.
-	// Returning an error will cause the passive connection to fail
+	// Returning an error will cause the passive connection to fail.
+	// With PassiveTransferPortMultiplexing, it is called once per shared port, and the
+	// wrapped listener's connections are matched to clients by their RemoteAddr: a wrapper
+	// reading the PROXY protocol header lets them be matched on the client's IP. Its Accept
+	// must not wait for the client.
 	WrapPassiveListener(listener net.Listener) (net.Listener, error)
 }
 
