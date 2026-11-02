@@ -49,3 +49,6 @@ fails and the client is disconnected, so the impact depends on the driver.
 - Should step 2 (503 for `PASS` before `USER`) ship, or only the TLS check of step 1? Recommended: ship both. Step
   1 closes the `TLSRequired` bypass, and step 2 also stops `PreAuthUser` from being skipped. No mainstream client
   sends `PASS` first, and RFC 959 expects 503 there.
+
+## Resolved open questions
+- Ship both step 1 (TLS check) and step 2 (503 for `PASS` before `USER`). (autopilot: recommended answer)
