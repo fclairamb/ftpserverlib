@@ -97,6 +97,7 @@ type clientHandler struct {
 	driver              ClientDriver    // Client handling driver
 	conn                net.Conn        // TCP connection
 	user                string          // Authenticated user
+	userAccepted        bool            // A USER was accepted and is waiting for its PASS
 	path                string          // Current path
 	listPath            string          // Path for NLST/LIST requests
 	clnt                string          // Identified client

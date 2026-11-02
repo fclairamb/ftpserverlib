@@ -195,7 +195,7 @@ type ClientContext interface {
 	GetLastDataChannel() DataChannel
 
 	// SetTLSRequirement sets the TLS requirement to respect on a per-client basis.
-	// The requirement is checked when the client issues the "USER" command,
+	// The requirement is checked when the client issues the "USER" and "PASS" commands,
 	// after executing the MainDriverExtensionUserVerifier extension, and
 	// before opening transfer connections.
 	// Supported values: ClearOrEncrypted, MandatoryEncryption.
