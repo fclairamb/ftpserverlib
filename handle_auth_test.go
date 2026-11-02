@@ -3,6 +3,8 @@ package ftpserver
 import (
 	"crypto/tls"
 	"net"
+	"net/textproto"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -341,4 +343,104 @@ func TestUserVerifierError(t *testing.T) {
 	_, err = c.OpenRawConn()
 	require.Error(t, err, "Plain text login must fail, TLS is required")
 	require.EqualError(t, err, "unexpected response: 530-User rejected: invalid TLS requirement")
+}
+
+func dialRawControl(t *testing.T, addr string) *textproto.Conn {
+	t.Helper()
+
+	dialer := &net.Dialer{Timeout: 5 * time.Second}
+	conn, err := dialer.DialContext(t.Context(), "tcp", addr)
+	require.NoError(t, err)
+	require.NoError(t, conn.SetDeadline(time.Now().Add(10*time.Second)))
+
+	ctrl := textproto.NewConn(conn)
+
+	t.Cleanup(func() { _ = ctrl.Close() })
+
+	_, _, err = ctrl.ReadResponse(StatusServiceReady)
+	require.NoError(t, err)
+
+	return ctrl
+}
+
+func sendRawCommand(ctrl *textproto.Conn, cmd string) (int, error) {
+	if _, err := ctrl.Cmd("%s", cmd); err != nil {
+		return 0, err
+	}
+
+	code, _, err := ctrl.ReadResponse(0)
+
+	return code, err
+}
+
+// tokenAuthProvider makes the driver accept any user name, empty included,
+// with the password "token", and reports whether AuthUser was called.
+func tokenAuthProvider(driver *TestServerDriver) *atomic.Bool {
+	called := &atomic.Bool{}
+	driver.AuthProvider = func(_, pass string) (ClientDriver, error) {
+		called.Store(true)
+
+		if pass == "token" {
+			return NewTestClientDriver(driver), nil
+		}
+
+		return nil, errBadUserNameOrPassword
+	}
+
+	return called
+}
+
+func TestPassWithoutUserTLSRequired(t *testing.T) {
+	t.Parallel()
+
+	driver := &TestServerDriver{Debug: false, TLS: true}
+	authCalled := tokenAuthProvider(driver)
+	server := NewTestServerWithTestDriver(t, driver)
+	server.settings.TLSRequired = MandatoryEncryption
+
+	ctrl := dialRawControl(t, server.Addr())
+
+	code, err := sendRawCommand(ctrl, "PASS token")
+	require.NoError(t, err)
+	require.NotEqual(t, StatusUserLoggedIn, code)
+	require.Equal(t, StatusServiceNotAvailable, code)
+	require.False(t, authCalled.Load())
+
+	code, err = sendRawCommand(ctrl, "PWD")
+	if err == nil {
+		require.NotEqual(t, StatusPathCreated, code)
+	}
+}
+
+func TestPassWithoutUser(t *testing.T) {
+	t.Parallel()
+
+	driver := &TestServerDriver{Debug: false}
+	authCalled := tokenAuthProvider(driver)
+	server := NewTestServerWithTestDriver(t, driver)
+
+	ctrl := dialRawControl(t, server.Addr())
+
+	code, err := sendRawCommand(ctrl, "PASS token")
+	require.NoError(t, err)
+	require.Equal(t, StatusBadCommandSequence, code)
+	require.False(t, authCalled.Load())
+
+	code, err = sendRawCommand(ctrl, "PWD")
+	require.NoError(t, err)
+	require.Equal(t, StatusNotLoggedIn, code)
+
+	// A regular USER/PASS sequence still logs in
+	code, err = sendRawCommand(ctrl, "USER "+authUser)
+	require.NoError(t, err)
+	require.Equal(t, StatusUserOK, code)
+
+	code, err = sendRawCommand(ctrl, "PASS token")
+	require.NoError(t, err)
+	require.Equal(t, StatusUserLoggedIn, code)
+	require.True(t, authCalled.Load())
+
+	code, err = sendRawCommand(ctrl, "PWD")
+	require.NoError(t, err)
+	require.Equal(t, StatusPathCreated, code)
 }

@@ -195,7 +195,7 @@ type ClientContext interface {
 	GetLastDataChannel() DataChannel
 
 	// SetTLSRequirement sets the TLS requirement to respect on a per-client basis.
-	// The requirement is checked when the client issues the "USER" command,
+	// The requirement is checked when the client issues the "USER" and "PASS" commands,
 	// after executing the MainDriverExtensionUserVerifier extension, and
 	// before opening transfer connections.
 	// Supported values: ClearOrEncrypted, MandatoryEncryption.
@@ -364,9 +364,13 @@ type Settings struct {
 	DisableActiveMode               bool             // Disable Active FTP
 	EnableHASH                      bool             // Enable support for calculating hash value of files
 	// DisableSTAT disables Server STATUS. STAT on files and directories still works.
-	DisableSTAT             bool
-	DisableSYST             bool         // Disable SYST
-	EnableCOMB              bool         // Enable COMB support
+	DisableSTAT bool
+	DisableSYST bool // Disable SYST
+	// EnableCOMB enables COMB support. The library rejects a COMB whose target is among its sources,
+	// or whose sources repeat, by comparing their cleaned paths. Two different paths can still name the
+	// same file through a symlink or a hard link: detecting that is the driver's job (for instance by
+	// comparing os.SameFile in its OpenFile).
+	EnableCOMB              bool
 	DeflateCompressionLevel int          // Deflate compression level (0-9). 0 means disabled
 	DefaultTransferType     TransferType // Transfer type to use if the client don't send the TYPE command
 	// DisableASCIIConversion disables CRLF/LF line-ending conversion for TYPE A (ASCII) transfers.
