@@ -121,6 +121,66 @@ func TestPassiveListenersManagerRejectsSameIPForSamePort(t *testing.T) {
 	req.Nil(deadlineSetter)
 }
 
+// orderedPortGetter offers its ports in a fixed order, in place of the random order of a range
+type orderedPortGetter struct {
+	ports []int
+	next  int
+}
+
+const orderedPortGetterExposedOffset = 1000
+
+func (g *orderedPortGetter) FetchNext() (int, int, bool) {
+	if g.next == len(g.ports) {
+		return 0, 0, false
+	}
+
+	port := g.ports[g.next]
+	g.next++
+
+	return port + orderedPortGetterExposedOffset, port, true
+}
+
+func (g *orderedPortGetter) NumberAttempts() int {
+	return len(g.ports)
+}
+
+func TestPassiveListenersManagerPrefersBoundPorts(t *testing.T) {
+	req := require.New(t)
+	port1 := getFreePassivePort(t)
+	port2 := getFreePassivePort(t)
+	req.NotEqual(port1, port2)
+
+	manager := newPassiveListenersManager(slog.New(slog.DiscardHandler))
+	defer func() {
+		req.NoError(manager.close())
+	}()
+
+	ip1 := net.ParseIP("127.0.0.2")
+	ip2 := net.ParseIP("127.0.0.3")
+
+	exposedPort, first, _, err := manager.reserve(ip1, &orderedPortGetter{ports: []int{port1, port2}})
+	req.NoError(err)
+	req.Equal(port1+orderedPortGetterExposedOffset, exposedPort)
+
+	// port2 comes first, but port1 is bound and free for ip2
+	exposedPort, _, _, err = manager.reserve(ip2, &orderedPortGetter{ports: []int{port2, port1}})
+	req.NoError(err)
+	req.Equal(port1+orderedPortGetterExposedOffset, exposedPort)
+	req.Len(manager.listeners, 1)
+
+	// port1 is reserved for ip1, so a second reservation for it binds port2
+	exposedPort, _, _, err = manager.reserve(ip1, &orderedPortGetter{ports: []int{port1, port2}})
+	req.NoError(err)
+	req.Equal(port2+orderedPortGetterExposedOffset, exposedPort)
+	req.Len(manager.listeners, 2)
+
+	req.NoError(first.Close())
+
+	exposedPort, _, _, err = manager.reserve(ip1, &orderedPortGetter{ports: []int{port2, port1}})
+	req.NoError(err)
+	req.Equal(port1+orderedPortGetterExposedOffset, exposedPort)
+}
+
 func TestPassiveReservationCloseKeepsNewerReservation(t *testing.T) {
 	port := getFreePassivePort(t)
 	manager := newPassiveListenersManager(slog.New(slog.DiscardHandler))
@@ -354,7 +414,7 @@ func TestSharedPassiveListenerDispatchRejectionsAndClosedManager(t *testing.T) {
 	req.NoError(manager.close())
 	req.NoError(manager.close())
 
-	_, err := manager.getOrCreate(port)
+	_, err := manager.getOrCreate(passivePortCandidate{exposedPort: port, listenedPort: port})
 	req.ErrorIs(err, net.ErrClosed)
 
 	listener, err := newSharedPassiveListener(port, slog.New(slog.NewTextHandler(io.Discard, nil))) //nolint:sloglint

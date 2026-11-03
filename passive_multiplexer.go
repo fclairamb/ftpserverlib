@@ -40,8 +40,14 @@ func (m *passiveListenersManager) reserve(
 	remoteIP net.IP,
 	portRange PasvPortGetter,
 ) (int, net.Listener, passiveDeadlineSetter, error) {
+	// The candidates come in random order, so they could bind a new port while a bound one can still
+	// serve remoteIP: new ports are only bound once every bound port has a reservation for remoteIP
+	if listener, reservation := m.reserveBound(remoteIP); reservation != nil {
+		return listener.exposedPort, reservation, reservation, nil
+	}
+
 	for _, candidate := range getPassivePortCandidates(portRange) {
-		listener, err := m.getOrCreate(candidate.listenedPort)
+		listener, err := m.getOrCreate(candidate)
 		if err != nil {
 			continue
 		}
@@ -56,6 +62,22 @@ func (m *passiveListenersManager) reserve(
 	}
 
 	return 0, nil, nil, ErrNoAvailableListeningPort
+}
+
+// reserveBound reserves a bound port that has no reservation for remoteIP, if there is one
+func (m *passiveListenersManager) reserveBound(
+	remoteIP net.IP,
+) (*sharedPassiveListener, *passiveReservationListener) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	for _, listener := range m.listeners {
+		if reservation, err := listener.reserve(remoteIP); err == nil {
+			return listener, reservation
+		}
+	}
+
+	return nil, nil
 }
 
 func (m *passiveListenersManager) close() error {
@@ -83,10 +105,11 @@ func (m *passiveListenersManager) close() error {
 	return closeErr
 }
 
-func (m *passiveListenersManager) getOrCreate(port int) (*sharedPassiveListener, error) {
+func (m *passiveListenersManager) getOrCreate(candidate passivePortCandidate) (*sharedPassiveListener, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
+	port := candidate.listenedPort
 	if m.closed {
 		return nil, net.ErrClosed
 	}
@@ -99,6 +122,7 @@ func (m *passiveListenersManager) getOrCreate(port int) (*sharedPassiveListener,
 		return nil, err
 	}
 
+	listener.exposedPort = candidate.exposedPort
 	m.listeners[port] = listener
 
 	return listener, nil
@@ -110,6 +134,7 @@ type sharedPassiveListener struct {
 	mu           sync.Mutex
 	reservations map[string]*passiveReservationListener
 	closed       bool
+	exposedPort  int // the port sent to clients, set before the listener is shared
 }
 
 func newSharedPassiveListener(port int, logger *slog.Logger) (*sharedPassiveListener, error) {
