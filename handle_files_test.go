@@ -13,6 +13,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/secsy/goftp"
 	"github.com/stretchr/testify/assert"
@@ -842,6 +843,56 @@ func TestCOMBAppend(t *testing.T) {
 	contents, err := client.ReadDir("/")
 	require.NoError(t, err)
 	require.Len(t, contents, 1)
+}
+
+func TestCOMBRejectsRepeatedPaths(t *testing.T) {
+	server := NewTestServerWithTestDriver(
+		t,
+		&TestServerDriver{
+			Debug: false,
+			Settings: &Settings{
+				EnableCOMB: true,
+			},
+		},
+	)
+	conf := goftp.Config{
+		User:     authUser,
+		Password: authPass,
+		// Without the check, a COMB listing its target as a source never answers:
+		// the timeout makes the test fail instead of hang.
+		Timeout: 5 * time.Second,
+	}
+
+	client, err := goftp.DialConfig(conf, server.Addr())
+	require.NoError(t, err, "Couldn't connect")
+
+	defer func() { panicOnError(client.Close()) }()
+
+	partSize := 1024
+	ftpUpload(t, client, createTemporaryFile(t, partSize), "a")
+	ftpUpload(t, client, createTemporaryFile(t, partSize), "b")
+
+	raw, err := client.OpenRawConn()
+	require.NoError(t, err, "Couldn't open raw connection")
+
+	defer func() { require.NoError(t, raw.Close()) }()
+
+	for _, cmd := range []string{"COMB a a", "COMB a b a", "COMB t a ./a", "COMB /a ../a"} {
+		returnCode, message, errCmd := raw.SendCommand("%s", cmd)
+		require.NoError(t, errCmd, cmd)
+		require.Equal(t, StatusSyntaxErrorParameters, returnCode, "%s: %s", cmd, message)
+
+		info, errStat := client.Stat("a")
+		require.NoError(t, errStat, cmd)
+		require.Equal(t, int64(partSize), info.Size(), cmd)
+
+		info, err = client.Stat("b")
+		require.NoError(t, err, cmd)
+		require.Equal(t, int64(partSize), info.Size(), cmd)
+	}
+
+	_, err = client.Stat("t")
+	require.Error(t, err, "target of a rejected COMB must not be created")
 }
 
 func TestCOMBCloseError(t *testing.T) {

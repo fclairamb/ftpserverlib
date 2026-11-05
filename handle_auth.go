@@ -31,6 +31,7 @@ func (c *clientHandler) handleUSER(user string) error {
 	}
 
 	c.user = user
+	c.userAccepted = true
 	c.writeMessage(StatusUserOK, "OK")
 
 	return nil
@@ -59,6 +60,7 @@ func (c *clientHandler) handleUserTLS(user string) bool {
 
 	if driver != nil {
 		c.user = user
+		c.userAccepted = true
 		c.driver = driver
 		c.writeMessage(StatusUserLoggedIn, "TLS certificate ok, continue")
 
@@ -72,6 +74,24 @@ func (c *clientHandler) handleUserTLS(user string) bool {
 func (c *clientHandler) handlePASS(param string) error {
 	var err error
 	var msg string
+
+	// The TLS requirement is also checked here, so that a PASS sent without
+	// a USER can't log a client in over a clear-text connection.
+	if c.isTLSRequired() && !c.HasTLSForControl() {
+		c.writeMessage(StatusServiceNotAvailable, "TLS is required")
+		_ = c.disconnect()
+
+		return nil
+	}
+
+	if !c.userAccepted {
+		c.writeMessage(StatusBadCommandSequence, "Login with USER first")
+
+		return nil
+	}
+
+	c.userAccepted = false
+
 	c.driver, err = c.server.driver.AuthUser(c, c.user, param)
 
 	dpa, ok := c.server.driver.(MainDriverExtensionPostAuthMessage)

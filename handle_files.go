@@ -187,8 +187,22 @@ func (c *clientHandler) handleCOMB(param string) error {
 	targetPath := c.absPath(relativePaths[0])
 
 	sourcePaths := make([]string, 0, len(relativePaths)-1)
+	seen := make(map[string]struct{}, len(relativePaths))
+	seen[targetPath] = struct{}{}
+
 	for _, src := range relativePaths[1:] {
-		sourcePaths = append(sourcePaths, c.absPath(src))
+		srcPath := c.absPath(src)
+		// A source equal to the target would append the file to itself without end,
+		// and a source listed twice would be deleted before its second copy.
+		if _, dup := seen[srcPath]; dup {
+			c.writeMessage(StatusSyntaxErrorParameters,
+				fmt.Sprintf("invalid COMB parameters: %#v is listed more than once", srcPath))
+
+			return nil
+		}
+
+		seen[srcPath] = struct{}{}
+		sourcePaths = append(sourcePaths, srcPath)
 	}
 	// if targetPath exists we have append to it
 	// partial files will be deleted if COMB succeeded
