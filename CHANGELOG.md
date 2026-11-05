@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.33.0](https://github.com/fclairamb/ftpserverlib/compare/v0.32.7...v0.33.0) (2026-11-05)
+
+
+### Features
+
+* **transfer:** support PROXY protocol and IPMatchDisabled with passive port multiplexing ([#694](https://github.com/fclairamb/ftpserverlib/issues/694)) ([aa330d0](https://github.com/fclairamb/ftpserverlib/commit/aa330d0ece6f1df06d3eb8ed1fc4a0ec088d9319))
+
+
+### Bug Fixes
+
+* **auth:** COMB self-append and PASS without USER ([#695](https://github.com/fclairamb/ftpserverlib/issues/695)) ([1637033](https://github.com/fclairamb/ftpserverlib/commit/16370336850c39fc92918f20f44ae0e72b0183ec))
+
 ## [0.32.7](https://github.com/fclairamb/ftpserverlib/compare/v0.32.6...v0.32.7) (2026-11-01)
 
 
