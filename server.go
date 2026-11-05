@@ -187,7 +187,12 @@ func (server *FtpServer) loadSettings() error {
 	}
 
 	server.settings = settings
-	server.passiveListeners = newPassiveListenersManager(server.Logger)
+	var wrap passiveListenerWrapper
+	if wrapper, ok := server.driver.(MainDriverExtensionPassiveWrapper); ok {
+		wrap = wrapper.WrapPassiveListener
+	}
+
+	server.passiveListeners = newPassiveListenersManager(server.Logger, wrap)
 
 	return nil
 }

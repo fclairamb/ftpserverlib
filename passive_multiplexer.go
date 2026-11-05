@@ -13,6 +13,10 @@ const errStrClosedNetworkConnection = "use of closed network connection"
 
 var errPassiveListenerReservedForIP = errors.New("passive listener already reserved for client ip")
 
+// anyIPKey is the reservation key of a client whose data connection may come from any IP. Such a
+// reservation can't be told apart from others by IP, so it has the port to itself until it is used.
+const anyIPKey = ""
+
 type passiveDeadlineSetter interface {
 	SetDeadline(deadline time.Time) error
 }
@@ -22,16 +26,21 @@ type passivePortCandidate struct {
 	listenedPort int
 }
 
+// passiveListenerWrapper wraps the listener of a shared port, see MainDriverExtensionPassiveWrapper
+type passiveListenerWrapper func(listener net.Listener) (net.Listener, error)
+
 type passiveListenersManager struct {
 	logger    *slog.Logger
+	wrap      passiveListenerWrapper
 	mu        sync.Mutex
 	listeners map[int]*sharedPassiveListener
 	closed    bool
 }
 
-func newPassiveListenersManager(logger *slog.Logger) *passiveListenersManager {
+func newPassiveListenersManager(logger *slog.Logger, wrap passiveListenerWrapper) *passiveListenersManager {
 	return &passiveListenersManager{
 		logger:    logger,
+		wrap:      wrap,
 		listeners: make(map[int]*sharedPassiveListener),
 	}
 }
@@ -94,7 +103,7 @@ func (m *passiveListenersManager) getOrCreate(port int) (*sharedPassiveListener,
 		return listener, nil
 	}
 
-	listener, err := newSharedPassiveListener(port, m.logger.With("passivePort", port))
+	listener, err := newSharedPassiveListener(port, m.logger.With("passivePort", port), m.wrap)
 	if err != nil {
 		return nil, err
 	}
@@ -106,13 +115,17 @@ func (m *passiveListenersManager) getOrCreate(port int) (*sharedPassiveListener,
 
 type sharedPassiveListener struct {
 	logger       *slog.Logger
-	listener     *net.TCPListener
+	listener     net.Listener
 	mu           sync.Mutex
 	reservations map[string]*passiveReservationListener
 	closed       bool
 }
 
-func newSharedPassiveListener(port int, logger *slog.Logger) (*sharedPassiveListener, error) {
+func newSharedPassiveListener(
+	port int,
+	logger *slog.Logger,
+	wrap passiveListenerWrapper,
+) (*sharedPassiveListener, error) {
 	laddr, err := net.ResolveTCPAddr("tcp", fmt.Sprintf("0.0.0.0:%d", port))
 	if err != nil {
 		return nil, newNetworkError(fmt.Sprintf("could not resolve port %d", port), err)
@@ -123,9 +136,20 @@ func newSharedPassiveListener(port int, logger *slog.Logger) (*sharedPassiveList
 		return nil, err
 	}
 
+	// Wrapping happens before connections are matched by IP, so a wrapper reading the PROXY protocol
+	// header gets them matched on the client's IP instead of the proxy's
+	var listener net.Listener = tcpListener
+	if wrap != nil {
+		if listener, err = wrap(tcpListener); err != nil {
+			_ = tcpListener.Close()
+
+			return nil, err
+		}
+	}
+
 	result := &sharedPassiveListener{
 		logger:       logger,
-		listener:     tcpListener,
+		listener:     listener,
 		reservations: make(map[string]*passiveReservationListener),
 	}
 
@@ -156,12 +180,18 @@ func (l *sharedPassiveListener) serve() {
 			return
 		}
 
-		l.dispatch(conn)
+		// A wrapper may read from the connection to get its remote address, which must not block the
+		// other clients of this port
+		go l.dispatch(conn)
 	}
 }
 
+// reserve reserves the port for the next data connection from remoteIP, or from any IP if it is nil
 func (l *sharedPassiveListener) reserve(remoteIP net.IP) (*passiveReservationListener, error) {
-	key := remoteIP.String()
+	key := anyIPKey
+	if remoteIP != nil {
+		key = remoteIP.String()
+	}
 
 	l.mu.Lock()
 	defer l.mu.Unlock()
@@ -169,7 +199,11 @@ func (l *sharedPassiveListener) reserve(remoteIP net.IP) (*passiveReservationLis
 	if l.closed {
 		return nil, net.ErrClosed
 	}
-	if _, ok := l.reservations[key]; ok {
+
+	_, taken := l.reservations[key]
+	_, takenByAnyIP := l.reservations[anyIPKey]
+
+	if taken || takenByAnyIP || (key == anyIPKey && len(l.reservations) > 0) {
 		return nil, errPassiveListenerReservedForIP
 	}
 
@@ -196,7 +230,11 @@ func (l *sharedPassiveListener) dispatch(conn net.Conn) {
 	key := ipAddress.String()
 
 	l.mu.Lock()
-	reservation := l.reservations[key]
+	reservation, ok := l.reservations[key]
+	if !ok {
+		key = anyIPKey
+		reservation = l.reservations[key]
+	}
 	if reservation != nil {
 		delete(l.reservations, key)
 	}
