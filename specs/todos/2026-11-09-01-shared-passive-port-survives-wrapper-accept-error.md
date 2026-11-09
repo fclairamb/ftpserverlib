@@ -58,3 +58,6 @@ the next `reserve` on that port fail with `ErrNoAvailableListeningPort`.
 - A wrapper whose `Accept` fails on every call (for example after closing itself without closing the TCP listener)
   would make the loop spin. Recommended answer: stop the loop as well when the wrapper's error wraps
   `net.ErrClosed`, and otherwise keep going; a wrapper that fails forever on an open listener is a driver bug.
+
+## Resolved open questions
+- Wrapper whose `Accept` fails on every call: stop the loop as well when the wrapper's error wraps `net.ErrClosed`, otherwise log and keep going (autopilot: recommended answer).
