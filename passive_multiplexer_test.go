@@ -8,6 +8,7 @@ import (
 	"io"
 	"log/slog"
 	"net"
+	"os"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -665,4 +666,134 @@ func TestPassivePortMultiplexingIPMatchDisabled(t *testing.T) {
 	readBytes, err = conn.Read(buf)
 	req.NoError(err)
 	req.True(strings.HasPrefix(string(buf[:readBytes]), "150 Using transfer connection"), string(buf[:readBytes]))
+}
+
+var errTestRefusedPeer = errors.New("refused peer")
+
+// failOnceTestListener fails the Accept of the first connection it gets, like a wrapper refusing a peer
+type failOnceTestListener struct {
+	net.Listener
+	failed atomic.Bool
+}
+
+func (l *failOnceTestListener) Accept() (net.Conn, error) {
+	conn, err := l.Listener.Accept()
+	if err != nil {
+		return nil, err
+	}
+
+	if l.failed.CompareAndSwap(false, true) {
+		_ = conn.Close()
+
+		return nil, errTestRefusedPeer
+	}
+
+	return conn, nil
+}
+
+func newFailOnceTestManager() (*passiveListenersManager, *failOnceTestListener) {
+	wrapped := &failOnceTestListener{}
+
+	return newPassiveListenersManager(slog.New(slog.DiscardHandler), func(listener net.Listener) (net.Listener, error) {
+		wrapped.Listener = listener
+
+		return wrapped, nil
+	}), wrapped
+}
+
+func TestPassiveMultiplexingWrapperAcceptErrorKeepsPort(t *testing.T) {
+	req := require.New(t)
+	port := getFreePassivePort(t)
+	manager, wrapped := newFailOnceTestManager()
+	defer func() { req.NoError(manager.close()) }()
+
+	portRange := PortRange{Start: port, End: port}
+	clientIP := net.ParseIP("127.0.0.1")
+
+	_, reservation, _, err := manager.reserve(clientIP, portRange)
+	req.NoError(err)
+	req.NoError(reservation.Close())
+
+	// A connection the wrapper refuses
+	stray := dialPassivePort(t, port, "")
+	req.NoError(stray.Close())
+	req.Eventually(wrapped.failed.Load, 2*time.Second, 10*time.Millisecond)
+
+	_, reservation, deadlineSetter, err := manager.reserve(clientIP, portRange)
+	req.NoError(err)
+	defer func() { _ = reservation.Close() }()
+
+	client := dialPassivePort(t, port, "hello")
+	defer func() { _ = client.Close() }()
+
+	req.NoError(deadlineSetter.SetDeadline(time.Now().Add(5 * time.Second)))
+	conn, err := reservation.Accept()
+	req.NoError(err)
+	defer func() { _ = conn.Close() }()
+
+	payload := make([]byte, 5)
+	_, err = io.ReadFull(conn, payload)
+	req.NoError(err)
+	req.Equal("hello", string(payload))
+}
+
+// closedErrorTestListener reports itself closed on every Accept without closing the TCP listener
+type closedErrorTestListener struct {
+	net.Listener
+	closed chan struct{}
+}
+
+func (l *closedErrorTestListener) Accept() (net.Conn, error) {
+	<-l.closed
+
+	return nil, fmt.Errorf("wrapper closed: %w", net.ErrClosed)
+}
+
+func TestPassiveMultiplexingWrapperClosedErrorStopsPort(t *testing.T) {
+	req := require.New(t)
+	port := getFreePassivePort(t)
+	wrapped := &closedErrorTestListener{closed: make(chan struct{})}
+	wrap := func(listener net.Listener) (net.Listener, error) {
+		wrapped.Listener = listener
+
+		return wrapped, nil
+	}
+	manager := newPassiveListenersManager(slog.New(slog.DiscardHandler), wrap)
+	defer func() { req.NoError(manager.close()) }()
+
+	_, reservation, deadlineSetter, err := manager.reserve(net.ParseIP("127.0.0.1"), PortRange{Start: port, End: port})
+	req.NoError(err)
+
+	close(wrapped.closed)
+
+	// The waiting reservation is failed instead of hanging
+	req.NoError(deadlineSetter.SetDeadline(time.Now().Add(5 * time.Second)))
+	_, err = reservation.Accept()
+	req.ErrorIs(err, net.ErrClosed)
+}
+
+func TestPassiveMultiplexingCloseFailsWaitingReservation(t *testing.T) {
+	req := require.New(t)
+	port := getFreePassivePort(t)
+	manager, _ := newFailOnceTestManager()
+
+	_, reservation, deadlineSetter, err := manager.reserve(net.ParseIP("127.0.0.1"), PortRange{Start: port, End: port})
+	req.NoError(err)
+	req.NoError(deadlineSetter.SetDeadline(time.Now().Add(5 * time.Second)))
+
+	accepted := make(chan error, 1)
+	go func() {
+		_, acceptErr := reservation.Accept()
+		accepted <- acceptErr
+	}()
+
+	req.NoError(manager.close())
+
+	select {
+	case err = <-accepted:
+		req.Error(err)
+		req.NotErrorIs(err, os.ErrDeadlineExceeded)
+	case <-time.After(3 * time.Second):
+		req.Fail("Accept did not return after the shared listener was closed")
+	}
 }

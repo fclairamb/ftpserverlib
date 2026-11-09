@@ -52,7 +52,9 @@ type MainDriverExtensionPassiveWrapper interface {
 	// With PassiveTransferPortMultiplexing, it is called once per shared port, and the
 	// wrapped listener's connections are matched to clients by their RemoteAddr: a wrapper
 	// reading the PROXY protocol header lets them be matched on the client's IP. Its Accept
-	// must not wait for the client.
+	// must not wait for the client. An error returned by the wrapped listener's Accept is then
+	// treated as a refused connection, not as the end of the listener: only an error wrapping
+	// net.ErrClosed, or the server closing the port, stops it.
 	WrapPassiveListener(listener net.Listener) (net.Listener, error)
 }
 
