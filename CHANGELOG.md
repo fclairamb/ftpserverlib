@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.33.1](https://github.com/fclairamb/ftpserverlib/compare/v0.33.0...v0.33.1) (2026-11-13)
+
+
+### Bug Fixes
+
+* **server:** multiplexed passive ports keep serving after a wrapper accept error ([#699](https://github.com/fclairamb/ftpserverlib/issues/699)) ([fa7185c](https://github.com/fclairamb/ftpserverlib/commit/fa7185c60458b46c0940928a50381f02c38da35e))
+* **deps:** bump golang.org/x/sys to v0.50.0 ([#700](https://github.com/fclairamb/ftpserverlib/issues/700)) ([de6ea54](https://github.com/fclairamb/ftpserverlib/commit/de6ea54e405651fbf98ebe04ebd27ba9552951fb))
+
 ## [0.33.0](https://github.com/fclairamb/ftpserverlib/compare/v0.32.7...v0.33.0) (2026-11-05)
 
 
