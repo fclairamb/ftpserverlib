@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -119,6 +120,7 @@ type sharedPassiveListener struct {
 	mu           sync.Mutex
 	reservations map[string]*passiveReservationListener
 	closed       bool
+	closing      atomic.Bool // set by close(), before the listener is closed
 }
 
 func newSharedPassiveListener(
@@ -162,22 +164,18 @@ func (l *sharedPassiveListener) serve() {
 	for {
 		conn, err := l.listener.Accept()
 		if err != nil {
-			if isClosedListenerError(err) {
+			// Only the end of the listener stops the loop. A wrapper may fail the Accept of a single
+			// connection (a refused PROXY protocol upstream, a filtered peer): that must not stop the
+			// port for every other client.
+			if l.closing.Load() || isClosedListenerError(err) {
 				l.failAll(net.ErrClosed)
 
 				return
 			}
 
-			var netErr net.Error
-			if errors.As(err, &netErr) && netErr.Temporary() { //nolint:staticcheck
-				l.logger.Warn("Temporary passive accept error", "err", err)
+			l.logger.Warn("Passive accept error, connection refused", "err", err)
 
-				continue
-			}
-
-			l.failAll(err)
-
-			return
+			continue
 		}
 
 		// A wrapper may read from the connection to get its remote address, which must not block the
@@ -276,6 +274,7 @@ func (l *sharedPassiveListener) failAll(err error) {
 }
 
 func (l *sharedPassiveListener) close() error {
+	l.closing.Store(true)
 	err := l.listener.Close()
 	l.failAll(net.ErrClosed)
 
