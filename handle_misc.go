@@ -15,7 +15,10 @@ var errUnknownHash = errors.New("unknown hash algorithm")
 func (c *clientHandler) handleAUTH(_ string) error {
 	if tlsConfig, err := c.server.driver.GetTLSConfig(); err == nil {
 		c.writeMessage(StatusAuthAccepted, "AUTH command ok. Expecting TLS Negotiation.")
+		// Close, RemoteAddr and LocalAddr can read conn from other goroutines
+		c.connMu.Lock()
 		c.conn = tls.Server(c.conn, tlsConfig)
+		c.connMu.Unlock()
 		c.reader = bufio.NewReaderSize(c.conn, maxCommandSize)
 		c.writer = bufio.NewWriter(c.conn)
 		c.setTLSForControl(true)

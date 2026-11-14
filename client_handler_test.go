@@ -222,6 +222,113 @@ func TestCloseConnection(t *testing.T) {
 	}, 1*time.Second, 50*time.Millisecond)
 }
 
+// controlConn is a control connection a test opened, with its server side.
+type controlConn struct {
+	conn    net.Conn
+	reader  *bufio.Reader
+	context ClientContext
+}
+
+// dialControlConns opens nbConns control connections and reads each one's
+// welcome, so ClientConnected registered them.
+func dialControlConns(t *testing.T, server *FtpServer, driver *TestServerDriver, nbConns int) []controlConn {
+	t.Helper()
+
+	conns := make([]controlConn, 0, nbConns)
+
+	for range nbConns {
+		dialer := &net.Dialer{Timeout: 5 * time.Second}
+		conn, err := dialer.DialContext(t.Context(), "tcp", server.Addr())
+		require.NoError(t, err)
+
+		t.Cleanup(func() { _ = conn.Close() })
+
+		reader := bufio.NewReader(conn)
+		welcome, err := reader.ReadString('\n')
+		require.NoError(t, err)
+		require.Equal(t, "220 TEST Server\r\n", welcome)
+
+		clientContext := driver.clientOf(conn)
+		require.NotNil(t, clientContext)
+
+		conns = append(conns, controlConn{conn: conn, reader: reader, context: clientContext})
+	}
+
+	return conns
+}
+
+// clientOf returns the ClientContext of the control connection conn opened.
+func (driver *TestServerDriver) clientOf(conn net.Conn) ClientContext {
+	driver.clientMU.Lock()
+	defer driver.clientMU.Unlock()
+
+	for _, clientContext := range driver.Clients {
+		if clientContext.RemoteAddr().String() == conn.LocalAddr().String() {
+			return clientContext
+		}
+	}
+
+	return nil
+}
+
+// TestCloseWhileClientQuits closes clients from another goroutine, as a driver
+// kicking them does, while their QUIT disconnects them from their own
+// goroutine. Both run disconnect: run it with -race.
+func TestCloseWhileClientQuits(t *testing.T) {
+	driver := &TestServerDriver{}
+	server := NewTestServerWithTestDriver(t, driver)
+
+	var waitGroup sync.WaitGroup
+
+	for _, control := range dialControlConns(t, server, driver, 50) {
+		waitGroup.Go(func() {
+			_, err := control.conn.Write([]byte("QUIT\r\n"))
+			assert.NoError(t, err)
+		})
+		waitGroup.Go(func() {
+			assert.NoError(t, control.context.Close())
+		})
+	}
+
+	waitGroup.Wait()
+}
+
+// TestClientContextWhileClientStartsTLS reads clients' addresses and closes
+// them from another goroutine once their AUTH TLS was answered, while the
+// server replaces their control connection with a TLS one. Run it with -race.
+func TestClientContextWhileClientStartsTLS(t *testing.T) {
+	driver := &TestServerDriver{TLS: true}
+	server := NewTestServerWithTestDriver(t, driver)
+
+	var waitGroup sync.WaitGroup
+
+	for _, control := range dialControlConns(t, server, driver, 50) {
+		waitGroup.Add(1)
+
+		go func() {
+			defer waitGroup.Done()
+
+			_, err := control.conn.Write([]byte("AUTH TLS\r\n"))
+			if !assert.NoError(t, err) {
+				return
+			}
+
+			reply, err := control.reader.ReadString('\n')
+			if !assert.NoError(t, err) {
+				return
+			}
+
+			assert.Equal(t, "234 AUTH command ok. Expecting TLS Negotiation.\r\n", reply)
+
+			assert.Equal(t, control.conn.LocalAddr().String(), control.context.RemoteAddr().String())
+			assert.Equal(t, control.conn.RemoteAddr().String(), control.context.LocalAddr().String())
+			assert.NoError(t, control.context.Close())
+		}()
+	}
+
+	waitGroup.Wait()
+}
+
 func TestClientContextConcurrency(t *testing.T) {
 	driver := &TestServerDriver{}
 	server := NewTestServerWithTestDriver(t, driver)
