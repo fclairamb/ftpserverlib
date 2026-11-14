@@ -149,6 +149,12 @@ func (c *clientHandler) findListenerWithinPortRange(portMapping PasvPortGetter) 
 
 func (c *clientHandler) handlePASV(_ string) error {
 	command := c.GetLastCommand()
+
+	// The previous transfer, if any, is replaced: release its listener first so that its port can be reused
+	c.transferMu.Lock()
+	c.discardTransfer()
+	c.transferMu.Unlock()
+
 	exposedPort, listener, deadlineSetter, err := c.getPassiveListener()
 
 	if err != nil {
@@ -218,10 +224,7 @@ func (c *clientHandler) handlePASV(_ string) error {
 	}
 
 	c.transferMu.Lock()
-	if c.transfer != nil {
-		c.transfer.Close() //nolint:errcheck,gosec
-	}
-
+	c.discardTransfer()
 	c.transfer = transferHandler
 	installed = true
 	c.transferMu.Unlock()

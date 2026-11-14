@@ -2056,3 +2056,86 @@ func TestPASVOverIPv6WithoutPublicHostReleasesPort(t *testing.T) {
 	req.NoError(err)
 	req.Equal(StatusEnteringEPSV, returnCode, message)
 }
+
+// A transfer command that fails before opening the data connection must release the passive port (issue #703)
+func TestFailedTransferCommandReleasesPassivePort(t *testing.T) {
+	commands := map[string]int{
+		"RETR fail-to-open.bin": StatusActionNotTaken,
+		"STOR fail-to-open.bin": StatusActionNotTaken,
+		"LIST /missing":         StatusFileActionNotTaken,
+		"NLST /missing":         StatusFileActionNotTaken,
+		"MLSD /missing":         StatusActionNotTaken,
+	}
+
+	for command, expectedCode := range commands {
+		t.Run(command, func(t *testing.T) {
+			req := require.New(t)
+			port := getFreePassivePort(t)
+			server := NewTestServerWithTestDriver(t, &TestServerDriver{
+				Debug: true,
+				Settings: &Settings{
+					ListenAddr:               testServerListenAddr,
+					DefaultTransferType:      TransferTypeBinary,
+					PassiveTransferPortRange: &PortRange{Start: port, End: port},
+				},
+			})
+
+			client, err := goftp.DialConfig(goftp.Config{User: authUser, Password: authPass}, server.Addr())
+			req.NoError(err)
+
+			defer func() { panicOnError(client.Close()) }()
+
+			raw, err := client.OpenRawConn()
+			req.NoError(err)
+
+			defer func() { req.NoError(raw.Close()) }()
+
+			returnCode, message, err := raw.SendCommand("PASV")
+			req.NoError(err)
+			req.Equal(StatusEnteringPASV, returnCode, message)
+
+			returnCode, message, err = raw.SendCommand("%s", command)
+			req.NoError(err)
+			req.Equal(expectedCode, returnCode, message)
+
+			// NOOP waits for the transfer command to be fully handled
+			returnCode, message, err = raw.SendCommand("NOOP")
+			req.NoError(err)
+			req.Equal(StatusOK, returnCode, message)
+
+			listener, err := (&net.ListenConfig{}).Listen(t.Context(), "tcp", fmt.Sprintf(":%d", port))
+			req.NoError(err, "the passive port should have been released")
+			req.NoError(listener.Close())
+		})
+	}
+}
+
+// A PASV that replaces a pending passive transfer must be able to reuse its port (issue #703)
+func TestPASVReplacesPendingPassiveTransfer(t *testing.T) {
+	req := require.New(t)
+	port := getFreePassivePort(t)
+	server := NewTestServerWithTestDriver(t, &TestServerDriver{
+		Debug: true,
+		Settings: &Settings{
+			ListenAddr:               testServerListenAddr,
+			DefaultTransferType:      TransferTypeBinary,
+			PassiveTransferPortRange: &PortRange{Start: port, End: port},
+		},
+	})
+
+	client, err := goftp.DialConfig(goftp.Config{User: authUser, Password: authPass}, server.Addr())
+	req.NoError(err)
+
+	defer func() { panicOnError(client.Close()) }()
+
+	raw, err := client.OpenRawConn()
+	req.NoError(err)
+
+	defer func() { req.NoError(raw.Close()) }()
+
+	for _, command := range []string{"PASV", "EPSV", "EPSV", "PASV"} {
+		returnCode, message, errCmd := raw.SendCommand("%s", command)
+		req.NoError(errCmd)
+		req.Contains([]int{StatusEnteringPASV, StatusEnteringEPSV}, returnCode, message)
+	}
+}
