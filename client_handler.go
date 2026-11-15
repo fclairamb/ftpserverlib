@@ -95,7 +95,8 @@ type clientHandler struct {
 	connectedAt         time.Time       // Date of connection
 	paramsMutex         sync.RWMutex    // mutex to protect the parameters exposed to the library users
 	driver              ClientDriver    // Client handling driver
-	conn                net.Conn        // TCP connection
+	connMu              sync.RWMutex    // protects conn and connClosed, which Close, RemoteAddr and LocalAddr read
+	conn                net.Conn        // TCP connection, replaced by AUTH TLS under connMu
 	user                string          // Authenticated user
 	userAccepted        bool            // A USER was accepted and is waiting for its PASS
 	path                string          // Current path
@@ -146,13 +147,22 @@ func (server *FtpServer) newClientHandler(
 	}
 }
 
-// disconnects the connection without any other messaging
+// disconnects the connection without any other messaging. Close calls it from any goroutine
+// while the client's own goroutine calls it on QUIT, a refused login or its end: connMu lets
+// only the first one close the connection.
 func (c *clientHandler) disconnect() error {
+	c.connMu.Lock()
 	if c.connClosed {
+		c.connMu.Unlock()
+
 		return nil
 	}
 
-	err := c.conn.Close()
+	c.connClosed = true
+	conn := c.conn
+	c.connMu.Unlock()
+
+	err := conn.Close()
 	if err != nil {
 		err = newNetworkError("error closing control connection", err)
 		c.logger.Warn(
@@ -160,8 +170,6 @@ func (c *clientHandler) disconnect() error {
 			"err", err,
 		)
 	}
-
-	c.connClosed = true
 
 	return err
 }
@@ -221,11 +229,17 @@ func (c *clientHandler) ID() uint32 {
 
 // RemoteAddr returns the remote network address.
 func (c *clientHandler) RemoteAddr() net.Addr {
+	c.connMu.RLock()
+	defer c.connMu.RUnlock()
+
 	return c.conn.RemoteAddr()
 }
 
 // LocalAddr returns the local network address.
 func (c *clientHandler) LocalAddr() net.Addr {
+	c.connMu.RLock()
+	defer c.connMu.RUnlock()
+
 	return c.conn.LocalAddr()
 }
 
