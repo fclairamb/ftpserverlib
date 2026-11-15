@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.33.2](https://github.com/fclairamb/ftpserverlib/compare/v0.33.1...v0.33.2) (2026-11-15)
+
+
+### Bug Fixes
+
+* **server:** `ClientContext.Close`, `RemoteAddr` and `LocalAddr` are now safe to call from another goroutine (data race with `QUIT`, refused logins and `AUTH TLS`) ([#706](https://github.com/fclairamb/ftpserverlib/issues/706)) ([c8e9016](https://github.com/fclairamb/ftpserverlib/commit/c8e9016d757d727a9a786e5e1eda29501c04443a))
+* **transfer:** RETR, STOR, APPE, LIST, NLST and MLSD release the passive port when they fail before opening the data connection, so the next PASV/EPSV no longer gets `421` on a small port range; a second PASV in the same session now replaces the pending one ([#704](https://github.com/fclairamb/ftpserverlib/issues/704)) ([dd97893](https://github.com/fclairamb/ftpserverlib/commit/dd978936cd17093809582034eee15d9f0d9c3005))
+
 ## [0.33.1](https://github.com/fclairamb/ftpserverlib/compare/v0.33.0...v0.33.1) (2026-11-13)
 
 
