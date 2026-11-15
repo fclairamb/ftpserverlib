@@ -279,7 +279,17 @@ func TestPassivePortMultiplexingSameClientExhaustion(t *testing.T) {
 	req.NoError(err)
 	req.Equal(StatusEnteringPASV, returnCode, message)
 
+	// A new PASV of the same session replaces its reservation
 	returnCode, message, err = raw.SendCommand("PASV")
+	req.NoError(err)
+	req.Equal(StatusEnteringPASV, returnCode, message)
+
+	// Another session from the same IP can't get a second reservation on the port
+	raw2, err := client.OpenRawConn()
+	req.NoError(err)
+	defer func() { req.NoError(raw2.Close()) }()
+
+	returnCode, message, err = raw2.SendCommand("PASV")
 	req.NoError(err)
 	req.Equal(StatusServiceNotAvailable, returnCode, message)
 	req.Contains(message, ErrNoAvailableListeningPort.Error())

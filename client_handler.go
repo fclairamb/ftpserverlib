@@ -637,6 +637,7 @@ func (c *clientHandler) handleCommand(line string) {
 			defer c.transferWg.Done()
 
 			c.executeCommandFn(cmdDesc, cmd, param)
+			c.discardUnusedTransfer()
 		}(command, param)
 	} else {
 		c.executeCommandFn(cmdDesc, command, param)
@@ -703,12 +704,22 @@ func (c *clientHandler) GetTranferInfo() string {
 	return c.transfer.GetInfo()
 }
 
-// discardFailedTransfer closes the transfer handler after a failed TransferOpen, so that its data connection
+// discardTransfer closes the transfer handler, if any, e.g. after a failed TransferOpen, so that its data connection
 // can't be reused by a later transfer: the client has to send PASV/PORT again. transferMu must be held.
-func (c *clientHandler) discardFailedTransfer() {
+func (c *clientHandler) discardTransfer() {
 	if err := c.closeTransfer(); err != nil {
-		c.logger.Warn("Problem closing the failed transfer", "err", err)
+		c.logger.Warn("Problem closing the transfer", "err", err)
 	}
+}
+
+// discardUnusedTransfer closes the transfer handler left by a transfer command that failed before it opened
+// the data connection (driver error, missing file...). A passive listener would otherwise keep its port until
+// the next PASV/EPSV or the end of the session.
+func (c *clientHandler) discardUnusedTransfer() {
+	c.transferMu.Lock()
+	defer c.transferMu.Unlock()
+
+	c.discardTransfer()
 }
 
 func (c *clientHandler) TransferOpen(info string) (io.ReadWriter, error) {
@@ -741,7 +752,7 @@ func (c *clientHandler) TransferOpen(info string) (io.ReadWriter, error) {
 			"error", err)
 
 		c.writeMessage(StatusCannotOpenDataConnection, err.Error())
-		c.discardFailedTransfer()
+		c.discardTransfer()
 
 		err = newNetworkError("Unable to open transfer", err)
 
@@ -757,7 +768,7 @@ func (c *clientHandler) TransferOpen(info string) (io.ReadWriter, error) {
 			"requested", c.HasTLSForTransfers())
 
 		c.writeMessage(StatusCannotOpenDataConnection, errProtMismatch.Error())
-		c.discardFailedTransfer()
+		c.discardTransfer()
 
 		return nil, errProtMismatch
 	}
@@ -768,7 +779,7 @@ func (c *clientHandler) TransferOpen(info string) (io.ReadWriter, error) {
 		transferStream, err = newDeflateTransfer(transferStream, c.server.settings.DeflateCompressionLevel)
 		if err != nil {
 			c.writeMessage(StatusActionNotTaken, fmt.Sprintf("Could not switch to deflate mode: %v", err))
-			c.discardFailedTransfer()
+			c.discardTransfer()
 
 			return nil, fmt.Errorf("could not switch to deflate mode: %w", err)
 		}
