@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.33.2](https://github.com/fclairamb/ftpserverlib/compare/v0.33.1...v0.33.2) (2026-11-15)
+
+
+### Bug Fixes
+
+* **server:** make ClientContext.Close safe from another goroutine ([#706](https://github.com/fclairamb/ftpserverlib/issues/706)) ([c8e9016](https://github.com/fclairamb/ftpserverlib/commit/c8e9016d757d727a9a786e5e1eda29501c04443a))
+* **transfer:** release the passive port when a transfer command fails early ([#704](https://github.com/fclairamb/ftpserverlib/issues/704)) ([dd97893](https://github.com/fclairamb/ftpserverlib/commit/dd978936cd17093809582034eee15d9f0d9c3005))
+
 ## [0.33.1](https://github.com/fclairamb/ftpserverlib/compare/v0.33.0...v0.33.1) (2026-11-13)
 
 
