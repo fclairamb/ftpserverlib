@@ -174,6 +174,14 @@ func (c *clientHandler) disconnect() error {
 	return err
 }
 
+// isClosed reports whether disconnect() has closed the control connection
+func (c *clientHandler) isClosed() bool {
+	c.connMu.RLock()
+	defer c.connMu.RUnlock()
+
+	return c.connClosed
+}
+
 // Path provides the current working directory of the client
 func (c *clientHandler) Path() string {
 	c.paramsMutex.RLock()
@@ -471,6 +479,12 @@ func (c *clientHandler) readCommand() bool {
 	}
 
 	lineSlice, isPrefix, err := c.reader.ReadLine()
+
+	// Lines already buffered when disconnect() closed the connection (a refused
+	// login, Close from another goroutine) must not be run.
+	if c.isClosed() {
+		return true
+	}
 
 	if isPrefix {
 		if c.debug {

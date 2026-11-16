@@ -24,7 +24,8 @@ type MainDriver interface {
 	// ClientDisconnected is called when the user disconnects, even if he never authenticated
 	ClientDisconnected(cc ClientContext)
 
-	// AuthUser authenticates the user and selects an handling driver
+	// AuthUser authenticates the user and selects an handling driver.
+	// When an error is returned, the returned ClientDriver is ignored.
 	AuthUser(cc ClientContext, user, pass string) (ClientDriver, error)
 
 	// GetTLSConfig returns a TLS Certificate to use

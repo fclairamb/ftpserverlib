@@ -72,7 +72,6 @@ func (c *clientHandler) handleUserTLS(user string) bool {
 
 // Handle the "PASS" command
 func (c *clientHandler) handlePASS(param string) error {
-	var err error
 	var msg string
 
 	// The TLS requirement is also checked here, so that a PASS sent without
@@ -92,7 +91,14 @@ func (c *clientHandler) handlePASS(param string) error {
 
 	c.userAccepted = false
 
-	c.driver, err = c.server.driver.AuthUser(c, c.user, param)
+	// The driver is kept only on success: whatever AuthUser returns along with
+	// an error is dropped, and a failed re-login doesn't keep the previous driver.
+	driver, err := c.server.driver.AuthUser(c, c.user, param)
+	if err == nil && driver != nil {
+		c.driver = driver
+	} else {
+		c.driver = nil
+	}
 
 	dpa, ok := c.server.driver.(MainDriverExtensionPostAuthMessage)
 	if ok {
