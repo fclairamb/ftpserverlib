@@ -234,6 +234,16 @@ type FileTransfer interface {
 //   - the client dropping the data connection (TCP RST or otherwise),
 //   - an I/O error while copying bytes between the data connection and the file.
 //
+// When the file's Read or Write fails, err is the error it returned
+// (io.ErrShortWrite for a short write without one), which the reply to the
+// client also shows. Without ASCII conversion (TYPE I, or TYPE A with
+// DisableASCIIConversion), a file that implements io.ReaderFrom (uploads), or
+// io.WriterTo or syscall.Conn (downloads), such as an *os.File, is handed to
+// the copy as is to keep the data connection's zero-copy path: its errors can
+// then reach err, and the reply, wrapped in a *net.OpError naming the data
+// connection. This includes a file whose SyscallConn fails, which gets a
+// regular copy.
+//
 // It is NOT called when the transfer ends cleanly (the data connection is
 // closed gracefully by the client after sending all of its bytes). In that
 // case only Close is invoked.

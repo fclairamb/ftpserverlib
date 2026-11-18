@@ -159,7 +159,8 @@ func (c *clientHandler) handlePASV(_ string) error {
 
 	if err != nil {
 		c.logger.Error("Could not listen for passive connection", "err", err)
-		c.writeMessage(StatusServiceNotAvailable, fmt.Sprintf("Could not listen for passive connection: %v", err))
+		c.writeMessage(StatusServiceNotAvailable,
+			fmt.Sprintf("Could not listen for passive connection: %v", c.replyError(err)))
 
 		return nil
 	}

@@ -1,21 +1,29 @@
 package ftpserver
 
 import (
+	"bufio"
+	"bytes"
 	"crypto/rand"
 	"crypto/sha256"
 	"crypto/tls"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"math/big"
+	"net"
 	"os"
 	"regexp"
+	"runtime"
 	"strconv"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 
 	"github.com/secsy/goftp"
+	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -498,6 +506,521 @@ func TestUploadErrorCodes(t *testing.T) {
 
 	if assert.Error(t, err) {
 		assert.Contains(t, err.Error(), "553-Could not access file")
+	}
+}
+
+func requireFTPError(t *testing.T, err error, code int, message string) {
+	t.Helper()
+
+	var ftpErr goftp.Error
+
+	require.ErrorAs(t, err, &ftpErr)
+	require.Equal(t, code, ftpErr.Code(), ftpErr.Message())
+	require.Equal(t, message, ftpErr.Message())
+}
+
+func TestDriverErrorReplies(t *testing.T) {
+	t.Parallel()
+
+	req := require.New(t)
+	driver := &TestServerDriver{
+		Settings: &Settings{EnableCOMB: true, EnableHASH: true},
+	}
+	server := NewTestServerWithTestDriver(t, driver)
+
+	client, err := goftp.DialConfig(goftp.Config{User: authUser, Password: authPass}, server.Addr())
+	req.NoError(err)
+
+	defer func() { panicOnError(client.Close()) }()
+
+	err = client.Store("quota-exceeded.bin", createTemporaryFile(t, 10))
+	requireFTPError(t, err, StatusActionAborted, "Could not access file: storage limit exceeded")
+
+	ftpUpload(t, client, createTemporaryFile(t, 10), "file.bin")
+	req.NoError(client.Rename("file.bin", "fail-to-open.bin"))
+
+	err = client.Retrieve("fail-to-open.bin", io.Discard)
+	requireFTPError(t, err, StatusActionNotTaken, "Could not access file: "+errFailOpen.Error())
+
+	raw, err := client.OpenRawConn()
+	req.NoError(err)
+
+	defer func() { req.NoError(raw.Close()) }()
+
+	replies := []struct {
+		command string
+		code    int
+		message string
+	}{
+		{"XMD5 fail-to-open.bin", StatusActionNotTaken, "fail-to-open.bin: " + errFailOpen.Error()},
+		{"COMB quota-exceeded.bin fail-to-open.bin", StatusActionAborted,
+			`Could not access file "/quota-exceeded.bin": storage limit exceeded`},
+		{"COMB combined.bin fail-to-open.bin", StatusActionNotTaken,
+			`Could not access file "/fail-to-open.bin": ` + errFailOpen.Error()},
+	}
+
+	for _, reply := range replies {
+		returnCode, message, errCmd := raw.SendCommand("%s", reply.command)
+		req.NoError(errCmd, reply.command)
+		req.Equal(reply.code, returnCode, "%s: %s", reply.command, message)
+		req.Equal(reply.message, message, reply.command)
+	}
+
+	_, statErr := driver.fs.Stat("/missing")
+	req.Error(statErr)
+
+	returnCode, message, err := raw.SendCommand("LIST /missing")
+	req.NoError(err)
+	req.Equal(StatusFileActionNotTaken, returnCode, message)
+	req.Equal("Could not list: "+statErr.Error(), message)
+}
+
+func TestDriverTransferErrorReplies(t *testing.T) {
+	t.Parallel()
+
+	server := NewTestServer(t, false)
+
+	client, err := goftp.DialConfig(goftp.Config{User: authUser, Password: authPass}, server.Addr())
+	require.NoError(t, err)
+
+	defer func() { panicOnError(client.Close()) }()
+
+	uploads := []struct {
+		path    string
+		code    int
+		message string
+	}{
+		{"storage-full-on-write.bin", StatusActionAborted, "Issue during transfer: storage limit exceeded"},
+		{"fail-to-write.bin", StatusActionNotTaken, "Issue during transfer: " + errFailWrite.Error()},
+	}
+
+	// An empty upload reaches the driver's Write after the copy, a non-empty one from inside it.
+	// Store would retry a failed non-empty upload, TransferFromOffset doesn't.
+	for _, size := range []int{0, 10} {
+		for _, upload := range uploads {
+			src := createTemporaryFile(t, size)
+			_, err = src.Seek(0, io.SeekStart)
+			require.NoError(t, err)
+
+			_, err = client.TransferFromOffset(upload.path, nil, src, 0)
+			requireFTPError(t, err, upload.code, upload.message)
+		}
+	}
+
+	ftpUpload(t, client, createTemporaryFile(t, 10), "fail-on-read.bin")
+
+	err = client.Retrieve("fail-on-read.bin", io.Discard)
+	requireFTPError(t, err, StatusActionNotTaken, "Issue during transfer: "+errFailRead.Error())
+}
+
+// In ASCII mode the converter, not the data connection, is the source of an upload
+func TestASCIIUploadDriverErrorReply(t *testing.T) {
+	t.Parallel()
+
+	server := NewTestServer(t, false)
+
+	client, err := goftp.DialConfig(goftp.Config{User: authUser, Password: authPass}, server.Addr())
+	require.NoError(t, err)
+
+	defer func() { panicOnError(client.Close()) }()
+
+	raw, err := client.OpenRawConn()
+	require.NoError(t, err)
+
+	defer func() { require.NoError(t, raw.Close()) }()
+
+	requireRawCommand(t, raw, "TYPE A", StatusOK)
+
+	uploads := []struct {
+		path    string
+		code    int
+		message string
+	}{
+		{"storage-full-on-write.txt", StatusActionAborted, "Issue during transfer: storage limit exceeded"},
+		{"fail-to-write.txt", StatusActionNotTaken, "Issue during transfer: " + errFailWrite.Error()},
+	}
+
+	for _, upload := range uploads {
+		dcGetter, err := raw.PrepareDataConn()
+		require.NoError(t, err)
+
+		requireRawCommand(t, raw, "STOR "+upload.path, StatusFileStatusOK)
+
+		dataConn, err := dcGetter()
+		require.NoError(t, err)
+
+		_, err = dataConn.Write([]byte("line\r\n"))
+		require.NoError(t, err)
+		require.NoError(t, dataConn.Close())
+
+		returnCode, response, err := raw.ReadResponse()
+		require.NoError(t, err)
+		require.Equal(t, upload.code, returnCode, response)
+		require.Equal(t, upload.message, response)
+	}
+}
+
+// A driver error that is a nil pointer must neither break the reply nor leave the REST offset to the next transfer
+func TestTypedNilDriverErrorReply(t *testing.T) {
+	t.Parallel()
+
+	server := NewTestServer(t, false)
+
+	client, err := goftp.DialConfig(goftp.Config{User: authUser, Password: authPass}, server.Addr())
+	require.NoError(t, err)
+
+	defer func() { panicOnError(client.Close()) }()
+
+	file := createTemporaryFile(t, 10)
+	ftpUpload(t, client, file, "file.bin")
+
+	raw, err := client.OpenRawConn()
+	require.NoError(t, err)
+
+	defer func() { require.NoError(t, raw.Close()) }()
+
+	requireRawCommand(t, raw, "TYPE I", StatusOK)
+	requireRawCommand(t, raw, "REST 5", StatusFileActionPending)
+
+	response := requireRawCommand(t, raw, "RETR typed-nil-error.bin", StatusActionNotTaken)
+	require.Equal(t, "Could not access file: <nil>", response)
+
+	require.Equal(t, hashFile(t, file), ftpDownloadAndHashWithRawConnection(t, raw, "file.bin", nil))
+}
+
+// tcpConnPair returns both ends of a loopback TCP connection: io.Copy reaches net.TCPConn's ReadFrom and
+// WriteTo, which wrap the file's errors, only with a real one.
+func tcpConnPair(t *testing.T) (*net.TCPConn, *net.TCPConn) {
+	t.Helper()
+
+	listener, err := (&net.ListenConfig{}).Listen(t.Context(), "tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+
+	defer func() { require.NoError(t, listener.Close()) }()
+
+	dialed, err := (&net.Dialer{}).DialContext(t.Context(), "tcp", listener.Addr().String())
+	require.NoError(t, err)
+
+	accepted, err := listener.Accept()
+	require.NoError(t, err)
+
+	t.Cleanup(func() {
+		_ = dialed.Close()
+		_ = accepted.Close()
+	})
+
+	server, ok := accepted.(*net.TCPConn)
+	require.True(t, ok)
+
+	client, ok := dialed.(*net.TCPConn)
+	require.True(t, ok)
+
+	return server, client
+}
+
+func newTransferTestHandler(transferType TransferType, logs io.Writer) *clientHandler {
+	return &clientHandler{
+		server:              &FtpServer{settings: &Settings{}},
+		logger:              slog.New(slog.NewTextHandler(logs, &slog.HandlerOptions{Level: slog.LevelDebug})),
+		currentTransferType: transferType,
+	}
+}
+
+// errors.Is panics on this type: it is comparable but holds an uncomparable value
+type uncomparableValueError struct {
+	cause any
+}
+
+func (e uncomparableValueError) Error() string {
+	return fmt.Sprintf("invalid value: %v", e.cause)
+}
+
+// errors.Is never matches this type: it is uncomparable
+type uncomparableError struct {
+	fields []string
+}
+
+func (e uncomparableError) Error() string {
+	return "invalid fields: " + strings.Join(e.fields, ", ")
+}
+
+// failingFile fails its reads and writes with err or, if shortWrite, writes half of the data without an error
+type failingFile struct {
+	err         error
+	shortWrite  bool
+	transferErr error
+}
+
+func (f *failingFile) Read([]byte) (int, error) {
+	return 0, f.err
+}
+
+func (f *failingFile) Write(p []byte) (int, error) {
+	if f.shortWrite {
+		return len(p) / 2, nil
+	}
+
+	return 0, f.err
+}
+
+func (f *failingFile) TransferError(err error) {
+	f.transferErr = err
+}
+
+// joiningConn is a data connection with its own ReadFrom, which joins another error to the file's
+type joiningConn struct{}
+
+func (joiningConn) Read([]byte) (int, error) {
+	return 0, io.EOF
+}
+
+func (joiningConn) Write(p []byte) (int, error) {
+	return len(p), nil
+}
+
+func (joiningConn) ReadFrom(r io.Reader) (int64, error) {
+	_, err := r.Read(make([]byte, 1))
+
+	return 0, errors.Join(err, ErrStorageExceeded)
+}
+
+type fileErrorReplyCase struct {
+	name      string
+	conn      io.ReadWriter // a TCP connection if nil
+	file      *failingFile
+	upload    bool
+	code      int
+	driverErr error  // shown in the reply and given to TransferError
+	copyErr   string // in the copy's full error, which is logged
+}
+
+// The reply shows the error the driver's file returned, and its code maps from the copy's full error
+func TestTransferFileErrorReplies(t *testing.T) {
+	cases := make([]fileErrorReplyCase, 0, 6)
+
+	// errors.Is panics on, or never matches, these driver errors
+	for _, driverErr := range []error{
+		uncomparableValueError{cause: []string{"a", "b"}},
+		uncomparableError{fields: []string{"a", "b"}},
+	} {
+		cases = append(cases,
+			fileErrorReplyCase{name: fmt.Sprintf("%T download", driverErr), file: &failingFile{err: driverErr},
+				code: StatusActionNotTaken, driverErr: driverErr, copyErr: "readfrom tcp"},
+			fileErrorReplyCase{name: fmt.Sprintf("%T upload", driverErr), file: &failingFile{err: driverErr},
+				upload: true, code: StatusActionNotTaken, driverErr: driverErr, copyErr: "writeto tcp"},
+		)
+	}
+
+	cases = append(cases,
+		fileErrorReplyCase{name: "short write", file: &failingFile{shortWrite: true}, upload: true,
+			code: StatusActionNotTaken, driverErr: io.ErrShortWrite, copyErr: "writeto tcp"},
+		fileErrorReplyCase{name: "file error joined by the connection", conn: joiningConn{},
+			file: &failingFile{err: errFailRead}, code: StatusActionAborted, driverErr: errFailRead,
+			copyErr: ErrStorageExceeded.Error()},
+	)
+
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			conn := testCase.conn
+			if conn == nil {
+				serverConn, clientConn := tcpConnPair(t)
+				if testCase.upload {
+					_, err := clientConn.Write([]byte("data"))
+					require.NoError(t, err)
+				}
+
+				conn = serverConn
+			}
+
+			logs := &bytes.Buffer{}
+			reply := &bytes.Buffer{}
+			handler := newTransferTestHandler(TransferTypeBinary, logs)
+			handler.writer = bufio.NewWriter(reply)
+
+			require.NotPanics(t, func() {
+				handler.TransferClose(nil, handler.doFileTransfer(conn, testCase.file, testCase.upload))
+			})
+
+			require.Equal(t, fmt.Sprintf("%d Issue during transfer: %v\r\n", testCase.code, testCase.driverErr),
+				reply.String())
+			require.Equal(t, testCase.driverErr, testCase.file.transferErr)
+			require.Contains(t, logs.String(), testCase.copyErr)
+		})
+	}
+}
+
+// partialReadFile returns data along with its error, as io.Reader allows
+type partialReadFile struct {
+	err error
+}
+
+func (f partialReadFile) Read(p []byte) (int, error) {
+	return copy(p, "data"), f.err
+}
+
+func (partialReadFile) Write(p []byte) (int, error) {
+	return len(p), nil
+}
+
+// When writing the data the file returned along with its error fails, the connection's error is kept.
+func TestTransferConnectionErrorKept(t *testing.T) {
+	serverConn, _ := tcpConnPair(t)
+	require.NoError(t, serverConn.SetWriteDeadline(time.Now().Add(-time.Second)))
+
+	handler := newTransferTestHandler(TransferTypeBinary, io.Discard)
+	err := handler.doFileTransfer(serverConn, partialReadFile{err: os.ErrDeadlineExceeded}, false)
+
+	var opErr *net.OpError
+
+	require.ErrorAs(t, err, &opErr)
+	require.Equal(t, "readfrom", opErr.Op)
+}
+
+// recordingOSFile counts the calls to the copy paths of its *os.File
+type recordingOSFile struct {
+	*os.File
+	readFromCalls int
+	writeToCalls  int
+}
+
+func (f *recordingOSFile) ReadFrom(r io.Reader) (int64, error) {
+	f.readFromCalls++
+
+	return f.File.ReadFrom(r)
+}
+
+func (f *recordingOSFile) WriteTo(w io.Writer) (int64, error) {
+	f.writeToCalls++
+
+	return f.File.WriteTo(w)
+}
+
+// syscallConnOnlyFile is a file whose only copy path is the SyscallConn of its *os.File
+type syscallConnOnlyFile struct {
+	file             *os.File
+	syscallConnCalls int
+}
+
+func (f *syscallConnOnlyFile) Read(p []byte) (int, error) {
+	return f.file.Read(p)
+}
+
+func (f *syscallConnOnlyFile) Write(p []byte) (int, error) {
+	return f.file.Write(p)
+}
+
+func (f *syscallConnOnlyFile) SyscallConn() (syscall.RawConn, error) {
+	f.syscallConnCalls++
+
+	return f.file.SyscallConn()
+}
+
+// Transfers hand the file to the copy as is where wrapping it would hide its zero-copy path or its own ReadFrom
+func TestTransferKeepsFileCopyPaths(t *testing.T) {
+	data := strings.Repeat("line\r\n", 1000)
+
+	asciiStored := strings.Repeat("line\n", 1000)
+	if runtime.GOOS == "windows" {
+		asciiStored = data
+	}
+
+	readFrom := func(osFile *os.File) (io.ReadWriter, func() int) {
+		file := &recordingOSFile{File: osFile}
+
+		return file, func() int { return file.readFromCalls }
+	}
+
+	cases := []struct {
+		name         string
+		transferType TransferType
+		upload       bool
+		stored       string // what an upload writes to the file
+		linuxOnly    bool
+		wrap         func(osFile *os.File) (io.ReadWriter, func() int)
+	}{
+		{name: "binary upload with ReadFrom", transferType: TransferTypeBinary, upload: true, stored: data,
+			wrap: readFrom},
+		{name: "ASCII upload with ReadFrom", transferType: TransferTypeASCII, upload: true, stored: asciiStored,
+			wrap: readFrom},
+		{name: "download with WriteTo", transferType: TransferTypeBinary,
+			wrap: func(osFile *os.File) (io.ReadWriter, func() int) {
+				file := &recordingOSFile{File: osFile}
+
+				return file, func() int { return file.writeToCalls }
+			}},
+		{name: "download with SyscallConn", transferType: TransferTypeBinary, linuxOnly: true,
+			wrap: func(osFile *os.File) (io.ReadWriter, func() int) {
+				file := &syscallConnOnlyFile{file: osFile}
+
+				return file, func() int { return file.syscallConnCalls }
+			}},
+	}
+
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			if testCase.linuxOnly && runtime.GOOS != "linux" {
+				t.Skip("only Linux's sendfile goes through SyscallConn")
+			}
+
+			osFile, err := os.CreateTemp(t.TempDir(), "file")
+			require.NoError(t, err)
+
+			defer func() { require.NoError(t, osFile.Close()) }()
+
+			serverConn, clientConn := tcpConnPair(t)
+
+			// a download fits in the client's socket buffer
+			if testCase.upload {
+				_, err = clientConn.Write([]byte(data))
+				require.NoError(t, err)
+				require.NoError(t, clientConn.Close())
+			} else {
+				_, err = osFile.WriteString(data)
+				require.NoError(t, err)
+				_, err = osFile.Seek(0, io.SeekStart)
+				require.NoError(t, err)
+			}
+
+			file, calls := testCase.wrap(osFile)
+			handler := newTransferTestHandler(testCase.transferType, io.Discard)
+			require.NoError(t, handler.doFileTransfer(serverConn, file, testCase.upload))
+			require.Equal(t, 1, calls())
+
+			if testCase.upload {
+				stored, errRead := os.ReadFile(osFile.Name())
+				require.NoError(t, errRead)
+				require.Equal(t, testCase.stored, string(stored))
+			}
+		})
+	}
+}
+
+type syscallConnFile struct {
+	afero.File
+}
+
+func (syscallConnFile) SyscallConn() (syscall.RawConn, error) {
+	return nil, errors.ErrUnsupported
+}
+
+// Transfers wrap the file to mark its errors only where that can't hide a zero-copy path.
+func TestCanZeroCopy(t *testing.T) {
+	osFile := createTemporaryFile(t, 0)
+
+	cases := []struct {
+		name     string
+		file     io.ReadWriter
+		upload   bool
+		download bool
+	}{
+		{"os.File", osFile, true, true},
+		{"afero.File wrapper", &testFile{File: osFile}, false, false},
+		{"SyscallConn without WriteTo", syscallConnFile{File: osFile}, false, true},
+	}
+
+	for _, testCase := range cases {
+		require.Equal(t, testCase.upload, canZeroCopy(testCase.file, true), testCase.name)
+		require.Equal(t, testCase.download, canZeroCopy(testCase.file, false), testCase.name)
 	}
 }
 

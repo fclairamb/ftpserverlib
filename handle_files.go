@@ -16,6 +16,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 )
 
@@ -72,7 +73,7 @@ func (c *clientHandler) transferFile(write bool, appendFile bool, param, info st
 	// If this fail, can stop right here and reset the seek position
 	if err != nil {
 		if !c.isCommandAborted() {
-			c.writeMessage(getErrorCode(err, StatusActionNotTaken), "Could not access file: "+err.Error())
+			c.writeMessage(getErrorCode(err, StatusActionNotTaken), fmt.Sprintf("Could not access file: %v", c.replyError(err)))
 		}
 
 		c.ctxRest = 0
@@ -126,21 +127,27 @@ func (c *clientHandler) doFileTransfer(transferConn io.ReadWriter, file io.ReadW
 	var writer io.Writer
 
 	conversionMode := convertModeToCRLF
+	convert := c.currentTransferType == TransferTypeASCII && !c.server.settings.DisableASCIIConversion
+
+	fileSide := file
+	if needsFileErrorMarker(file, write, convert) {
+		fileSide = fileErrorMarker{file: file}
+	}
 
 	// Copy the data
 	if write { // ... from the connection to the file
 		reader = transferConn
-		writer = file
+		writer = fileSide
 
 		if runtime.GOOS != "windows" {
 			conversionMode = convertModeToLF
 		}
 	} else { // ... from the file to the connection
-		reader = file
+		reader = fileSide
 		writer = transferConn
 	}
 
-	if c.currentTransferType == TransferTypeASCII && !c.server.settings.DisableASCIIConversion {
+	if convert {
 		reader = newASCIIConverter(reader, conversionMode)
 	}
 
@@ -160,13 +167,95 @@ func (c *clientHandler) doFileTransfer(transferConn io.ReadWriter, file io.ReadW
 
 	if err != nil {
 		if fileTransferError, ok := file.(FileTransferError); ok {
-			fileTransferError.TransferError(err)
+			fileTransferError.TransferError(fileCopyError(err))
 		}
 
 		err = newNetworkError("error transferring data", err)
 	}
 
 	return err
+}
+
+// needsFileErrorMarker reports whether the file must be wrapped in a fileErrorMarker for the copy. Wrapping
+// hides the file's zero-copy path, if any (see canZeroCopy). An ASCII upload doesn't need it: the converter,
+// not the data connection, is then the copy's source, so the file's errors reach io.Copy as they are.
+func needsFileErrorMarker(file io.ReadWriter, write, convert bool) bool {
+	if write {
+		return !convert && !canZeroCopy(file, true)
+	}
+
+	// the ASCII converter hides the file from the zero-copy paths anyway
+	return convert || !canZeroCopy(file, false)
+}
+
+// canZeroCopy reports whether io.Copy can hand the file to a zero-copy path with the data connection, which
+// wrapping it would hide: on upload its ReadFrom (os.File splices from a TCP socket), on download its WriteTo
+// (os.File sends with sendfile) or SyscallConn (net.TCPConn.ReadFrom sends with sendfile).
+func canZeroCopy(file io.ReadWriter, write bool) bool {
+	if write {
+		_, ok := file.(io.ReaderFrom)
+
+		return ok
+	}
+
+	switch file.(type) {
+	case io.WriterTo, syscall.Conn:
+		return true
+	default:
+		return false
+	}
+}
+
+// fileErrorMarker marks the errors returned by the driver's file. net.TCPConn's ReadFrom and WriteTo, which
+// io.Copy prefers, wrap them in a *net.OpError naming the data connection, as they do the connection's own
+// errors. Comparing the copy's error with the file's wouldn't tell the sides apart: errors.Is panics or never
+// matches for some error types, and both sides can fail with the same error (a deadline, a reset).
+type fileErrorMarker struct {
+	file io.ReadWriter
+}
+
+func (m fileErrorMarker) Read(p []byte) (int, error) {
+	n, err := m.file.Read(p)
+	if err != nil && err != io.EOF { //nolint:errorlint // io.Copy ends cleanly on this exact value
+		err = &fileError{err: err}
+	}
+
+	return n, err
+}
+
+func (m fileErrorMarker) Write(p []byte) (int, error) {
+	written, err := m.file.Write(p)
+	if err == nil && written < len(p) {
+		err = io.ErrShortWrite
+	}
+
+	if err != nil {
+		err = &fileError{err: err}
+	}
+
+	return written, err
+}
+
+type fileError struct {
+	err error
+}
+
+func (e *fileError) Error() string {
+	return e.err.Error()
+}
+
+func (e *fileError) Unwrap() error {
+	return e.err
+}
+
+// fileCopyError returns the driver's own error if its file is what ended the copy, else errCopy.
+func fileCopyError(errCopy error) error {
+	var fileErr *fileError
+	if errors.As(errCopy, &fileErr) {
+		return fileErr.err
+	}
+
+	return errCopy
 }
 
 func (c *clientHandler) handleCOMB(param string) error {
@@ -228,7 +317,8 @@ func (c *clientHandler) handleCOMB(param string) error {
 func (c *clientHandler) combineFiles(targetPath string, fileFlag int, sourcePaths []string) {
 	file, err := c.getFileHandle(targetPath, fileFlag, 0)
 	if err != nil {
-		c.writeMessage(getErrorCode(err, StatusActionNotTaken), fmt.Sprintf("Could not access file %#v: %v", targetPath, err))
+		c.writeMessage(getErrorCode(err, StatusActionNotTaken),
+			fmt.Sprintf("Could not access file %#v: %v", targetPath, c.replyError(err)))
 
 		return
 	}
@@ -239,7 +329,8 @@ func (c *clientHandler) combineFiles(targetPath string, fileFlag int, sourcePath
 		src, err = c.getFileHandle(partial, os.O_RDONLY, 0)
 		if err != nil {
 			c.closeUnchecked(file)
-			c.writeMessage(getErrorCode(err, StatusActionNotTaken), fmt.Sprintf("Could not access file %#v: %v", partial, err))
+			c.writeMessage(getErrorCode(err, StatusActionNotTaken),
+				fmt.Sprintf("Could not access file %#v: %v", partial, c.replyError(err)))
 
 			return
 		}
@@ -683,7 +774,7 @@ func (c *clientHandler) handleGenericHash(param string, algo HASHAlgo, isCustomM
 	}
 
 	if err != nil {
-		c.writeMessage(StatusActionNotTaken, fmt.Sprintf("%v: %v", args[0], err))
+		c.writeMessage(StatusActionNotTaken, fmt.Sprintf("%v: %v", args[0], c.replyError(err)))
 
 		return nil
 	}

@@ -382,9 +382,7 @@ func (c *clientHandler) closeTransfer() error {
 	}
 
 	if err != nil {
-		err = fmt.Errorf("error closing transfer connection: %w", err)
-
-		return err
+		return newNetworkError("error closing transfer connection", err)
 	}
 
 	return nil
@@ -710,6 +708,47 @@ func (c *clientHandler) writeMessage(code int, message string) {
 	}
 }
 
+// replyError returns err without the library's own wrappers at its top, for a reply: their text names internal
+// steps ("calling OpenFile") that mean nothing to the client, and io.Copy can't tell whether an error came from
+// the driver or the data connection, so "network error" is also put on a driver's write error. When the
+// driver's file ended a transfer, the reply is the error it returned, without the data connection's wrapping.
+// When anything is removed, the full error is logged at debug level.
+func (c *clientHandler) replyError(err error) error {
+	reply := err
+	unwrapped := false
+
+	var fileErr *fileError
+	if errors.As(err, &fileErr) {
+		reply = fileErr.err
+		unwrapped = true
+	}
+
+	for {
+		var cause error
+
+		switch wrapper := reply.(type) { //nolint:errorlint // only the wrappers added by the library are removed
+		case DriverError:
+			cause = wrapper.err
+		case NetworkError:
+			cause = wrapper.err
+		case FileAccessError:
+			cause = wrapper.err
+		}
+
+		// The wrapper types are exported, so a driver can return one without a cause: keep it rather than nil
+		if cause == nil {
+			if unwrapped {
+				c.logger.Debug("Replying without the library's error wrapping", "err", err)
+			}
+
+			return reply
+		}
+
+		reply = cause
+		unwrapped = true
+	}
+}
+
 func (c *clientHandler) GetTranferInfo() string {
 	if c.transfer == nil {
 		return ""
@@ -765,7 +804,7 @@ func (c *clientHandler) TransferOpen(info string) (io.ReadWriter, error) {
 			"Unable to open transfer",
 			"error", err)
 
-		c.writeMessage(StatusCannotOpenDataConnection, err.Error())
+		c.writeMessage(StatusCannotOpenDataConnection, fmt.Sprint(c.replyError(err)))
 		c.discardTransfer()
 
 		err = newNetworkError("Unable to open transfer", err)
@@ -880,9 +919,9 @@ func (c *clientHandler) TransferClose(transfer io.ReadWriter, err error) {
 	case err == nil && errClose == nil:
 		c.writeMessage(StatusClosingDataConn, "Closing transfer connection")
 	case errClose != nil:
-		c.writeMessage(StatusActionNotTaken, fmt.Sprintf("Issue during transfer close: %v", errClose))
+		c.writeMessage(StatusActionNotTaken, fmt.Sprintf("Issue during transfer close: %v", c.replyError(errClose)))
 	case err != nil:
-		c.writeMessage(getErrorCode(err, StatusActionNotTaken), fmt.Sprintf("Issue during transfer: %v", err))
+		c.writeMessage(getErrorCode(err, StatusActionNotTaken), fmt.Sprintf("Issue during transfer: %v", c.replyError(err)))
 	}
 }
 

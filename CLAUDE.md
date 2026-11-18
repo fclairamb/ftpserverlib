@@ -122,6 +122,9 @@ const (
 - Wrap errors with context: `fmt.Errorf("operation failed: %w", err)`
 - Check errors with `errors.Is()`: `errors.Is(err, ErrStorageExceeded)`
 - Use `getErrorCode()` to map Go errors to FTP status codes
+- When a reply prints an error that may carry the library's wrappers (from `getFileHandle`, `getFileList`,
+  transfers, PORT/EPRT/PASV or `closeTransfer`), print `c.replyError(err)`, not `err`: it drops those wrappers so
+  the client sees the driver's error. Map the code from the full `err`. Other replies print their error as is.
 
 ### Synchronization
 - No global mutexes (only per-client)

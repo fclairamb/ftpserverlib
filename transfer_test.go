@@ -1273,6 +1273,29 @@ func TestPASVWrappedListenerError(t *testing.T) {
 	}
 }
 
+func TestPASVResolveErrorReply(t *testing.T) {
+	// A port range can go above 65535, which only fails when resolved
+	server := NewTestServerWithTestDriver(t, &TestServerDriver{
+		Settings: &Settings{PassiveTransferPortRange: PortRange{Start: 70000, End: 70000}},
+	})
+
+	client, err := goftp.DialConfig(goftp.Config{User: authUser, Password: authPass}, server.Addr())
+	require.NoError(t, err, "Couldn't connect")
+
+	defer func() { panicOnError(client.Close()) }()
+
+	raw, err := client.OpenRawConn()
+	require.NoError(t, err, "Couldn't open raw connection")
+
+	defer func() { require.NoError(t, raw.Close()) }()
+
+	_, resolveErr := net.ResolveTCPAddr("tcp", "0.0.0.0:70000")
+	require.Error(t, resolveErr)
+
+	response := requireRawCommand(t, raw, "PASV", StatusServiceNotAvailable)
+	require.Equal(t, "Could not listen for passive connection: "+resolveErr.Error(), response)
+}
+
 func TestPASVPublicIPResolver(t *testing.T) {
 	server := NewTestServer(t, false)
 

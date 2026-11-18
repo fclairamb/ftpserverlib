@@ -2,9 +2,14 @@
 package ftpserver
 
 import (
+	"bufio"
+	"bytes"
 	"io"
+	"log/slog"
 	"net"
+	"os"
 	"regexp"
+	"syscall"
 	"testing"
 
 	"github.com/secsy/goftp"
@@ -24,6 +29,69 @@ func testRegexMatch(t *testing.T, regexp *regexp.Regexp, strings []string, expec
 func TestRemoteAddrFormat(t *testing.T) {
 	testRegexMatch(t, remoteAddrRegex, []string{"1,2,3,4,5,6"}, true)
 	testRegexMatch(t, remoteAddrRegex, []string{"1,2,3,4,5"}, false)
+}
+
+func TestPORTResolveErrorReply(t *testing.T) {
+	server := NewTestServer(t, false)
+
+	client, err := goftp.DialConfig(goftp.Config{User: authUser, Password: authPass}, server.Addr())
+	require.NoError(t, err, "Couldn't connect")
+
+	defer func() { panicOnError(client.Close()) }()
+
+	raw, err := client.OpenRawConn()
+	require.NoError(t, err, "Couldn't open raw connection")
+
+	defer func() { require.NoError(t, raw.Close()) }()
+
+	// The PORT syntax allows a port above 65535 (999*256+999), which only fails when resolved
+	_, resolveErr := net.ResolveTCPAddr("tcp", "127.0.0.1:256743")
+	require.Error(t, resolveErr)
+
+	returnCode, response, err := raw.SendCommand("PORT 127,0,0,1,999,999")
+	require.NoError(t, err)
+	require.Equal(t, StatusSyntaxErrorParameters, returnCode, response)
+	require.Equal(t, "Problem parsing 127,0,0,1,999,999: "+resolveErr.Error(), response)
+}
+
+// failingTransferHandler is a data connection that can't be opened
+type failingTransferHandler struct {
+	err error
+}
+
+func (h failingTransferHandler) Open() (net.Conn, error) {
+	return nil, h.err
+}
+
+func (failingTransferHandler) Close() error {
+	return nil
+}
+
+func (failingTransferHandler) SetInfo(string) {}
+
+func (failingTransferHandler) GetInfo() string {
+	return ""
+}
+
+func TestActiveConnectionErrorReply(t *testing.T) {
+	dialErr := &net.OpError{
+		Op:   "dial",
+		Net:  "tcp",
+		Addr: &net.TCPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 2121},
+		Err:  os.NewSyscallError("connect", syscall.ECONNREFUSED),
+	}
+
+	reply := &bytes.Buffer{}
+	handler := clientHandler{
+		server:   &FtpServer{settings: &Settings{}},
+		writer:   bufio.NewWriter(reply),
+		logger:   slog.New(slog.DiscardHandler),
+		transfer: failingTransferHandler{err: newNetworkError("could not establish active connection", dialErr)},
+	}
+
+	_, err := handler.TransferOpen("")
+	require.Error(t, err)
+	require.Equal(t, "425 "+dialErr.Error()+"\r\n", reply.String())
 }
 
 func TestActiveTransferFromPort20(t *testing.T) {
