@@ -3,13 +3,19 @@ package ftpserver
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"io"
 	"log/slog"
 	"net"
+	"os"
+	"path/filepath"
+	"runtime"
 	"slices"
+	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -327,6 +333,568 @@ func TestClientContextWhileClientStartsTLS(t *testing.T) {
 	}
 
 	waitGroup.Wait()
+}
+
+// TestCloseWhileClientStartsTransfer closes clients from another goroutine while their LIST starts: Close sets the
+// transfer's abort flag, which the client's goroutine resets when a transfer command starts. Run it with -race.
+func TestCloseWhileClientStartsTransfer(t *testing.T) {
+	driver := &TestServerDriver{}
+	server := NewTestServerWithTestDriver(t, driver)
+	controls := dialControlConns(t, server, driver, 50)
+
+	for _, control := range controls {
+		requireControlReply(t, control, "USER "+authUser, StatusUserOK)
+		requireControlReply(t, control, "PASS "+authPass, StatusUserLoggedIn)
+	}
+
+	var waitGroup sync.WaitGroup
+
+	for _, control := range controls {
+		waitGroup.Add(1)
+
+		go func() {
+			defer waitGroup.Done()
+
+			// Once NOOP is answered, the client's goroutine reads LIST
+			_, err := control.conn.Write([]byte("NOOP\r\nLIST\r\n"))
+			if !assert.NoError(t, err) {
+				return
+			}
+
+			reply, err := control.reader.ReadString('\n')
+			if !assert.NoError(t, err) {
+				return
+			}
+
+			assert.Equal(t, "200 OK\r\n", reply)
+			assert.NoError(t, control.context.Close())
+		}()
+	}
+
+	waitGroup.Wait()
+}
+
+// pendingDataConnection is the wait of a transfer for its data connection
+type pendingDataConnection struct {
+	waiting  <-chan struct{} // closed once the transfer waits
+	released <-chan struct{} // closed once the wait is stopped, nil if not reported
+	peer     net.Conn        // client end of a data connection that the server must close, with a read deadline
+}
+
+type pendingTransferCase struct {
+	name     string
+	settings func() *Settings
+	// prepare sends PASV or PORT and returns the wait of the transfer for its data connection
+	prepare func(t *testing.T, control controlConn) pendingDataConnection
+}
+
+func passiveSettings() *Settings { return &Settings{} }
+
+// multiplexedSettings shares a single passive port between clients: port 0, the only candidate, makes the shared
+// listener bind once to a free port, which PASV reports
+func multiplexedSettings() *Settings {
+	return &Settings{
+		PassiveTransferPortRange:        &PortRange{Start: 0, End: 0},
+		PassiveTransferPortMultiplexing: true,
+	}
+}
+
+func activeSettings() *Settings { return &Settings{ActiveTransferPortNon20: true} }
+
+func pendingTransferCases() []pendingTransferCase {
+	return []pendingTransferCase{
+		{name: "passive", settings: passiveSettings, prepare: awaitPassiveDataConnection},
+		{name: "passive-multiplexed", settings: multiplexedSettings, prepare: awaitPassiveDataConnection},
+		{name: "active", settings: activeSettings, prepare: awaitActiveDataConnection},
+	}
+}
+
+// startPendingTransfer logs a client in and sends LIST, which waits for its data connection
+func startPendingTransfer(t *testing.T, testCase pendingTransferCase) (controlConn, pendingDataConnection) {
+	t.Helper()
+
+	driver := &TestServerDriver{Settings: testCase.settings()}
+	server := NewTestServerWithTestDriver(t, driver)
+	control := dialControlConns(t, server, driver, 1)[0]
+
+	requireControlReply(t, control, "USER "+authUser, StatusUserOK)
+	requireControlReply(t, control, "PASS "+authPass, StatusUserLoggedIn)
+
+	pending := testCase.prepare(t, control)
+
+	_, err := control.conn.Write([]byte("LIST\r\n"))
+	require.NoError(t, err)
+
+	requireSignal(t, pending.waiting, "LIST does not wait for the data connection")
+
+	return control, pending
+}
+
+// TestCloseWhileTransferWaitsForDataConnection closes a client, as a driver kicking it does, while its LIST waits
+// for the data connection. Close must not wait for ConnectionTimeout, the client must get no 425 before its
+// control connection is closed, and a data connection made as Close cancels the wait must be closed. Close closes
+// the transfer itself once it gets transferMu: this doesn't cover the discard in TransferOpen's cancel path.
+func TestCloseWhileTransferWaitsForDataConnection(t *testing.T) {
+	testCases := append(pendingTransferCases(),
+		pendingTransferCase{name: "passive-checking", settings: passiveSettings, prepare: awaitPassiveConnectionCheck},
+		pendingTransferCase{name: "active-connected", settings: activeSettings, prepare: awaitConnectedActiveDial},
+	)
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			control, pending := startPendingTransfer(t, testCase)
+
+			requireCloseWithoutReply(t, control)
+
+			if pending.peer != nil {
+				_, err := pending.peer.Read(make([]byte, 1))
+				require.ErrorIs(t, err, io.EOF, "the data connection must be closed")
+			}
+		})
+	}
+}
+
+// TestClientDropWhileTransferWaitsForDataConnection closes the control connection from the client side while its
+// LIST waits for the data connection: the wait must stop at once, not after ConnectionTimeout.
+func TestClientDropWhileTransferWaitsForDataConnection(t *testing.T) {
+	for _, testCase := range pendingTransferCases() {
+		t.Run(testCase.name, func(t *testing.T) {
+			control, pending := startPendingTransfer(t, testCase)
+
+			require.NoError(t, control.conn.Close())
+
+			requireSignal(t, pending.released, "the transfer still waits for its data connection")
+		})
+	}
+}
+
+// TestCloseReleasesMultiplexedReservation closes a client whose LIST waits for its data connection on the single
+// shared passive port: another client from the same IP can reserve the port right after Close.
+func TestCloseReleasesMultiplexedReservation(t *testing.T) {
+	driver := &TestServerDriver{Settings: multiplexedSettings()}
+	server := NewTestServerWithTestDriver(t, driver)
+	controls := dialControlConns(t, server, driver, 2)
+
+	for _, control := range controls {
+		requireControlReply(t, control, "USER "+authUser, StatusUserOK)
+		requireControlReply(t, control, "PASS "+authPass, StatusUserLoggedIn)
+	}
+
+	pending := awaitPassiveDataConnection(t, controls[0])
+
+	_, err := controls[0].conn.Write([]byte("LIST\r\n"))
+	require.NoError(t, err)
+
+	requireSignal(t, pending.waiting, "LIST does not wait for the data connection")
+
+	// The port is reserved for this IP until the wait ends
+	requireControlReply(t, controls[1], "PASV", StatusServiceNotAvailable)
+
+	requireCloseWithoutReply(t, controls[0])
+
+	requireControlReply(t, controls[1], "PASV", StatusEnteringPASV)
+}
+
+// TestCloseWhileCommandWaitsForTransfer closes a client while a command sent after LIST waits for the LIST's
+// transfer, itself waiting for its data connection: once Close aborted the transfer, the command must not run or
+// reply. ABOR and STAT wait for transferMu, the others for the transfer to end.
+func TestCloseWhileCommandWaitsForTransfer(t *testing.T) {
+	for _, command := range []string{"DELE file.txt", "ABOR", "STAT", "QUIT"} {
+		t.Run(command, func(t *testing.T) {
+			received := &lineReceivedHandler{line: command, received: make(chan struct{})}
+			testDriver := &TestServerDriver{Debug: true}
+			testDriver.Init()
+			driver := &quitRecordingDriver{TestServerDriver: testDriver}
+			server := NewTestServerWithDriverAndLogger(t, driver, slog.New(received))
+
+			filePath := filepath.Join(testDriver.serverDir, "file.txt")
+			require.NoError(t, os.WriteFile(filePath, []byte("content"), 0o600))
+
+			control := dialControlConns(t, server, testDriver, 1)[0]
+
+			requireControlReply(t, control, "USER "+authUser, StatusUserOK)
+			requireControlReply(t, control, "PASS "+authPass, StatusUserLoggedIn)
+
+			pending := awaitPassiveDataConnection(t, control)
+
+			_, err := control.conn.Write([]byte("LIST\r\n"))
+			require.NoError(t, err)
+
+			// Sent once the transfer holds transferMu: ABOR and STAT, run at once, would otherwise reply before Close
+			requireSignal(t, pending.waiting, "LIST does not wait for the data connection")
+
+			_, err = control.conn.Write([]byte(command + "\r\n"))
+			require.NoError(t, err)
+
+			// The command is read before Close: it is not dropped as a line read once the connection is closed
+			requireSignal(t, received.received, "the command is not received")
+
+			requireCloseWithoutReply(t, control)
+
+			// The client's goroutine ends after the command, if it runs
+			waitClientsGone(t, testDriver)
+
+			require.FileExists(t, filePath, "the command must not run after Close")
+			require.Zero(t, driver.quits.Load(), "the command must not run after Close")
+		})
+	}
+}
+
+// TestCloseBeforeTransferCommandStarts closes a client once its STOR passed the check made after the wait for the
+// previous transfer, but before the transfer starts: it must not start, the driver must not open the file.
+func TestCloseBeforeTransferCommandStarts(t *testing.T) {
+	driver := &TestServerDriver{}
+	server := NewTestServerWithTestDriver(t, driver)
+	control := dialControlConns(t, server, driver, 1)[0]
+
+	requireControlReply(t, control, "USER "+authUser, StatusUserOK)
+	requireControlReply(t, control, "PASS "+authPass, StatusUserLoggedIn)
+
+	handler, ok := control.context.(*clientHandler)
+	require.True(t, ok)
+
+	// setLastCommand locks paramsMutex between that check and the start of the transfer: held here for reading, it
+	// stops STOR there, and TryRLock fails once STOR waits for it
+	handler.paramsMutex.RLock()
+
+	release := sync.OnceFunc(handler.paramsMutex.RUnlock)
+	defer release()
+
+	_, err := control.conn.Write([]byte("STOR file.txt\r\n"))
+	require.NoError(t, err)
+
+	timeout := time.After(10 * time.Second)
+
+	for handler.paramsMutex.TryRLock() {
+		handler.paramsMutex.RUnlock()
+
+		select {
+		case <-timeout:
+			require.FailNow(t, "STOR does not reach setLastCommand")
+		default:
+			runtime.Gosched()
+		}
+	}
+
+	requireCloseWithoutReply(t, control)
+	release()
+
+	waitClientsGone(t, driver)
+	// A transfer goroutine is added before the client's goroutine ends
+	handler.transferWg.Wait()
+
+	require.Nil(t, driver.getTransferFile("/file.txt"), "the driver must not open the file after Close")
+}
+
+// TestTransferOpenAfterCloseCanceled calls TransferOpen once Close canceled closeCtx, before Close gets
+// transferMu, as a transfer getting the lock first does: no reply, not even the one saying that TLS is required.
+func TestTransferOpenAfterCloseCanceled(t *testing.T) {
+	driver := &TestServerDriver{}
+	server := NewTestServerWithTestDriver(t, driver)
+	control := dialControlConns(t, server, driver, 1)[0]
+
+	requireControlReply(t, control, "USER "+authUser, StatusUserOK)
+	requireControlReply(t, control, "PASS "+authPass, StatusUserLoggedIn)
+	requireControlReply(t, control, "PASV", StatusEnteringPASV)
+	// PASV replies before it installs the transfer: NOOP waits for it
+	requireControlReply(t, control, "NOOP", StatusOK)
+	require.NoError(t, control.context.SetTLSRequirement(MandatoryEncryption))
+
+	handler, ok := control.context.(*clientHandler)
+	require.True(t, ok)
+
+	handler.cancelClose()
+
+	_, err := handler.TransferOpen("LIST")
+	require.ErrorIs(t, err, errTransferCanceled)
+
+	requireCloseWithoutReply(t, control)
+}
+
+// requireSignal waits for signal to be closed, well below the default ConnectionTimeout of 30 seconds
+func requireSignal(t *testing.T, signal <-chan struct{}, failure string) {
+	t.Helper()
+
+	select {
+	case <-signal:
+	case <-time.After(10 * time.Second):
+		require.FailNow(t, failure)
+	}
+}
+
+// requireCloseWithoutReply closes control's client and checks that Close doesn't wait for the data connection,
+// and that the client gets no reply before its control connection is closed
+func requireCloseWithoutReply(t *testing.T, control controlConn) {
+	t.Helper()
+
+	closed := make(chan error, 1)
+
+	go func() { closed <- control.context.Close() }()
+
+	// Well below the default ConnectionTimeout of 30 seconds
+	select {
+	case err := <-closed:
+		require.NoError(t, err)
+	case <-time.After(10 * time.Second):
+		require.FailNow(t, "Close waits for the data connection")
+	}
+
+	require.NoError(t, control.conn.SetReadDeadline(time.Now().Add(10*time.Second)))
+
+	reply, err := control.reader.ReadString('\n')
+	require.ErrorIs(t, err, io.EOF)
+	require.Empty(t, reply, "the client must get no reply")
+}
+
+// requireControlReply sends command on control and checks the code of its one-line reply
+func requireControlReply(t *testing.T, control controlConn, command string, expectedCode int) {
+	t.Helper()
+
+	_, err := control.conn.Write([]byte(command + "\r\n"))
+	require.NoError(t, err)
+
+	reply, err := control.reader.ReadString('\n')
+	require.NoError(t, err)
+	require.True(t, strings.HasPrefix(reply, fmt.Sprintf("%d ", expectedCode)), reply)
+}
+
+// editPendingTransfer calls edit with the transfer handler PASV or PORT installed for control's client
+func editPendingTransfer(t *testing.T, control controlConn, edit func(transfer transferHandler)) {
+	t.Helper()
+
+	handler, ok := control.context.(*clientHandler)
+	require.True(t, ok)
+
+	handler.transferMu.Lock()
+	defer handler.transferMu.Unlock()
+
+	edit(handler.transfer)
+}
+
+// replacePassiveListener sends PASV, replaces the listener of the transfer it prepares with what wrap returns, and
+// returns the passive port
+func replacePassiveListener(t *testing.T, control controlConn, wrap func(listener net.Listener) net.Listener) int {
+	t.Helper()
+
+	requireControlReply(t, control, "PASV", StatusEnteringPASV)
+	// PASV replies before it installs the transfer: NOOP waits for it
+	requireControlReply(t, control, "NOOP", StatusOK)
+
+	var port int
+
+	editPendingTransfer(t, control, func(transfer transferHandler) {
+		passive, ok := transfer.(*passiveTransferHandler)
+		require.True(t, ok)
+
+		passive.listener = wrap(passive.listener)
+		port = passive.Port
+	})
+
+	return port
+}
+
+// awaitPassiveDataConnection sends PASV. The transfer waits once it accepts on its listener, and the wait is
+// stopped once the listener is closed.
+func awaitPassiveDataConnection(t *testing.T, control controlConn) pendingDataConnection {
+	t.Helper()
+
+	listener := &reportingListener{accepting: make(chan struct{}), closed: make(chan struct{})}
+
+	replacePassiveListener(t, control, func(wrapped net.Listener) net.Listener {
+		listener.Listener = wrapped
+
+		return listener
+	})
+
+	return pendingDataConnection{waiting: listener.accepting, released: listener.closed}
+}
+
+// awaitPassiveConnectionCheck sends PASV and makes the data connection. The transfer waits once it checks the
+// connection: its RemoteAddr reads a header that never comes.
+func awaitPassiveConnectionCheck(t *testing.T, control controlConn) pendingDataConnection {
+	t.Helper()
+
+	listener := &headerReadingListener{reading: make(chan struct{})}
+
+	port := replacePassiveListener(t, control, func(wrapped net.Listener) net.Listener {
+		listener.Listener = wrapped
+
+		return listener
+	})
+
+	dialer := &net.Dialer{Timeout: 5 * time.Second}
+	peer, err := dialer.DialContext(t.Context(), "tcp", fmt.Sprintf("127.0.0.1:%d", port))
+	require.NoError(t, err)
+
+	t.Cleanup(func() { _ = peer.Close() })
+
+	require.NoError(t, peer.SetReadDeadline(time.Now().Add(20*time.Second)))
+
+	return pendingDataConnection{waiting: listener.reading, peer: peer}
+}
+
+// awaitActiveDataConnection sends PORT and makes the transfer's dial fail once it is canceled
+func awaitActiveDataConnection(t *testing.T, control controlConn) pendingDataConnection {
+	t.Helper()
+
+	return awaitActiveDial(t, control, func(ctx context.Context) (net.Conn, error) { return nil, ctx.Err() })
+}
+
+// awaitConnectedActiveDial sends PORT and makes the transfer's dial succeed once it is canceled, as a dial that
+// connects just as the wait is canceled
+func awaitConnectedActiveDial(t *testing.T, control controlConn) pendingDataConnection {
+	t.Helper()
+
+	serverEnd, clientEnd := net.Pipe()
+
+	t.Cleanup(func() {
+		_ = serverEnd.Close()
+		_ = clientEnd.Close()
+	})
+
+	require.NoError(t, clientEnd.SetReadDeadline(time.Now().Add(20*time.Second)))
+
+	pending := awaitActiveDial(t, control, func(context.Context) (net.Conn, error) { return serverEnd, nil })
+	pending.peer = clientEnd
+
+	return pending
+}
+
+// awaitActiveDial sends PORT and makes the transfer's dial wait until it is canceled, then return what canceled
+// returns. The transfer waits once it dials, and the wait is stopped once the dial returns.
+func awaitActiveDial(
+	t *testing.T,
+	control controlConn,
+	canceled func(ctx context.Context) (net.Conn, error),
+) pendingDataConnection {
+	t.Helper()
+
+	// Nothing has to listen on this address: the dial below never connects
+	requireControlReply(t, control, "PORT 127,0,0,1,4,1", StatusOK)
+
+	dialing := make(chan struct{})
+	released := make(chan struct{})
+
+	editPendingTransfer(t, control, func(transfer transferHandler) {
+		active, ok := transfer.(*activeTransferHandler)
+		require.True(t, ok)
+
+		active.dial = func(ctx context.Context, _, _ string) (net.Conn, error) {
+			close(dialing)
+			defer close(released)
+
+			// Nothing else ends the wait: if the context given to Open did not reach the dial, the test would fail
+			<-ctx.Done()
+
+			return canceled(ctx)
+		}
+	})
+
+	return pendingDataConnection{waiting: dialing, released: released}
+}
+
+// reportingListener closes accepting on its first Accept, and closed once it is closed
+type reportingListener struct {
+	net.Listener
+	accepting  chan struct{}
+	acceptOnce sync.Once
+	closed     chan struct{}
+	closeOnce  sync.Once
+}
+
+func (l *reportingListener) Accept() (net.Conn, error) {
+	l.acceptOnce.Do(func() { close(l.accepting) })
+
+	return l.Listener.Accept()
+}
+
+func (l *reportingListener) Close() error {
+	err := l.Listener.Close()
+	l.closeOnce.Do(func() { close(l.closed) })
+
+	return err
+}
+
+// headerReadingListener accepts headerReadingConn connections
+type headerReadingListener struct {
+	net.Listener
+	reading     chan struct{} // closed once the RemoteAddr of a connection reads
+	readingOnce sync.Once
+}
+
+func (l *headerReadingListener) Accept() (net.Conn, error) {
+	conn, err := l.Listener.Accept()
+	if err != nil {
+		return nil, err
+	}
+
+	return &headerReadingConn{Conn: conn, listener: l}, nil
+}
+
+// headerReadingConn reads a header in its first RemoteAddr, as a passive wrapper reading the PROXY protocol header
+// does
+type headerReadingConn struct {
+	net.Conn
+	listener   *headerReadingListener
+	headerOnce sync.Once
+}
+
+func (c *headerReadingConn) RemoteAddr() net.Addr {
+	c.headerOnce.Do(func() {
+		c.listener.readingOnce.Do(func() { close(c.listener.reading) })
+
+		_, _ = c.Read(make([]byte, 1))
+	})
+
+	return c.Conn.RemoteAddr()
+}
+
+// quitRecordingDriver counts the calls to QuitMessage
+type quitRecordingDriver struct {
+	*TestServerDriver
+	quits atomic.Int32
+}
+
+func (d *quitRecordingDriver) QuitMessage() string {
+	d.quits.Add(1)
+
+	return "Goodbye"
+}
+
+// lineReceivedHandler closes received once the client handler logs, in debug, that it received line
+type lineReceivedHandler struct {
+	line     string
+	received chan struct{}
+	once     sync.Once
+}
+
+func (h *lineReceivedHandler) Enabled(context.Context, slog.Level) bool {
+	return true
+}
+
+//nolint:gocritic // slog.Handler requires the record by value
+func (h *lineReceivedHandler) Handle(_ context.Context, record slog.Record) error {
+	if record.Message != "Received line" {
+		return nil
+	}
+
+	record.Attrs(func(attr slog.Attr) bool {
+		if attr.Key == "line" && attr.Value.String() == h.line {
+			h.once.Do(func() { close(h.received) })
+		}
+
+		return true
+	})
+
+	return nil
+}
+
+func (h *lineReceivedHandler) WithAttrs([]slog.Attr) slog.Handler {
+	return h
+}
+
+func (h *lineReceivedHandler) WithGroup(string) slog.Handler {
+	return h
 }
 
 func TestClientContextConcurrency(t *testing.T) {

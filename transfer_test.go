@@ -1336,7 +1336,7 @@ func TestPASVConnectionWait(t *testing.T) {
 	invalidConn := &testNetConn{remoteAddr: &net.TCPAddr{IP: nil, Port: 21}} // invalid IP
 	transferHandler := newTestPassiveTransferHandler(t, &testNetListener{conns: []net.Conn{invalidConn}})
 
-	_, err := transferHandler.ConnectionWait(time.Second)
+	_, err := transferHandler.ConnectionWait(t.Context(), time.Second)
 	if assert.Error(t, err) {
 		assert.Contains(t, err.Error(), "invalid remote IP")
 	}
@@ -1346,12 +1346,12 @@ func TestPASVConnectionWait(t *testing.T) {
 	validConn := &testNetConn{remoteAddr: &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: 21}}
 	transferHandler.listener = &testNetListener{conns: []net.Conn{validConn}}
 
-	conn, err := transferHandler.ConnectionWait(time.Second)
+	conn, err := transferHandler.ConnectionWait(t.Context(), time.Second)
 	require.NoError(t, err)
 	require.Same(t, validConn, conn)
 
 	// the accepted connection is kept for the transfer
-	conn, err = transferHandler.ConnectionWait(time.Second)
+	conn, err = transferHandler.ConnectionWait(t.Context(), time.Second)
 	require.NoError(t, err)
 	require.Same(t, validConn, conn)
 
@@ -1368,7 +1368,7 @@ func TestPASVConnectionWaitSkipsNonMatchingIP(t *testing.T) {
 		conns: []net.Conn{foreignConn, invalidConn, clientConn},
 	})
 
-	conn, err := transferHandler.ConnectionWait(time.Second)
+	conn, err := transferHandler.ConnectionWait(t.Context(), time.Second)
 	require.NoError(t, err)
 	require.Same(t, clientConn, conn)
 	assert.True(t, foreignConn.closed, "the connection from a foreign IP must be closed")
@@ -1385,7 +1385,7 @@ func TestPASVConnectionWaitOnlyNonMatchingIP(t *testing.T) {
 		listener := &testNetListener{conns: []net.Conn{foreignConns[0], foreignConns[1]}}
 		transferHandler := newTestPassiveTransferHandler(t, listener)
 
-		_, err := transferHandler.ConnectionWait(time.Second)
+		_, err := transferHandler.ConnectionWait(t.Context(), time.Second)
 		require.Error(t, err)
 		require.Equal(t, "data connection security requirements not met", err.Error())
 
@@ -1393,7 +1393,7 @@ func TestPASVConnectionWaitOnlyNonMatchingIP(t *testing.T) {
 			assert.True(t, conn.closed)
 		}
 
-		conn, err := transferHandler.ConnectionWait(time.Second)
+		conn, err := transferHandler.ConnectionWait(t.Context(), time.Second)
 		require.Error(t, err)
 		require.Nil(t, conn)
 	})
@@ -1404,14 +1404,14 @@ func TestPASVConnectionWaitOnlyNonMatchingIP(t *testing.T) {
 		transferHandler := newTestPassiveTransferHandler(t, &testNetListener{conn: foreignConn})
 
 		start := time.Now()
-		_, err := transferHandler.ConnectionWait(100 * time.Millisecond)
+		_, err := transferHandler.ConnectionWait(t.Context(), 100*time.Millisecond)
 		require.Error(t, err)
 		require.Equal(t, "data connection security requirements not met", err.Error())
 		require.Less(t, time.Since(start), 5*time.Second)
 		assert.True(t, foreignConn.closed)
 
 		foreignConn.closed = false
-		conn, err := transferHandler.ConnectionWait(100 * time.Millisecond)
+		conn, err := transferHandler.ConnectionWait(t.Context(), 100*time.Millisecond)
 		require.Error(t, err)
 		require.Nil(t, conn)
 		assert.True(t, foreignConn.closed)

@@ -1,19 +1,21 @@
 package ftpserver
 
 import (
+	"context"
 	"crypto/tls"
 	"errors"
 	"fmt"
 	"log/slog"
 	"net"
 	"strings"
+	"sync"
 	"time"
 )
 
 // Active/Passive transfer connection handler
 type transferHandler interface {
-	// Get the connection to transfer data on
-	Open() (net.Conn, error)
+	// Get the connection to transfer data on. Canceling ctx stops the wait for it.
+	Open(ctx context.Context) (net.Conn, error)
 
 	// Close the connection (and any associated resource)
 	Close() error
@@ -30,6 +32,7 @@ var _ transferHandler = (*passiveTransferHandler)(nil)
 // Passive connection
 type passiveTransferHandler struct {
 	listener       net.Listener          // TCP or SSL Listener
+	listenerClose  sync.Once             // Open's cancellation and Close may both close the listener
 	deadlineSetter passiveDeadlineSetter // Listener used to set accept deadlines
 	Port           int                   // TCP Port we are listening on
 	connection     net.Conn              // TCP Connection established
@@ -291,10 +294,14 @@ func (c *clientHandler) handlePassivePASV(transferHandler *passiveTransferHandle
 	return false
 }
 
-func (p *passiveTransferHandler) ConnectionWait(wait time.Duration) (net.Conn, error) {
+func (p *passiveTransferHandler) ConnectionWait(ctx context.Context, wait time.Duration) (net.Conn, error) {
 	if p.connection != nil {
 		return p.connection, nil
 	}
+
+	// Closing the listener is the only way to stop a pending Accept
+	stopListenerClose := context.AfterFunc(ctx, p.closeListener)
+	defer stopListenerClose()
 
 	deadline := time.Now().Add(wait)
 
@@ -318,7 +325,15 @@ func (p *passiveTransferHandler) ConnectionWait(wait time.Duration) (net.Conn, e
 			return nil, fmt.Errorf("failed to accept passive transfer connection: %w", err)
 		}
 
+		// A passive wrapper can read from the connection to get its remote address: closing the connection is the
+		// only way to stop that read
+		stopConnClose := context.AfterFunc(ctx, func() { _ = conn.Close() })
 		rejectErr = p.validateConnection(conn)
+
+		if !stopConnClose() {
+			return nil, fmt.Errorf("passive transfer connection canceled: %w", ctx.Err())
+		}
+
 		if rejectErr == nil {
 			p.connection = conn
 
@@ -362,19 +377,27 @@ func (p *passiveTransferHandler) SetInfo(info string) {
 	p.info = info
 }
 
-func (p *passiveTransferHandler) Open() (net.Conn, error) {
+func (p *passiveTransferHandler) Open(ctx context.Context) (net.Conn, error) {
 	timeout := time.Duration(time.Second.Nanoseconds() * int64(p.settings.ConnectionTimeout))
 
-	return p.ConnectionWait(timeout)
+	return p.ConnectionWait(ctx, timeout)
+}
+
+func (p *passiveTransferHandler) closeListener() {
+	p.listenerClose.Do(func() {
+		if p.listener == nil {
+			return
+		}
+
+		if err := p.listener.Close(); err != nil && !errors.Is(err, net.ErrClosed) {
+			p.logger.Warn("Problem closing passive listener", "err", err)
+		}
+	})
 }
 
 // Closing only the client connection is not supported at that time
 func (p *passiveTransferHandler) Close() error {
-	if p.listener != nil {
-		if err := p.listener.Close(); err != nil && !errors.Is(err, net.ErrClosed) {
-			p.logger.Warn("Problem closing passive listener", "err", err)
-		}
-	}
+	p.closeListener()
 
 	if p.connection != nil {
 		if err := p.connection.Close(); err != nil {

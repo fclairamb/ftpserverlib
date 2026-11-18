@@ -2,6 +2,7 @@
 package ftpserver
 
 import (
+	"context"
 	"io"
 	"net"
 	"regexp"
@@ -138,4 +139,25 @@ func requireTCPAddr(t *testing.T, addr net.Addr) *net.TCPAddr {
 	require.True(t, ok, "expected a TCP address, got %T", addr)
 
 	return tcpAddr
+}
+
+// The dial of an active data connection must not connect once its context is canceled: Close cancels it to stop
+// the wait for the data connection
+func TestActiveTransferOpenCanceled(t *testing.T) {
+	listener, err := (&net.ListenConfig{}).Listen(t.Context(), "tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+
+	defer func() { require.NoError(t, listener.Close()) }()
+
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+
+	transfer := &activeTransferHandler{
+		raddr:    requireTCPAddr(t, listener.Addr()),
+		settings: &Settings{ConnectionTimeout: 30, ActiveTransferPortNon20: true},
+	}
+
+	conn, err := transfer.Open(ctx)
+	require.ErrorIs(t, err, context.Canceled)
+	require.Nil(t, conn)
 }

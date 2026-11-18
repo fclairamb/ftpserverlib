@@ -1,6 +1,7 @@
 package ftpserver
 
 import (
+	"context"
 	"crypto/tls"
 	"errors"
 	"fmt"
@@ -95,6 +96,8 @@ type activeTransferHandler struct {
 	settings  *Settings    // Settings
 	tlsConfig *tls.Config  // not nil if the active connection requires TLS
 	info      string       // transfer info
+	// dial replaces the dialer in tests, which need a dial that only ends when it is canceled
+	dial func(ctx context.Context, network, address string) (net.Conn, error)
 }
 
 func (a *activeTransferHandler) GetInfo() string {
@@ -105,7 +108,7 @@ func (a *activeTransferHandler) SetInfo(info string) {
 	a.info = info
 }
 
-func (a *activeTransferHandler) Open() (net.Conn, error) {
+func (a *activeTransferHandler) Open(ctx context.Context) (net.Conn, error) {
 	timeout := time.Duration(time.Second.Nanoseconds() * int64(a.settings.ConnectionTimeout))
 	dialer := &net.Dialer{Timeout: timeout}
 
@@ -117,7 +120,12 @@ func (a *activeTransferHandler) Open() (net.Conn, error) {
 		dialer.LocalAddr = &net.TCPAddr{IP: a.laddr}
 	}
 
-	conn, err := dialer.Dial("tcp", a.raddr.String())
+	dial := dialer.DialContext
+	if a.dial != nil {
+		dial = a.dial
+	}
+
+	conn, err := dial(ctx, "tcp", a.raddr.String())
 	if err != nil {
 		return nil, newNetworkError("could not establish active connection", err)
 	}
