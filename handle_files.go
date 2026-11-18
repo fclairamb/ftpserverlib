@@ -484,7 +484,7 @@ func (c *clientHandler) handleSTATFile(param string) error {
 		defer c.multilineAnswer(StatusDirectoryStatus, fmt.Sprintf("STAT %v", param))()
 
 		for _, f := range files {
-			c.writeLine(" %s" + c.fileStat(f))
+			c.writeLine(" " + c.fileStat(f))
 		}
 	} else {
 		c.writeMessage(StatusFileActionNotTaken, fmt.Sprintf("Could not list: %v", errList))

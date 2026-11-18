@@ -352,9 +352,10 @@ func TestSTATFile(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, StatusFileStatus, returnCode)
 
-	returnCode, _, err = raw.SendCommand("STAT dir")
+	returnCode, message, err := raw.SendCommand("STAT dir")
 	require.NoError(t, err)
 	require.Equal(t, StatusDirectoryStatus, returnCode)
+	require.Regexp(t, `(?m)^ d[-rwx]{9} 1 `+fakeUser+" "+fakeGroup+` +\d+ .+ sub$`, message, "each entry is a LIST line")
 
 	// finally stat a missing file dir
 	returnCode, _, err = raw.SendCommand("STAT missing")
