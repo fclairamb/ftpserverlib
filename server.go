@@ -135,7 +135,8 @@ type FtpServer struct {
 	Logger           *slog.Logger // Structured logger (log/slog)
 	settings         *Settings    // General settings
 	listener         net.Listener // listener used to receive files
-	listenerMu       sync.RWMutex // guards listener (written by Listen, read by Serve/Addr/Stop)
+	listenerMu       sync.RWMutex // guards listener, listenerRun, passiveListeners (set by Listen; Serve clears listener)
+	listenerRun      uint64       // incremented by each Listen, so that Serve only clears the listener of its own run
 	passiveListeners *passiveListenersManager
 	clientCounter    uint32     // Clients counter
 	driver           MainDriver // Driver to handle the client authentication and the file access driver selection
@@ -146,13 +147,6 @@ func (server *FtpServer) getListener() net.Listener {
 	defer server.listenerMu.RUnlock()
 
 	return server.listener
-}
-
-func (server *FtpServer) setListener(listener net.Listener) {
-	server.listenerMu.Lock()
-	defer server.listenerMu.Unlock()
-
-	server.listener = listener
 }
 
 func (server *FtpServer) loadSettings() error {
@@ -187,12 +181,6 @@ func (server *FtpServer) loadSettings() error {
 	}
 
 	server.settings = settings
-	var wrap passiveListenerWrapper
-	if wrapper, ok := server.driver.(MainDriverExtensionPassiveWrapper); ok {
-		wrap = wrapper.WrapPassiveListener
-	}
-
-	server.passiveListeners = newPassiveListenersManager(server.Logger, wrap)
 
 	return nil
 }
@@ -232,7 +220,20 @@ func (server *FtpServer) Listen() error {
 		}
 	}
 
-	server.setListener(listener)
+	var wrap passiveListenerWrapper
+	if wrapper, ok := server.driver.(MainDriverExtensionPassiveWrapper); ok {
+		wrap = wrapper.WrapPassiveListener
+	}
+
+	passiveListeners := newPassiveListenersManager(server.Logger, wrap)
+
+	// Set together so that a concurrent Stop closes the passive listeners of the run whose listener it sees
+	server.listenerMu.Lock()
+	server.listener = listener
+	server.passiveListeners = passiveListeners
+	server.listenerRun++
+	server.listenerMu.Unlock()
+
 	server.Logger.Info("Listening...", "address", listener.Addr())
 
 	return nil
@@ -278,12 +279,14 @@ func temporaryError(err net.Error) bool {
 func (server *FtpServer) Serve() error {
 	var tempDelay time.Duration // how long to sleep on accept failure
 
-	listener := server.getListener()
+	server.listenerMu.RLock()
+	listener, run := server.listener, server.listenerRun
+	server.listenerMu.RUnlock()
 
 	for {
 		connection, err := listener.Accept()
 		if err != nil {
-			if ok, finalErr := server.handleAcceptError(err, &tempDelay); ok {
+			if ok, finalErr := server.handleAcceptError(run, err, &tempDelay); ok {
 				return finalErr
 			}
 
@@ -299,11 +302,16 @@ func (server *FtpServer) Serve() error {
 // handleAcceptError handles the error that occurred when accepting a new connection
 // It returns a boolean indicating if the error should stop the server and the error itself or none if it's a standard
 // scenario (e.g. a closed listener)
-func (server *FtpServer) handleAcceptError(err error, tempDelay *time.Duration) (bool, error) {
+func (server *FtpServer) handleAcceptError(run uint64, err error, tempDelay *time.Duration) (bool, error) {
 	if errOp := (&net.OpError{}); errors.As(err, &errOp) {
 		// This means we just closed the connection and it's OK
 		if errOp.Err.Error() == "use of closed network connection" {
-			server.setListener(nil)
+			// A Listen that ran since this Serve started owns the listener now
+			server.listenerMu.Lock()
+			if server.listenerRun == run {
+				server.listener = nil
+			}
+			server.listenerMu.Unlock()
 
 			return true, nil
 		}
@@ -369,29 +377,45 @@ func (server *FtpServer) Addr() string {
 	return ""
 }
 
-// Stop closes the listener
+// Stop closes the listener and the multiplexed passive listeners shared by the clients, which releases their ports.
+// Passive listeners opened for a single client, without multiplexing, are not closed.
+// The multiplexed passive listeners are closed whatever Stop returns. Closing Settings.Listener stops Serve but leaves
+// them open for the clients still connected, until Stop is called. Stop then returns ErrNotListening, or a
+// NetworkError wrapping net.ErrClosed if Serve has not seen the close yet.
 func (server *FtpServer) Stop() error {
-	listener := server.getListener()
+	server.listenerMu.RLock()
+	listener, passiveListeners := server.listener, server.passiveListeners
+	server.listenerMu.RUnlock()
+
 	if listener == nil {
+		server.closePassiveListeners(passiveListeners)
+
 		return ErrNotListening
 	}
 
+	var stopErr error
 	if err := listener.Close(); err != nil {
 		server.Logger.Warn(
 			"Could not close listener",
 			"err", err,
 		)
 
-		return newNetworkError("couln't close listener", err)
+		stopErr = newNetworkError("couldn't close listener", err)
 	}
 
-	if server.passiveListeners != nil {
-		if err := server.passiveListeners.close(); err != nil && !errors.Is(err, net.ErrClosed) {
-			server.Logger.Warn("Could not close passive listeners", "err", err)
-		}
+	server.closePassiveListeners(passiveListeners)
+
+	return stopErr
+}
+
+func (server *FtpServer) closePassiveListeners(passiveListeners *passiveListenersManager) {
+	if passiveListeners == nil {
+		return
 	}
 
-	return nil
+	if err := passiveListeners.close(); err != nil && !errors.Is(err, net.ErrClosed) {
+		server.Logger.Warn("Could not close passive listeners", "err", err)
+	}
 }
 
 // When a client connects, the server could refuse the connection

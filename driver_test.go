@@ -3,6 +3,7 @@ package ftpserver
 import (
 	"crypto/tls"
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"net"
@@ -307,6 +308,14 @@ func mustStopServer(server *FtpServer) {
 	if err != nil {
 		panic(err)
 	}
+}
+
+func requirePortReleased(t *testing.T, port int) {
+	t.Helper()
+
+	listener, err := (&net.ListenConfig{}).Listen(t.Context(), "tcp", fmt.Sprintf("0.0.0.0:%d", port))
+	require.NoError(t, err, "port %d should be released", port)
+	require.NoError(t, listener.Close())
 }
 
 var errConnectionNotAllowed = errors.New("connection not allowed")
