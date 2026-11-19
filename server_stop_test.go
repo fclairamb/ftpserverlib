@@ -166,3 +166,39 @@ func TestServerStopClosesPassiveListenersAfterListenerClosed(t *testing.T) {
 	require.ErrorIs(t, server.Stop(), ErrNotListening)
 	requirePortReleased(t, port)
 }
+
+func TestServerStopBeforeListen(t *testing.T) {
+	server := NewFtpServer(&TestServerDriver{Settings: &Settings{ListenAddr: testServerListenAddr}})
+
+	require.ErrorIs(t, server.Stop(), ErrNotListening)
+}
+
+func TestServerStopLogsPassiveListenersCloseFailure(t *testing.T) {
+	mockHandler := &MockLogHandler{}
+	server := NewFtpServer(&TestServerDriver{Settings: &Settings{
+		ListenAddr:                      testServerListenAddr,
+		PassiveTransferPortRange:        &PortRange{Start: 0, End: 0},
+		PassiveTransferPortMultiplexing: true,
+	}})
+	server.Logger = slog.New(mockHandler)
+	require.NoError(t, server.Listen())
+
+	// The shared passive listener still closes its port, but reports a failure
+	server.passiveListeners.wrap = func(listener net.Listener) (net.Listener, error) {
+		return &failingCloseListener{Listener: listener}, nil
+	}
+
+	_, reservation, _, err := server.passiveListeners.reserve(net.ParseIP("127.0.0.1"), &PortRange{Start: 0, End: 0})
+	require.NoError(t, err)
+
+	addr, ok := reservation.Addr().(*net.TCPAddr)
+	require.True(t, ok)
+
+	require.NoError(t, server.Stop())
+	requirePortReleased(t, addr.Port)
+
+	mockHandler.mu.Lock()
+	defer mockHandler.mu.Unlock()
+
+	require.Contains(t, mockHandler.WarnLogs, "Could not close passive listeners")
+}
