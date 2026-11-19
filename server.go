@@ -369,8 +369,10 @@ func (server *FtpServer) Addr() string {
 	return ""
 }
 
-// Stop closes the listener
+// Stop closes the listener and the multiplexed passive listeners
 func (server *FtpServer) Stop() error {
+	defer server.closePassiveListeners()
+
 	listener := server.getListener()
 	if listener == nil {
 		return ErrNotListening
@@ -385,13 +387,17 @@ func (server *FtpServer) Stop() error {
 		return newNetworkError("couln't close listener", err)
 	}
 
-	if server.passiveListeners != nil {
-		if err := server.passiveListeners.close(); err != nil && !errors.Is(err, net.ErrClosed) {
-			server.Logger.Warn("Could not close passive listeners", "err", err)
-		}
+	return nil
+}
+
+func (server *FtpServer) closePassiveListeners() {
+	if server.passiveListeners == nil {
+		return
 	}
 
-	return nil
+	if err := server.passiveListeners.close(); err != nil && !errors.Is(err, net.ErrClosed) {
+		server.Logger.Warn("Could not close passive listeners", "err", err)
+	}
 }
 
 // When a client connects, the server could refuse the connection
