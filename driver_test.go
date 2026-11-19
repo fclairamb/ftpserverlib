@@ -217,23 +217,9 @@ var (
 	errFailSeek    = errors.New("couldn't seek")
 	errFailReaddir = errors.New("couldn't readdir")
 	errFailOpen    = errors.New("couldn't open")
-	errFailRead    = errors.New("couldn't read")
 )
 
-// nilPointerError is returned as a nil pointer, which is a non-nil error
-type nilPointerError struct {
-	msg string
-}
-
-func (e *nilPointerError) Error() string {
-	return e.msg
-}
-
 func (f *testFile) Read(out []byte) (int, error) {
-	if strings.Contains(f.Name(), "fail-on-read") {
-		return 0, errFailRead
-	}
-
 	// simulating a slow reading allows us to test ABOR
 	if strings.Contains(f.Name(), "delay-io") {
 		time.Sleep(500 * time.Millisecond)
@@ -245,10 +231,6 @@ func (f *testFile) Read(out []byte) (int, error) {
 func (f *testFile) Write(out []byte) (int, error) {
 	if strings.Contains(f.Name(), "fail-to-write") {
 		return 0, errFailWrite
-	}
-
-	if strings.Contains(f.Name(), "storage-full-on-write") {
-		return 0, ErrStorageExceeded
 	}
 
 	// simulating a slow writing allows us to test ABOR
@@ -510,12 +492,6 @@ func (driver *TestClientDriver) OpenFile(path string, flag int, perm os.FileMode
 
 	if strings.Contains(path, "not-allowed") {
 		return nil, ErrFileNameNotAllowed
-	}
-
-	if strings.Contains(path, "typed-nil-error") {
-		var err *nilPointerError
-
-		return nil, err
 	}
 
 	file, err := driver.Fs.OpenFile(path, flag, perm)

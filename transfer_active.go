@@ -30,7 +30,7 @@ func (c *clientHandler) handlePORT(param string) error {
 	}
 
 	if err != nil {
-		c.writeMessage(StatusSyntaxErrorParameters, fmt.Sprintf("Problem parsing %s: %v", param, c.replyError(err)))
+		c.writeMessage(StatusSyntaxErrorParameters, fmt.Sprintf("Problem parsing %s: %v", param, err))
 
 		return nil
 	}

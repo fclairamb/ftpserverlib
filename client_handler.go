@@ -382,7 +382,9 @@ func (c *clientHandler) closeTransfer() error {
 	}
 
 	if err != nil {
-		return newNetworkError("error closing transfer connection", err)
+		err = fmt.Errorf("error closing transfer connection: %w", err)
+
+		return err
 	}
 
 	return nil
@@ -708,44 +710,35 @@ func (c *clientHandler) writeMessage(code int, message string) {
 	}
 }
 
-// replyError returns err without the library's own wrappers at its top, for a reply: their text names internal
-// steps ("calling OpenFile") that mean nothing to the client, and io.Copy can't tell whether an error came from
-// the driver or the data connection, so "network error" is also put on a driver's write error. When the
-// driver's file ended a transfer, the reply is the error it returned, without the data connection's wrapping.
-// When anything is removed, the full error is logged at debug level.
+// replyError removes the library's wrappers and the data connection's addresses from the top of err:
+// they mean nothing to the client.
 func (c *clientHandler) replyError(err error) error {
-	reply := err
-	unwrapped := false
-
-	var fileErr *fileError
-	if errors.As(err, &fileErr) {
-		reply = fileErr.err
-		unwrapped = true
-	}
+	reply, unwrapped := err, false
 
 	for {
 		var cause error
 
-		switch wrapper := reply.(type) { //nolint:errorlint // only the wrappers added by the library are removed
+		switch wrapper := reply.(type) { //nolint:errorlint // only the wrappers at the top are removed
 		case DriverError:
 			cause = wrapper.err
 		case NetworkError:
 			cause = wrapper.err
 		case FileAccessError:
 			cause = wrapper.err
+		case *net.OpError:
+			cause = wrapper.Err
 		}
 
-		// The wrapper types are exported, so a driver can return one without a cause: keep it rather than nil
+		// A driver can return a wrapper without a cause
 		if cause == nil {
 			if unwrapped {
-				c.logger.Debug("Replying without the library's error wrapping", "err", err)
+				c.logger.Debug("Replying without the error's wrapping", "err", err)
 			}
 
 			return reply
 		}
 
-		reply = cause
-		unwrapped = true
+		reply, unwrapped = cause, true
 	}
 }
 
@@ -804,7 +797,7 @@ func (c *clientHandler) TransferOpen(info string) (io.ReadWriter, error) {
 			"Unable to open transfer",
 			"error", err)
 
-		c.writeMessage(StatusCannotOpenDataConnection, fmt.Sprint(c.replyError(err)))
+		c.writeMessage(StatusCannotOpenDataConnection, err.Error())
 		c.discardTransfer()
 
 		err = newNetworkError("Unable to open transfer", err)
@@ -919,7 +912,7 @@ func (c *clientHandler) TransferClose(transfer io.ReadWriter, err error) {
 	case err == nil && errClose == nil:
 		c.writeMessage(StatusClosingDataConn, "Closing transfer connection")
 	case errClose != nil:
-		c.writeMessage(StatusActionNotTaken, fmt.Sprintf("Issue during transfer close: %v", c.replyError(errClose)))
+		c.writeMessage(StatusActionNotTaken, fmt.Sprintf("Issue during transfer close: %v", errClose))
 	case err != nil:
 		c.writeMessage(getErrorCode(err, StatusActionNotTaken), fmt.Sprintf("Issue during transfer: %v", c.replyError(err)))
 	}

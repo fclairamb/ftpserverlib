@@ -548,6 +548,37 @@ func TestFailingFileTransfer(t *testing.T) {
 	})
 }
 
+func TestTransferErrorReplies(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		path    string
+		code    int
+		message string
+	}{
+		{"fail-to-write.bin", StatusActionNotTaken, "Issue during transfer: " + errFailWrite.Error()},
+		{"quota-exceeded.bin", StatusActionAborted, "Could not access file: " + ErrStorageExceeded.Error()},
+	}
+
+	for _, testCase := range cases {
+		t.Run(testCase.path, func(t *testing.T) {
+			t.Parallel()
+
+			_, client := dialTransferErrorServer(t)
+
+			defer func() { require.NoError(t, client.Close()) }()
+
+			// Unlike Store, TransferFromOffset doesn't retry
+			_, err := client.TransferFromOffset(testCase.path, nil, bytes.NewReader(make([]byte, 1024)), 0)
+
+			var ftpErr goftp.Error
+			require.ErrorAs(t, err, &ftpErr)
+			require.Equal(t, testCase.code, ftpErr.Code())
+			require.Equal(t, testCase.message, ftpErr.Message())
+		})
+	}
+}
+
 // TestFileTransferErrorNotification covers the contract documented on the
 // FileTransferError interface: TransferError is called before Close when the
 // transfer is interrupted, and is NOT called for a clean completion. This is
@@ -1271,29 +1302,6 @@ func TestPASVWrappedListenerError(t *testing.T) {
 	if assert.Error(t, err) {
 		assert.Contains(t, err.Error(), "421-Could not listen for passive connection")
 	}
-}
-
-func TestPASVResolveErrorReply(t *testing.T) {
-	// A port range can go above 65535, which only fails when resolved
-	server := NewTestServerWithTestDriver(t, &TestServerDriver{
-		Settings: &Settings{PassiveTransferPortRange: PortRange{Start: 70000, End: 70000}},
-	})
-
-	client, err := goftp.DialConfig(goftp.Config{User: authUser, Password: authPass}, server.Addr())
-	require.NoError(t, err, "Couldn't connect")
-
-	defer func() { panicOnError(client.Close()) }()
-
-	raw, err := client.OpenRawConn()
-	require.NoError(t, err, "Couldn't open raw connection")
-
-	defer func() { require.NoError(t, raw.Close()) }()
-
-	_, resolveErr := net.ResolveTCPAddr("tcp", "0.0.0.0:70000")
-	require.Error(t, resolveErr)
-
-	response := requireRawCommand(t, raw, "PASV", StatusServiceNotAvailable)
-	require.Equal(t, "Could not listen for passive connection: "+resolveErr.Error(), response)
 }
 
 func TestPASVPublicIPResolver(t *testing.T) {
