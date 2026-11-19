@@ -66,7 +66,7 @@ var (
 	errInvalidTLSRequirement = errors.New("invalid TLS requirement")
 	errProtMismatch          = errors.New("unable to open transfer: the data connection does not " +
 		"match the requested protection level, issue PASV or PORT again")
-	errTransferCanceled = errors.New("unable to open transfer: the client connection is closing")
+	errTransferCanceled = errors.New("unable to open transfer: the client is disconnected")
 )
 
 func getHashMapping() map[string]HASHAlgo {
@@ -127,11 +127,8 @@ type clientHandler struct {
 	isTransferAborted   bool            // indicate if the transfer was aborted
 	connClosed          bool            // indicates if the connection has been commanded to close
 	tlsRequirement      TLSRequirement  // TLS requirement to respect
-
-	// Close, and end once the client is gone, cancel closeCtx. TransferOpen holds transferMu while it waits for the
-	// data connection: canceling closeCtx stops the wait instead of waiting for transferMu.
-	closeCtx    context.Context //nolint:containedctx // bound to the client's lifetime, not to a call
-	cancelClose context.CancelFunc
+	closeCtx            context.Context //nolint:containedctx // canceled by Close and end
+	cancelClose         context.CancelFunc
 }
 
 // newClientHandler initializes a client handler when someone connects
@@ -403,7 +400,7 @@ func (c *clientHandler) closeTransfer() error {
 
 // Close closes the active transfer, if any, and the control connection
 func (c *clientHandler) Close() error {
-	// Before transferMu, which TransferOpen holds while it waits for the data connection
+	// TransferOpen holds transferMu while it waits for the data connection: stop that wait first
 	c.cancelClose()
 
 	c.transferMu.Lock()
@@ -432,10 +429,7 @@ func (c *clientHandler) Close() error {
 
 // disconnects client and ends transfer notifying the driver
 func (c *clientHandler) end() {
-	// The client is gone: a transfer waiting for its data connection stops now instead of at ConnectionTimeout, and
-	// releases transferMu, taken below
 	c.cancelClose()
-
 	c.server.driver.ClientDisconnected(c)
 	c.server.clientDeparture(c)
 
@@ -645,12 +639,9 @@ func (c *clientHandler) handleCommand(line string) {
 	// action command running at the same time.
 	// Only server STAT is a special action command so we do an additional check here
 	if !cmdDesc.SpecialAction || (command == cmdSTAT && param != "") {
-		// This goroutine is the only one reading commands: until the transfer ends, a client drop or an ABOR sent
-		// after this command is not seen, and a transfer waiting for its data connection waits for ConnectionTimeout
 		c.transferWg.Wait()
 
-		// Close aborts the transfer this command may have waited for: the client is being disconnected, the command
-		// is not run
+		// Close aborted the transfer this command waited for
 		if c.closeCtx.Err() != nil {
 			return
 		}
@@ -667,18 +658,9 @@ func (c *clientHandler) handleCommand(line string) {
 		// aborted and it does not open a transfer connection, see "transferFile"
 		// for details. For this to happen a client should send an ABOR before
 		// receiving the StatusFileStatusOK response. This is very unlikely
-		// The lock is required: Close sets it from another goroutine. Close may have run since the check above, and
-		// clearing the flag it set would let the transfer start once the client is disconnected.
-		c.transferMu.Lock()
-
-		if c.closeCtx.Err() != nil {
-			c.transferMu.Unlock()
-
-			return
-		}
-
+		// A lock is not required here, we cannot have another concurrent ABOR
+		// or transfer active here
 		c.isTransferAborted = false
-		c.transferMu.Unlock()
 
 		c.transferWg.Add(1)
 
@@ -771,14 +753,9 @@ func (c *clientHandler) discardUnusedTransfer() {
 	c.discardTransfer()
 }
 
-func (c *clientHandler) TransferOpen(info string) (io.ReadWriter, error) { //nolint:funlen // refusals in order
+func (c *clientHandler) TransferOpen(info string) (io.ReadWriter, error) {
 	c.transferMu.Lock()
 	defer c.transferMu.Unlock()
-
-	// Close, or end, canceled it and closes the transfer once it gets transferMu: no reply is sent
-	if c.closeCtx.Err() != nil {
-		return nil, errTransferCanceled
-	}
 
 	if c.transfer == nil {
 		// a transfer could be aborted before it is opened, in this case no response should be returned
@@ -800,9 +777,8 @@ func (c *clientHandler) TransferOpen(info string) (io.ReadWriter, error) { //nol
 	}
 
 	conn, err := c.transfer.Open(c.closeCtx)
-
-	// Close canceled the wait and disconnects the client: as for an aborted transfer, no reply is sent
 	if c.closeCtx.Err() != nil {
+		// The client is being disconnected: as for an aborted transfer, no reply is sent
 		c.discardTransfer()
 
 		return nil, errTransferCanceled

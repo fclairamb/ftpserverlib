@@ -96,7 +96,7 @@ type activeTransferHandler struct {
 	settings  *Settings    // Settings
 	tlsConfig *tls.Config  // not nil if the active connection requires TLS
 	info      string       // transfer info
-	// dial replaces the dialer in tests, which need a dial that only ends when it is canceled
+	// dial replaces the dialer in tests
 	dial func(ctx context.Context, network, address string) (net.Conn, error)
 }
 

@@ -186,8 +186,7 @@ type ClientContext interface {
 	// Client's version can be empty
 	GetClientVersion() string
 
-	// Close closes the connection and disconnects the client. A transfer waiting for its data connection is aborted
-	// without a reply.
+	// Close closes the connection and disconnects the client.
 	Close() error
 
 	// HasTLSForControl returns true if the control connection is over TLS

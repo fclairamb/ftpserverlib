@@ -118,11 +118,6 @@ func (c *clientHandler) handleSTATServer() error {
 	c.transferMu.Lock()
 	defer c.transferMu.Unlock()
 
-	// Close may have run while this waited for transferMu: the client is being disconnected, no reply is sent
-	if c.closeCtx.Err() != nil {
-		return nil
-	}
-
 	if c.server.settings.DisableSTAT {
 		c.writeMessage(StatusCommandNotImplemented, "STAT is disabled")
 
@@ -328,11 +323,6 @@ func (c *clientHandler) handleMODE(param string) error {
 func (c *clientHandler) handleQUIT(_ string) error {
 	c.transferWg.Wait()
 
-	// Close may have aborted the transfer this waited for: the client is being disconnected, no reply is sent
-	if c.closeCtx.Err() != nil {
-		return nil //nolint:nilerr
-	}
-
 	var msg string
 
 	if quitter, ok := c.server.driver.(MainDriverExtensionQuitMessage); ok {
@@ -351,11 +341,6 @@ func (c *clientHandler) handleQUIT(_ string) error {
 func (c *clientHandler) handleABOR(param string) error {
 	c.transferMu.Lock()
 	defer c.transferMu.Unlock()
-
-	// Close may have run while this waited for transferMu: the client is being disconnected, no reply is sent
-	if c.closeCtx.Err() != nil {
-		return nil
-	}
 
 	if c.transfer != nil {
 		isOpened := c.isTransferOpen
