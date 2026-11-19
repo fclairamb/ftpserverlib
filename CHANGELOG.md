@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.33.3](https://github.com/fclairamb/ftpserverlib/compare/v0.33.2...v0.33.3) (2026-11-19)
+
+
+### Bug Fixes
+
+* **auth:** a refused login no longer keeps the driver `AuthUser` returned with its error, and commands pipelined after a refused `PASS`, a TLS refusal or `QUIT` are dropped instead of run, whatever the idle timeout ([#708](https://github.com/fclairamb/ftpserverlib/issues/708)) ([f8c18d6](https://github.com/fclairamb/ftpserverlib/commit/f8c18d617897dc73fb9eefadd3dab8f4fa31a6a9))
+* **server:** `STAT <directory>` lines no longer start with a literal `%s` ([#711](https://github.com/fclairamb/ftpserverlib/issues/711)) ([c25e434](https://github.com/fclairamb/ftpserverlib/commit/c25e434d23804581fe2e1af7958fba1f3525e257))
+
 ## [0.33.2](https://github.com/fclairamb/ftpserverlib/compare/v0.33.1...v0.33.2) (2026-11-15)
 
 
