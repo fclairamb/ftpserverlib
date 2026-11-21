@@ -72,7 +72,7 @@ func (c *clientHandler) transferFile(write bool, appendFile bool, param, info st
 	// If this fail, can stop right here and reset the seek position
 	if err != nil {
 		if !c.isCommandAborted() {
-			c.writeMessage(getErrorCode(err, StatusActionNotTaken), "Could not access file: "+err.Error())
+			c.writeMessage(getErrorCode(err, StatusActionNotTaken), fmt.Sprintf("Could not access file: %v", c.replyError(err)))
 		}
 
 		c.ctxRest = 0
