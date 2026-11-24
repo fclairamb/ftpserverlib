@@ -360,6 +360,10 @@ type Settings struct {
 	// PassiveTransferPortMultiplexing allows different client IPs to share passive listener ports.
 	// With PasvConnectionsCheck set to IPMatchDisabled, a data connection can't be matched on its IP,
 	// so a pending transfer has its port to itself, as without multiplexing.
+	// Settings describes a single server: the shared ports are never shared between servers, and a port
+	// bound by one server stays bound until it stops. Servers that must live behind one firewall rule
+	// (e.g. explicit and implicit FTPS) should split the range between them, for example 30000-30002 for
+	// one and 30003-30004 for the other.
 	PassiveTransferPortMultiplexing bool
 	PublicIPResolver                PublicIPResolver // (Optional) To fetch a public IP lookup
 	IdleTimeout                     int              // Maximum inactivity time before disconnecting (#58)
