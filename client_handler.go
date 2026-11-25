@@ -765,7 +765,7 @@ func (c *clientHandler) TransferOpen(info string) (io.ReadWriter, error) {
 			"Unable to open transfer",
 			"error", err)
 
-		c.writeMessage(StatusCannotOpenDataConnection, err.Error())
+		c.writeMessage(StatusCannotOpenDataConnection, transferErrorText(err))
 		c.discardTransfer()
 
 		err = newNetworkError("Unable to open transfer", err)
@@ -880,10 +880,19 @@ func (c *clientHandler) TransferClose(transfer io.ReadWriter, err error) {
 	case err == nil && errClose == nil:
 		c.writeMessage(StatusClosingDataConn, "Closing transfer connection")
 	case errClose != nil:
-		c.writeMessage(StatusActionNotTaken, fmt.Sprintf("Issue during transfer close: %v", errClose))
+		c.writeMessage(StatusActionNotTaken, "Issue during transfer close: "+transferErrorText(errClose))
 	case err != nil:
-		c.writeMessage(getErrorCode(err, StatusActionNotTaken), fmt.Sprintf("Issue during transfer: %v", err))
+		c.writeMessage(getErrorCode(err, StatusActionNotTaken), "Issue during transfer: "+transferErrorText(err))
 	}
+}
+
+func transferErrorText(err error) string {
+	var errOp *net.OpError
+	if errors.As(err, &errOp) {
+		return fmt.Sprint(errOp.Err)
+	}
+
+	return err.Error()
 }
 
 // isClosedConnError checks if the error indicates the connection is already closed.

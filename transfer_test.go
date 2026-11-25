@@ -548,6 +548,37 @@ func TestFailingFileTransfer(t *testing.T) {
 	})
 }
 
+func TestTransferErrorReplies(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		path    string
+		code    int
+		message string
+	}{
+		{"fail-to-write.bin", StatusActionNotTaken, "Issue during transfer: " + errFailWrite.Error()},
+		{"quota-exceeded.bin", StatusActionAborted, "Could not access file: " + ErrStorageExceeded.Error()},
+	}
+
+	for _, testCase := range cases {
+		t.Run(testCase.path, func(t *testing.T) {
+			t.Parallel()
+
+			_, client := dialTransferErrorServer(t)
+
+			defer func() { require.NoError(t, client.Close()) }()
+
+			// Unlike Store, TransferFromOffset doesn't retry
+			_, err := client.TransferFromOffset(testCase.path, nil, bytes.NewReader(make([]byte, 1024)), 0)
+
+			var ftpErr goftp.Error
+			require.ErrorAs(t, err, &ftpErr)
+			require.Equal(t, testCase.code, ftpErr.Code())
+			require.Equal(t, testCase.message, ftpErr.Message())
+		})
+	}
+}
+
 // TestFileTransferErrorNotification covers the contract documented on the
 // FileTransferError interface: TransferError is called before Close when the
 // transfer is interrupted, and is NOT called for a clean completion. This is

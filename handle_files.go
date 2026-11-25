@@ -162,8 +162,6 @@ func (c *clientHandler) doFileTransfer(transferConn io.ReadWriter, file io.ReadW
 		if fileTransferError, ok := file.(FileTransferError); ok {
 			fileTransferError.TransferError(err)
 		}
-
-		err = newNetworkError("error transferring data", err)
 	}
 
 	return err
@@ -733,35 +731,27 @@ func (c *clientHandler) computeHashForFile(filePath string, algo HASHAlgo, start
 	if start > 0 {
 		_, err = file.Seek(start, io.SeekStart)
 		if err != nil {
-			return "", newFileAccessError("couldn't seek file", err)
+			return "", err
 		}
 	}
 
 	_, err = io.CopyN(chosenHashAlgo, file, end-start)
 
 	if err != nil && !errors.Is(err, io.EOF) {
-		return "", newFileAccessError("couldn't read file", err)
+		return "", err
 	}
 
 	return hex.EncodeToString(chosenHashAlgo.Sum(nil)), nil
 }
 
+// getFileHandle returns the driver's error unwrapped: the callers write its text
+// in the reply to the client.
 func (c *clientHandler) getFileHandle(name string, flags int, offset int64) (FileTransfer, error) {
 	if fileTransfer, ok := c.driver.(ClientDriverExtentionFileTransfer); ok {
-		ft, err := fileTransfer.GetHandle(name, flags, offset)
-		if err != nil {
-			err = newDriverError("calling GetHandle", err)
-		}
-
-		return ft, err
+		return fileTransfer.GetHandle(name, flags, offset)
 	}
 
-	file, err := c.driver.OpenFile(name, flags, os.ModePerm)
-	if err != nil {
-		err = newDriverError("calling OpenFile", err)
-	}
-
-	return file, err
+	return c.driver.OpenFile(name, flags, os.ModePerm)
 }
 
 func (c *clientHandler) closeUnchecked(file io.Closer) {

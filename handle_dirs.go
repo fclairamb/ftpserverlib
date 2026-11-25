@@ -375,7 +375,7 @@ func (c *clientHandler) getFileList(param string, filePathAllowed bool) ([]os.Fi
 	// return list of single file if directoryPath points to file and filePathAllowed
 	info, err := c.driver.Stat(listPath)
 	if err != nil {
-		return nil, "", newFileAccessError("couldn't stat", err)
+		return nil, "", err
 	}
 
 	if !info.IsDir() {
@@ -396,7 +396,7 @@ func (c *clientHandler) getFileList(param string, filePathAllowed bool) ([]os.Fi
 
 	directory, errOpenFile := c.driver.Open(listPath)
 	if errOpenFile != nil {
-		return nil, "", newFileAccessError("couldn't open directory", errOpenFile)
+		return nil, "", errOpenFile
 	}
 
 	defer c.closeDirectory(listPath, directory)

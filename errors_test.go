@@ -51,14 +51,4 @@ func TestErrorTypes(t *testing.T) {
 		req.ErrorAs(err, &specificError)
 		req.Equal("test", specificError.str)
 	})
-
-	t.Run("FileAccessError", func(t *testing.T) {
-		req := require.New(t)
-		var err error = newFileAccessError("test", os.ErrPermission)
-		req.Equal("file access error: test: permission denied", err.Error())
-		req.ErrorIs(err, os.ErrPermission)
-		var specificError FileAccessError
-		req.ErrorAs(err, &specificError)
-		req.Equal("test", specificError.str)
-	})
 }

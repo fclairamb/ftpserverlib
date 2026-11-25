@@ -60,21 +60,3 @@ func (e NetworkError) Error() string {
 func (e NetworkError) Unwrap() error {
 	return e.err
 }
-
-// FileAccessError is a wrapper for any error that occur while accessing the file system
-type FileAccessError struct {
-	str string
-	err error
-}
-
-func newFileAccessError(str string, err error) FileAccessError {
-	return FileAccessError{str: str, err: err}
-}
-
-func (e FileAccessError) Error() string {
-	return fmt.Sprintf("file access error: %s: %v", e.str, e.err)
-}
-
-func (e FileAccessError) Unwrap() error {
-	return e.err
-}
