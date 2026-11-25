@@ -924,3 +924,25 @@ func TestDebugLogRedactsPassword(t *testing.T) {
 	require.Contains(t, output, `line="USER acme"`)
 	require.Contains(t, output, `line="CWD /dir"`)
 }
+
+var errBrokenPipe = errors.New("broken pipe")
+
+type failingCloseTransfer struct {
+	transferHandler
+}
+
+func (failingCloseTransfer) Close() error {
+	return &net.OpError{Op: "close", Net: "tcp", Err: errBrokenPipe}
+}
+
+func TestTransferCloseConnectionError(t *testing.T) {
+	buf := bytes.Buffer{}
+	handler := clientHandler{
+		writer:   bufio.NewWriter(&buf),
+		logger:   slog.New(slog.NewTextHandler(io.Discard, nil)), //nolint:sloglint // DiscardHandler requires Go 1.23+
+		transfer: failingCloseTransfer{},
+	}
+
+	handler.TransferClose(nil, nil)
+	require.Equal(t, "550 Issue during transfer close: broken pipe\r\n", buf.String())
+}

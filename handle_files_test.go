@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"crypto/tls"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io"
 	"math/big"
@@ -1182,4 +1183,67 @@ func getKnownHASHMappings() map[string]string {
 	knownHASHMapping["XSHA512"] = "4f95c20e4d030cbc43b1e139a0fe11c5e0e5e520cf3265bae852ae212b1c7cdb02c2fea5ba038cbf3202af8cdf313579fbe344d47919c288c16d6dd671e9db63" //nolint:lll
 
 	return knownHASHMapping
+}
+
+func TestHASHFileAccessErrors(t *testing.T) {
+	t.Parallel()
+
+	server := NewTestServerWithTestDriver(t, &TestServerDriver{
+		Settings: &Settings{EnableHASH: true},
+	})
+
+	client, err := goftp.DialConfig(goftp.Config{User: authUser, Password: authPass}, server.Addr())
+	require.NoError(t, err)
+
+	defer func() { panicOnError(client.Close()) }()
+
+	for _, name := range []string{"fail-to-seek.txt", "fail-to-read.txt"} {
+		tempFile, errTemp := os.CreateTemp(t.TempDir(), "ftpserver")
+		require.NoError(t, errTemp)
+		_, errTemp = tempFile.WriteString("sample data with know checksum/hash\n")
+		require.NoError(t, errTemp)
+		ftpUpload(t, client, tempFile, name)
+		require.NoError(t, tempFile.Close())
+	}
+
+	raw, err := client.OpenRawConn()
+	require.NoError(t, err)
+
+	defer func() { require.NoError(t, raw.Close()) }()
+
+	// A start offset makes the server seek, which the driver refuses
+	code, message, err := raw.SendCommand("XSHA256 fail-to-seek.txt 7 11")
+	require.NoError(t, err)
+	require.Equal(t, StatusActionNotTaken, code)
+	require.Contains(t, message, errFailSeek.Error())
+
+	code, message, err = raw.SendCommand("XSHA256 fail-to-read.txt")
+	require.NoError(t, err)
+	require.Equal(t, StatusActionNotTaken, code)
+	require.Contains(t, message, errFailRead.Error())
+}
+
+var errHandle = errors.New("handle refused")
+
+type handleDriver struct {
+	ClientDriver
+	handle FileTransfer
+	err    error
+}
+
+func (d handleDriver) GetHandle(_ string, _ int, _ int64) (FileTransfer, error) {
+	return d.handle, d.err
+}
+
+func TestGetFileHandleExtension(t *testing.T) {
+	t.Parallel()
+
+	handler := &clientHandler{driver: handleDriver{err: errHandle}}
+	_, err := handler.getFileHandle("file", os.O_RDONLY, 0)
+	require.Equal(t, errHandle, err, "driver error must be returned unwrapped")
+
+	handler = &clientHandler{driver: handleDriver{handle: &testFile{}}}
+	handle, err := handler.getFileHandle("file", os.O_RDONLY, 0)
+	require.NoError(t, err)
+	require.NotNil(t, handle)
 }

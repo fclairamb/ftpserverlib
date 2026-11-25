@@ -215,6 +215,7 @@ var (
 	errFailClose   = errors.New("couldn't close")
 	errFailWrite   = errors.New("couldn't write")
 	errFailSeek    = errors.New("couldn't seek")
+	errFailRead    = errors.New("couldn't read")
 	errFailReaddir = errors.New("couldn't readdir")
 	errFailOpen    = errors.New("couldn't open")
 )
@@ -223,6 +224,10 @@ func (f *testFile) Read(out []byte) (int, error) {
 	// simulating a slow reading allows us to test ABOR
 	if strings.Contains(f.Name(), "delay-io") {
 		time.Sleep(500 * time.Millisecond)
+	}
+
+	if strings.Contains(f.Name(), "fail-to-read.") {
+		return 0, errFailRead
 	}
 
 	return f.File.Read(out)
