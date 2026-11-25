@@ -1,6 +1,7 @@
 package ftpserver
 
 import (
+	"context"
 	"crypto/tls"
 	"errors"
 	"fmt"
@@ -12,8 +13,8 @@ import (
 
 // Active/Passive transfer connection handler
 type transferHandler interface {
-	// Get the connection to transfer data on
-	Open() (net.Conn, error)
+	// Get the connection to transfer data on, canceling ctx stops the wait for it
+	Open(ctx context.Context) (net.Conn, error)
 
 	// Close the connection (and any associated resource)
 	Close() error
@@ -362,8 +363,12 @@ func (p *passiveTransferHandler) SetInfo(info string) {
 	p.info = info
 }
 
-func (p *passiveTransferHandler) Open() (net.Conn, error) {
+func (p *passiveTransferHandler) Open(ctx context.Context) (net.Conn, error) {
 	timeout := time.Duration(time.Second.Nanoseconds() * int64(p.settings.ConnectionTimeout))
+
+	// Closing the listener is the only way to stop a pending Accept
+	stop := context.AfterFunc(ctx, func() { _ = p.listener.Close() })
+	defer stop()
 
 	return p.ConnectionWait(timeout)
 }

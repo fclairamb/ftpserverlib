@@ -3,11 +3,14 @@ package ftpserver
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"io"
 	"log/slog"
 	"net"
+	"os"
+	"path/filepath"
 	"slices"
 	"sync"
 	"testing"
@@ -327,6 +330,158 @@ func TestClientContextWhileClientStartsTLS(t *testing.T) {
 	}
 
 	waitGroup.Wait()
+}
+
+// TestEndWhileTransferWaitsForDataConnection ends a client while its LIST waits up to ConnectionTimeout for the data
+// connection. Close must not wait for it, and neither LIST nor a DELE queued behind it may run on. A client drop must
+// end the wait.
+func TestEndWhileTransferWaitsForDataConnection(t *testing.T) {
+	for _, mode := range []string{"passive", "multiplexed", "active"} {
+		t.Run(mode+" Close", func(t *testing.T) {
+			logs := &deleReceivedWriter{received: make(chan struct{})}
+			driver, control, _ := startPendingList(t, mode, logs)
+
+			filePath := filepath.Join(driver.serverDir, "file.txt")
+			require.NoError(t, os.WriteFile(filePath, nil, 0o600))
+
+			_, err := control.conn.Write([]byte("DELE file.txt\r\n"))
+			require.NoError(t, err)
+			requireSignal(t, logs.received, "DELE is not received")
+
+			closed := make(chan struct{})
+
+			go func() {
+				assert.NoError(t, control.context.Close())
+				close(closed)
+			}()
+
+			requireSignal(t, closed, "Close waits for the data connection")
+
+			reply, err := control.reader.ReadString('\n')
+			require.ErrorIs(t, err, io.EOF)
+			require.Empty(t, reply, "the client must get no reply")
+
+			// DELE, if it runs, runs before the client's end
+			waitClientsGone(t, driver)
+			require.FileExists(t, filePath)
+		})
+
+		t.Run(mode+" client drop", func(t *testing.T) {
+			_, control, released := startPendingList(t, mode, io.Discard)
+			require.NoError(t, control.conn.Close())
+			requireSignal(t, released, "the transfer still waits for its data connection")
+		})
+	}
+}
+
+// startPendingList logs a client in, sends PASV or PORT then LIST, and returns once LIST waits for its data
+// connection, with a channel closed once that wait ends
+func startPendingList(t *testing.T, mode string, logs io.Writer) (*TestServerDriver, controlConn, <-chan struct{}) {
+	t.Helper()
+
+	driver := &TestServerDriver{Debug: true, Settings: &Settings{}}
+	if mode == "multiplexed" {
+		port := getFreePassivePort(t)
+		driver.Settings.PassiveTransferPortRange = &PortRange{Start: port, End: port}
+		driver.Settings.PassiveTransferPortMultiplexing = true
+	}
+
+	driver.Init()
+	logger := slog.New(slog.NewTextHandler(logs, &slog.HandlerOptions{Level: slog.LevelDebug}))
+	control := dialControlConns(t, NewTestServerWithDriverAndLogger(t, driver, logger), driver, 1)[0]
+
+	requireReply(t, control, "USER "+authUser, StatusUserOK)
+	requireReply(t, control, "PASS "+authPass, StatusUserLoggedIn)
+
+	if mode == "active" {
+		requireReply(t, control, "PORT 127,0,0,1,4,1", StatusOK)
+	} else {
+		requireReply(t, control, "PASV", StatusEnteringPASV)
+	}
+
+	// PASV replies before it installs the transfer
+	requireReply(t, control, "NOOP", StatusOK)
+
+	handler, ok := control.context.(*clientHandler)
+	require.True(t, ok)
+
+	waiting, released := make(chan struct{}), make(chan struct{})
+
+	handler.transferMu.Lock()
+	switch transfer := handler.transfer.(type) {
+	case *activeTransferHandler:
+		transfer.dial = func(ctx context.Context, _, _ string) (net.Conn, error) {
+			close(waiting)
+			<-ctx.Done()
+			close(released)
+
+			return nil, ctx.Err()
+		}
+	case *passiveTransferHandler:
+		transfer.listener = &signalingListener{Listener: transfer.listener, accepting: waiting, closed: released}
+	}
+	handler.transferMu.Unlock()
+
+	_, err := control.conn.Write([]byte("LIST\r\n"))
+	require.NoError(t, err)
+	requireSignal(t, waiting, "LIST does not wait for its data connection")
+
+	return driver, control, released
+}
+
+func requireReply(t *testing.T, control controlConn, command string, code int) {
+	t.Helper()
+
+	_, err := control.conn.Write([]byte(command + "\r\n"))
+	require.NoError(t, err)
+
+	reply, err := control.reader.ReadString('\n')
+	require.NoError(t, err)
+	require.Regexp(t, fmt.Sprintf("^%d ", code), reply)
+}
+
+// requireSignal waits for signal, well below the default ConnectionTimeout of 30 seconds
+func requireSignal(t *testing.T, signal <-chan struct{}, failure string) {
+	t.Helper()
+
+	select {
+	case <-signal:
+	case <-time.After(10 * time.Second):
+		require.FailNow(t, failure)
+	}
+}
+
+// signalingListener closes accepting on its first Accept and closed once it is closed
+type signalingListener struct {
+	net.Listener
+	accepting, closed     chan struct{}
+	acceptOnce, closeOnce sync.Once
+}
+
+func (l *signalingListener) Accept() (net.Conn, error) {
+	l.acceptOnce.Do(func() { close(l.accepting) })
+
+	return l.Listener.Accept()
+}
+
+func (l *signalingListener) Close() error {
+	defer l.closeOnce.Do(func() { close(l.closed) })
+
+	return l.Listener.Close()
+}
+
+// deleReceivedWriter closes received once the client handler logs that it received DELE
+type deleReceivedWriter struct {
+	received chan struct{}
+	once     sync.Once
+}
+
+func (w *deleReceivedWriter) Write(log []byte) (int, error) {
+	if bytes.Contains(log, []byte(`msg="Received line"`)) && bytes.Contains(log, []byte(`line="DELE file.txt"`)) {
+		w.once.Do(func() { close(w.received) })
+	}
+
+	return len(log), nil
 }
 
 func TestClientContextConcurrency(t *testing.T) {

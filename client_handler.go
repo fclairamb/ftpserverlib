@@ -3,6 +3,7 @@ package ftpserver
 import (
 	"bufio"
 	"compress/flate"
+	"context"
 	"crypto/tls"
 	"errors"
 	"fmt"
@@ -65,6 +66,7 @@ var (
 	errInvalidTLSRequirement = errors.New("invalid TLS requirement")
 	errProtMismatch          = errors.New("unable to open transfer: the data connection does not " +
 		"match the requested protection level, issue PASV or PORT again")
+	errTransferCanceled = errors.New("unable to open transfer: the client is disconnected")
 )
 
 func getHashMapping() map[string]HASHAlgo {
@@ -125,6 +127,8 @@ type clientHandler struct {
 	isTransferAborted   bool            // indicate if the transfer was aborted
 	connClosed          bool            // indicates if the connection has been commanded to close
 	tlsRequirement      TLSRequirement  // TLS requirement to respect
+	closeCtx            context.Context //nolint:containedctx // canceled by Close and end
+	cancelClose         context.CancelFunc
 }
 
 // newClientHandler initializes a client handler when someone connects
@@ -133,6 +137,8 @@ func (server *FtpServer) newClientHandler(
 	clientID uint32,
 	transferType TransferType,
 ) *clientHandler {
+	closeCtx, cancelClose := context.WithCancel(context.Background())
+
 	return &clientHandler{
 		server:              server,
 		conn:                connection,
@@ -144,6 +150,8 @@ func (server *FtpServer) newClientHandler(
 		selectedHashAlgo:    HASHAlgoSHA256,
 		currentTransferType: transferType,
 		logger:              server.Logger.With("clientId", clientID),
+		closeCtx:            closeCtx,
+		cancelClose:         cancelClose,
 	}
 }
 
@@ -392,6 +400,9 @@ func (c *clientHandler) closeTransfer() error {
 
 // Close closes the active transfer, if any, and the control connection
 func (c *clientHandler) Close() error {
+	// TransferOpen holds transferMu while it waits for the data connection: stop that wait first
+	c.cancelClose()
+
 	c.transferMu.Lock()
 	defer c.transferMu.Unlock()
 
@@ -418,6 +429,7 @@ func (c *clientHandler) Close() error {
 
 // disconnects client and ends transfer notifying the driver
 func (c *clientHandler) end() {
+	c.cancelClose()
 	c.server.driver.ClientDisconnected(c)
 	c.server.clientDeparture(c)
 
@@ -628,6 +640,11 @@ func (c *clientHandler) handleCommand(line string) {
 	// Only server STAT is a special action command so we do an additional check here
 	if !cmdDesc.SpecialAction || (command == cmdSTAT && param != "") {
 		c.transferWg.Wait()
+
+		// Close aborted the transfer this command waited for
+		if c.closeCtx.Err() != nil {
+			return
+		}
 	}
 
 	c.setLastCommand(command)
@@ -791,7 +808,14 @@ func (c *clientHandler) TransferOpen(info string) (io.ReadWriter, error) {
 		return nil, errTLSRequired
 	}
 
-	conn, err := c.transfer.Open()
+	conn, err := c.transfer.Open(c.closeCtx)
+	if c.closeCtx.Err() != nil {
+		// The client is being disconnected: as for an aborted transfer, no reply is sent
+		c.discardTransfer()
+
+		return nil, errTransferCanceled
+	}
+
 	if err != nil {
 		c.logger.Warn(
 			"Unable to open transfer",
