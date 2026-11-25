@@ -710,6 +710,38 @@ func (c *clientHandler) writeMessage(code int, message string) {
 	}
 }
 
+// replyError removes the library's wrappers and the data connection's addresses from the top of err:
+// they mean nothing to the client.
+func (c *clientHandler) replyError(err error) error {
+	reply, unwrapped := err, false
+
+	for {
+		var cause error
+
+		switch wrapper := reply.(type) { //nolint:errorlint // only the wrappers at the top are removed
+		case DriverError:
+			cause = wrapper.err
+		case NetworkError:
+			cause = wrapper.err
+		case FileAccessError:
+			cause = wrapper.err
+		case *net.OpError:
+			cause = wrapper.Err
+		}
+
+		// A driver can return a wrapper without a cause
+		if cause == nil {
+			if unwrapped {
+				c.logger.Debug("Replying without the error's wrapping", "err", err)
+			}
+
+			return reply
+		}
+
+		reply, unwrapped = cause, true
+	}
+}
+
 func (c *clientHandler) GetTranferInfo() string {
 	if c.transfer == nil {
 		return ""
@@ -882,7 +914,7 @@ func (c *clientHandler) TransferClose(transfer io.ReadWriter, err error) {
 	case errClose != nil:
 		c.writeMessage(StatusActionNotTaken, fmt.Sprintf("Issue during transfer close: %v", errClose))
 	case err != nil:
-		c.writeMessage(getErrorCode(err, StatusActionNotTaken), fmt.Sprintf("Issue during transfer: %v", err))
+		c.writeMessage(getErrorCode(err, StatusActionNotTaken), fmt.Sprintf("Issue during transfer: %v", c.replyError(err)))
 	}
 }
 

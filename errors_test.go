@@ -3,6 +3,9 @@ package ftpserver
 import (
 	"bufio"
 	"bytes"
+	"fmt"
+	"log/slog"
+	"net"
 	"os"
 	"testing"
 
@@ -61,4 +64,29 @@ func TestErrorTypes(t *testing.T) {
 		req.ErrorAs(err, &specificError)
 		req.Equal("test", specificError.str)
 	})
+}
+
+func TestReplyError(t *testing.T) {
+	opErr := &net.OpError{Op: "writeto", Net: "tcp", Err: errFailWrite}
+	otherWrapping := fmt.Errorf("context: %w", newDriverError("calling OpenFile", ErrStorageExceeded))
+
+	cases := []struct {
+		name  string
+		err   error
+		reply error
+	}{
+		{"library wrappers", newNetworkError("a", newFileAccessError("b", newDriverError("c", ErrStorageExceeded))),
+			ErrStorageExceeded},
+		{"net.OpError", opErr, errFailWrite},
+		{"both nested", newNetworkError("error transferring data", opErr), errFailWrite},
+		{"wrapper without a cause", newDriverError("calling OpenFile", DriverError{}), DriverError{}},
+		{"wrapped by something else", otherWrapping, otherWrapping},
+	}
+
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			h := clientHandler{logger: slog.New(slog.DiscardHandler)}
+			require.EqualError(t, h.replyError(testCase.err), testCase.reply.Error())
+		})
+	}
 }

@@ -197,7 +197,7 @@ func (c *clientHandler) handleLIST(param string) error {
 		}
 	} else {
 		if !c.isCommandAborted() {
-			c.writeMessage(StatusFileActionNotTaken, fmt.Sprintf("Could not list: %v", err))
+			c.writeMessage(StatusFileActionNotTaken, fmt.Sprintf("Could not list: %v", c.replyError(err)))
 		}
 	}
 
@@ -216,7 +216,7 @@ func (c *clientHandler) handleNLST(param string) error {
 		}
 	} else {
 		if !c.isCommandAborted() {
-			c.writeMessage(StatusFileActionNotTaken, fmt.Sprintf("Could not list: %v", err))
+			c.writeMessage(StatusFileActionNotTaken, fmt.Sprintf("Could not list: %v", c.replyError(err)))
 		}
 	}
 
@@ -263,7 +263,7 @@ func (c *clientHandler) handleMLSD(param string) error {
 		}
 	} else {
 		if !c.isCommandAborted() {
-			c.writeMessage(StatusActionNotTaken, fmt.Sprintf("Could not list: %v", err))
+			c.writeMessage(StatusActionNotTaken, fmt.Sprintf("Could not list: %v", c.replyError(err)))
 		}
 	}
 
