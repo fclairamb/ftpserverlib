@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.33.4](https://github.com/fclairamb/ftpserverlib/compare/v0.33.3...v0.33.4) (2026-11-25)
+
+
+### Bug Fixes
+
+* **server:** release passive ports when the server stops ([#716](https://github.com/fclairamb/ftpserverlib/issues/716)) ([16db9d3](https://github.com/fclairamb/ftpserverlib/commit/16db9d3344402261f007e5a6538767cb2ffeaecf))
+* **transfer:** reply with the driver's error, not the library's wrapping ([#713](https://github.com/fclairamb/ftpserverlib/issues/713)) ([d76426c](https://github.com/fclairamb/ftpserverlib/commit/d76426c0bb0ed45e6e330fdd7c1ab669d8687cfa))
+
 ## [0.33.3](https://github.com/fclairamb/ftpserverlib/compare/v0.33.2...v0.33.3) (2026-11-19)
 
 
