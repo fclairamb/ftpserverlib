@@ -565,13 +565,57 @@ func (c *clientHandler) handleREST(param string) error {
 
 func (c *clientHandler) handleMDTM(param string) error {
 	path := c.absPath(param)
-	if info, err := c.driver.Stat(path); err == nil {
+	info, err := c.driver.Stat(path)
+
+	if err == nil {
 		c.writeMessage(StatusFileStatus, info.ModTime().UTC().Format(dateFormatMLSD))
-	} else {
-		c.writeMessage(StatusActionNotTaken, fmt.Sprintf("Couldn't access %s: %s", path, err.Error()))
+
+		return nil
 	}
 
+	// Legacy form used by some clients to set the modification time: MDTM YYYYMMDDHHMMSS path
+	// (vsftpd mdtm_write, ProFTPD, Pure-FTPd). It is only considered if the whole parameter
+	// doesn't refer to an existing file, so files named like "20201209211059 file" still work.
+	if c.server.settings.EnableMDTMWrite {
+		if mtime, filePath, ok := parseMDTMWrite(param); ok {
+			c.setModTime(mtime, filePath, "File modification time set.")
+
+			return nil
+		}
+	}
+
+	c.writeMessage(StatusActionNotTaken, fmt.Sprintf("Couldn't access %s: %s", path, err.Error()))
+
 	return nil
+}
+
+// parseMDTMWrite splits a "YYYYMMDDHHMMSS path" parameter. The timestamp is interpreted as UTC.
+func parseMDTMWrite(param string) (time.Time, string, bool) {
+	const timestampLen = len(dateFormatMLSD)
+
+	if len(param) < timestampLen+2 || param[timestampLen] != ' ' {
+		return time.Time{}, "", false
+	}
+
+	mtime, err := time.Parse(dateFormatMLSD, param[:timestampLen])
+	if err != nil {
+		return time.Time{}, "", false
+	}
+
+	return mtime, param[timestampLen+1:], true
+}
+
+func (c *clientHandler) setModTime(mtime time.Time, filePath, successMessage string) {
+	path := c.absPath(filePath)
+
+	if err := c.driver.Chtimes(path, mtime, mtime); err != nil {
+		c.writeMessage(StatusActionNotTaken, fmt.Sprintf(
+			"Couldn't set mtime %q for %q, err: %v", mtime.Format(time.RFC3339), path, err))
+
+		return
+	}
+
+	c.writeMessage(StatusFileStatus, successMessage)
 }
 
 // RFC draft: https://tools.ietf.org/html/draft-somers-ftp-mfxx-04#section-3.1
@@ -593,16 +637,7 @@ func (c *clientHandler) handleMFMT(param string) error {
 		return nil
 	}
 
-	path := c.absPath(params[1])
-
-	if err := c.driver.Chtimes(path, mtime, mtime); err != nil {
-		c.writeMessage(StatusActionNotTaken, fmt.Sprintf(
-			"Couldn't set mtime %q for %q, err: %v", mtime.Format(time.RFC3339), path, err))
-
-		return nil
-	}
-
-	c.writeMessage(StatusFileStatus, fmt.Sprintf("Modify=%s; %s", params[0], params[1]))
+	c.setModTime(mtime, params[1], fmt.Sprintf("Modify=%s; %s", params[0], params[1]))
 
 	return nil
 }

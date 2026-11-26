@@ -33,7 +33,7 @@ If you're interested in a fully featured FTP server, you should use [sftpgo](htt
    * [AUTH TLS](https://tools.ietf.org/html/rfc4217#section-4.1) - TLS session
    * [PROT](https://tools.ietf.org/html/rfc2228#page-8) - Transfer protection
    * [EPRT/EPSV](https://tools.ietf.org/html/rfc2428) - IPv6 support
-   * [MDTM](https://tools.ietf.org/html/rfc3659#page-8) - File Modification Time
+   * [MDTM](https://tools.ietf.org/html/rfc3659#page-8) - File Modification Time (the legacy "MDTM YYYYMMDDHHMMSS path" form to set it is available with `EnableMDTMWrite`)
    * [SIZE](https://tools.ietf.org/html/rfc3659#page-11) - Size of a file
    * [REST](https://tools.ietf.org/html/rfc3659#page-13) - Restart of interrupted transfer
    * [MLST](https://tools.ietf.org/html/rfc3659#page-23) - Simple file listing for machine processing
@@ -133,6 +133,7 @@ type Settings struct {
 	DisableMLSD              bool             // Disable MLSD support
 	DisableMLST              bool             // Disable MLST support
 	DisableMFMT              bool             // Disable MFMT support (modify file mtime)
+	EnableMDTMWrite          bool             // Accept legacy "MDTM YYYYMMDDHHMMSS path" to set the mtime
 	Banner                   string           // Banner to use in server status response
 	TLSRequired              TLSRequirement   // defines the TLS mode
 	DisableLISTArgs          bool             // Disable ls like options (-a,-la etc.) for directory listing
