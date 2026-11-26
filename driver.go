@@ -372,6 +372,7 @@ type Settings struct {
 	DisableMLSD                     bool             // Disable MLSD support
 	DisableMLST                     bool             // Disable MLST support
 	DisableMFMT                     bool             // Disable MFMT support (modify file mtime)
+	EnableMDTMWrite                 bool             // Accept legacy "MDTM YYYYMMDDHHMMSS path" to set the mtime
 	TLSRequired                     TLSRequirement   // defines the TLS mode
 	DisableLISTArgs                 bool             // Disable ls like options (-a,-la etc.) for directory listing
 	DisableSite                     bool             // Disable SITE command

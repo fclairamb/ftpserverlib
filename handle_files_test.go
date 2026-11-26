@@ -434,6 +434,97 @@ func TestMDTM(t *testing.T) {
 	require.Equal(t, StatusActionNotTaken, returnCode)
 }
 
+func TestMDTMWrite(t *testing.T) {
+	server := NewTestServerWithTestDriver(t, &TestServerDriver{
+		Debug:    false,
+		Settings: &Settings{EnableMDTMWrite: true},
+	})
+	conf := goftp.Config{
+		User:     authUser,
+		Password: authPass,
+	}
+	client, err := goftp.DialConfig(conf, server.Addr())
+	require.NoError(t, err, "Couldn't connect")
+
+	defer func() { panicOnError(client.Close()) }()
+
+	ftpUpload(t, client, createTemporaryFile(t, 10), "file")
+	// a file whose name looks like the legacy "MDTM <time> <path>" parameter
+	ftpUpload(t, client, createTemporaryFile(t, 10), "20201209211059 file")
+
+	raw, err := client.OpenRawConn()
+	require.NoError(t, err, "Couldn't open raw connection")
+
+	defer func() { require.NoError(t, raw.Close()) }()
+
+	// Set the modification time with the legacy two arguments form
+	returnCode, response, err := raw.SendCommand("MDTM 20191010101010 file")
+	require.NoError(t, err)
+	require.Equal(t, StatusFileStatus, returnCode, response)
+
+	returnCode, response, err = raw.SendCommand("MDTM file")
+	require.NoError(t, err)
+	require.Equal(t, StatusFileStatus, returnCode)
+	require.Equal(t, "20191010101010", response)
+
+	// An existing file named like the parameter is still a query, not a write
+	returnCode, response, err = raw.SendCommand("MDTM 20201209211059 file")
+	require.NoError(t, err)
+	require.Equal(t, StatusFileStatus, returnCode)
+	require.NotEqual(t, "File modification time set.", response)
+
+	returnCode, response, err = raw.SendCommand("MDTM file")
+	require.NoError(t, err)
+	require.Equal(t, StatusFileStatus, returnCode)
+	require.Equal(t, "20191010101010", response, "mtime must not have been changed")
+
+	// Missing target file
+	returnCode, _, err = raw.SendCommand("MDTM 20191010101010 missing")
+	require.NoError(t, err)
+	require.Equal(t, StatusActionNotTaken, returnCode)
+
+	// Invalid timestamp: handled as a plain (missing) path
+	returnCode, _, err = raw.SendCommand("MDTM 2019101010101X file")
+	require.NoError(t, err)
+	require.Equal(t, StatusActionNotTaken, returnCode)
+}
+
+func TestMDTMWriteDisabled(t *testing.T) {
+	s := NewTestServer(t, false)
+	conf := goftp.Config{
+		User:     authUser,
+		Password: authPass,
+	}
+	client, err := goftp.DialConfig(conf, s.Addr())
+	require.NoError(t, err, "Couldn't connect")
+
+	defer func() { panicOnError(client.Close()) }()
+
+	ftpUpload(t, client, createTemporaryFile(t, 10), "file")
+
+	raw, err := client.OpenRawConn()
+	require.NoError(t, err, "Couldn't open raw connection")
+
+	defer func() { require.NoError(t, raw.Close()) }()
+
+	returnCode, _, err := raw.SendCommand("MDTM 20191010101010 file")
+	require.NoError(t, err)
+	require.Equal(t, StatusActionNotTaken, returnCode)
+}
+
+func TestParseMDTMWrite(t *testing.T) {
+	mtime, filePath, parsed := parseMDTMWrite("20191010101010 dir/my file")
+	require.True(t, parsed)
+	require.Equal(t, "dir/my file", filePath)
+	require.Equal(t, time.Date(2019, 10, 10, 10, 10, 10, 0, time.UTC), mtime)
+
+	for _, param := range []string{"", "file", "20191010101010", "20191010101010 ", "20191010101010file",
+		"2019101010101 file", "2019101010101X file", "20191310101010 file"} {
+		_, _, parsed = parseMDTMWrite(param)
+		require.False(t, parsed, param)
+	}
+}
+
 func TestRename(t *testing.T) {
 	s := NewTestServer(t, false)
 	conf := goftp.Config{
